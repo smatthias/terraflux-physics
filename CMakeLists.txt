@@ -21,6 +21,10 @@ target_link_libraries(terraflux_weather_map
         nlohmann_json::nlohmann_json
 )
 
+add_executable(terraflux-decode-radar-map src/weather/decode_radar_map.cpp)
+target_link_libraries(terraflux-decode-radar-map PRIVATE terraflux_weather_map)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux_weather_map PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-decode-radar-map PRIVATE -Wall -Wextra -Wpedantic)
 endif()
