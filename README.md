@@ -8,14 +8,15 @@ The engine is intended to read both structured weather datasets and rendered wea
 
 - `docs/weather/architecture.md` — model scope, boundaries, and implementation sequence
 - `docs/weather/dry-transport-model.md` — first solver assumptions, discretization, stability bound, and analytic cases
+- `docs/weather/observation-grid.md` — georeferenced observation projection, cell assignment, and quality preservation
 - `docs/weather/dry-transport-config-v1.schema.json` — dry transport configuration schema
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
-- `include/terraflux/weather/` — public observation and transport model types
-- `src/weather/` — sidecar parsing, raster decoding, serialization, CLI, and transport solver
+- `include/terraflux/weather/` — public observation, gridding, and transport model types
+- `src/weather/` — sidecar parsing, raster decoding, serialization, CLI, observation mapping, and transport solver
 - `tests/weather/` — analytic transport cases and planned map/reference coverage
 - `examples/weather/maps/` — synthetic palette rasters and metadata
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
