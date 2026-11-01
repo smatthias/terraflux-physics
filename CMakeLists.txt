@@ -8,6 +8,7 @@ find_package(nlohmann_json 3.12.0 REQUIRED)
 
 add_library(terraflux_weather_map
     src/weather/map_sidecar.cpp
+    src/weather/temperature_map_decoder.cpp
     src/weather/png_reflectivity_decoder.cpp
     src/weather/radar_reflectivity_decoder.cpp
     src/weather/weather_observation_json.cpp
@@ -33,6 +34,9 @@ target_link_libraries(terraflux_weather_map
 add_executable(terraflux-decode-radar-map src/weather/decode_radar_map.cpp)
 target_link_libraries(terraflux-decode-radar-map PRIVATE terraflux_weather_map)
 
+add_executable(terraflux-decode-temperature-map src/weather/decode_temperature_map.cpp)
+target_link_libraries(terraflux-decode-temperature-map PRIVATE terraflux_weather_map)
+
 if(BUILD_TESTING)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
@@ -47,6 +51,7 @@ endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux_weather_map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-decode-radar-map PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-decode-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
         target_compile_options(terraflux-weather-transport-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
