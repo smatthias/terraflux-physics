@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/dry-transport-state-v1.json",
+  "title": "TerraFlux dry scalar transport state v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "elapsed_seconds", "air_temperature_k", "wind_east_m_s", "wind_north_m_s"],
+  "properties": {
+    "schema_version": { "const": "terraflux.weather.dry-transport-state/v1" },
+    "elapsed_seconds": { "type": "number", "minimum": 0 },
+    "air_temperature_k": {
+      "type": "array",
+      "items": { "type": "number", "exclusiveMinimum": 0 }
+    },
+    "wind_east_m_s": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "wind_north_m_s": {
+      "type": "array",
+      "items": { "type": "number" }
+    }
+  },
+  "description": "All arrays are row-major, indexed by y * nx + x, and must each contain nx * ny values from the associated configuration. Wind is prescribed and remains fixed during a run."
+}
