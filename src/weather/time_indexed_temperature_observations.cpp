@@ -1,5 +1,6 @@
 #include "terraflux/weather/observation_grid.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -7,7 +8,7 @@ namespace terraflux::weather {
 namespace {
 
 double time_tolerance(double seconds) {
-    return 1.0e-6 * (seconds > 1.0 ? seconds : 1.0);
+    return std::max(1.0e-6, 1.0e-9 * std::abs(seconds));
 }
 
 }  // namespace
