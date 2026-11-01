@@ -42,7 +42,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres, a geographic anchor for the spherical azimuthal-equidistant map transform, and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
 
-The observation mapper gridded EPSG:4326 fields on the configured local metric grid while keeping variable and quality state separate; radar reflectivity remains dBZ and is not converted into temperature. See [observation gridding](observation-grid.md). The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
+The observation mapper grids EPSG:4326 fields on the configured local metric grid while keeping variable and quality state separate; radar reflectivity remains dBZ and is not converted into temperature. See [observation gridding](observation-grid.md). The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
 
 ## Map-source decisions
 
