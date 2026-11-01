@@ -2,7 +2,7 @@
 
 A C++ home for deterministic, testable physical models used by TerraFlux. The first planned area is weather physics, with a future interface for coupling weather to terrain and wildfire spread.
 
-The engine is intended to read structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation decodes sidecar-backed radar and temperature PNG/PPM maps, tracks timestamped temperature frames through a 2D dry transport model, and writes versioned forecast JSON. Examples remain synthetic; broader atmospheric dynamics and live provider adapters require further work.
+The engine is intended to read structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation decodes sidecar-backed radar and temperature PNG/PPM maps, tracks timestamped temperature frames through a 2D dry transport model, and writes versioned forecast JSON. NOAA MRMS is the temporary live radar data source; its GRIB2 acquisition helper is in place, while GRIB2 decoding into the model's canonical observation contract remains the next step. The planned Victoria source remains BOM radar, pending a suitable commercial licence and sample.
 
 ## Layout
 
@@ -12,7 +12,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 - `docs/weather/dry-transport-config-v1.schema.json` — dry transport configuration schema
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
-- `docs/weather/map-source-status.md` — BOM source terms and adapter prerequisites
+- `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
@@ -20,6 +20,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 - `src/weather/` — sidecar parsing, raster decoding, serialization, CLI, observation mapping, and transport solver
 - `tests/weather/` — analytic transport cases and planned map/reference coverage
 - `examples/weather/maps/` — synthetic palette rasters and metadata
+- `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
