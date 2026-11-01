@@ -112,4 +112,8 @@ void write_weather_observations_json(
     std::ostream& output,
     const std::vector<WeatherObservation>& observations);
 
+// Reads and validates an array of canonical v1 observation records.
+std::vector<WeatherObservation> read_weather_observations_json(
+    std::istream& input);
+
 }  // namespace terraflux::weather
