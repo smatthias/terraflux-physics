@@ -36,16 +36,14 @@ The background input is not mutated. The original gridded observation field rema
 At each boundary, decoded cells replace the current forecast temperatures. Empty, no-data, and ambiguous cells keep their current forecast values. The update is applied before the next transport step; an update at the final boundary changes the returned final state without advancing it further. Updates must be strictly chronological and unique. The routine advances one existing transport step at a time, retaining the model's current stability and wind checks.
 
 ~~~cpp
-std::vector<terraflux::weather::TimeIndexedTemperatureField> updates{
-    {600.0, temperature_field_at_10_minutes},
-    {1200.0, temperature_field_at_20_minutes},
-};
+auto updates = terraflux::weather::map_air_temperature_observations_to_updates(
+    raw_air_temperature_observations, config);
 
 auto forecast = terraflux::weather::advance_dry_transport_with_temperature_observations(
     initial_state, config, updates);
 ~~~
 
-The elapsed offset schedules the update; the field's UTC valid time is checked against the actual simulated time before its values are applied.
+The adapter groups raw observations by UTC valid time, maps each group onto the transport grid, sorts updates chronologically, and retains source indices into the original input vector. It accepts only air temperature in K. The elapsed offset schedules each update; the field's UTC valid time is checked against the actual simulated time before values are applied. The simulation runner rejects timestamps outside the run or between timestep boundaries.
 
 ## C++ API
 
