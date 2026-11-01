@@ -1,0 +1,103 @@
+{
+  "schema_version": "terraflux.weather.map-sidecar/v1",
+  "source": {
+    "provider": "synthetic",
+    "source_id": "synthetic-victoria-radar-demo",
+    "source_kind": "synthetic_fixture",
+    "product_candidate": "BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012)"
+  },
+  "valid_time_utc": "2026-11-01T00:00:00Z",
+  "raster": {
+    "file": "victoria-radar-synthetic.ppm",
+    "width": 4,
+    "height": 4,
+    "format": "ppm-p3",
+    "color_encoding": "rgb",
+    "palette_id": "synthetic-reflectivity-v1"
+  },
+  "georeferencing": {
+    "crs": "EPSG:4326",
+    "axis_order": [
+      "longitude",
+      "latitude"
+    ],
+    "transform_convention": "pixel_corner_affine",
+    "pixel_to_world": [
+      144,
+      0.25,
+      0,
+      -36,
+      0,
+      -0.25
+    ]
+  },
+  "observation": {
+    "variable": "radar_reflectivity",
+    "units": "dBZ",
+    "vertical_reference": "synthetic lowest-elevation sample; not a surface rainfall estimate"
+  },
+  "palette": [
+    {
+      "rgb": [
+        0,
+        160,
+        255
+      ],
+      "status": "decoded",
+      "value": 10
+    },
+    {
+      "rgb": [
+        0,
+        208,
+        0
+      ],
+      "status": "decoded",
+      "value": 20
+    },
+    {
+      "rgb": [
+        255,
+        255,
+        0
+      ],
+      "status": "decoded",
+      "value": 30
+    },
+    {
+      "rgb": [
+        255,
+        128,
+        0
+      ],
+      "status": "decoded",
+      "value": 40
+    },
+    {
+      "rgb": [
+        255,
+        0,
+        0
+      ],
+      "status": "decoded",
+      "value": 50
+    },
+    {
+      "rgb": [
+        255,
+        0,
+        255
+      ],
+      "status": "ambiguous",
+      "reason": "fixture color has no verified legend assignment; preserve as unknown"
+    },
+    {
+      "rgb": [
+        0,
+        0,
+        0
+      ],
+      "status": "no_data"
+    }
+  ]
+}
