@@ -33,7 +33,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 3. Select one structured weather dataset and one bounded rendered-map class for initial input support. The first rendered-map class is radar reflectivity with a known legend and georeferencing.
 4. Implement map decoding and georeferencing with explicit uncertainty and test fixtures.
 5. Define immutable simulation configuration and state contracts with validation. **Completed for the dry scalar transport v1 contract.**
-6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Next.**
+6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Kernel implemented; analytic/reference verification remains.**
 7. Add thermodynamic and moisture processes one at a time, with invariants and reference cases.
 8. Add terrain and surface exchange after the atmospheric baseline is stable.
 9. Add adapters for fire physics without making weather depend on the renderer or fire model.
@@ -42,7 +42,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
 
-The configured grid spacing and timestep are scenario inputs; the numerical implementation must validate timestep stability for its selected discretization. This baseline is a controlled transport experiment, not a regional forecast model.
+The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
 
 ## Map-source decisions
 
