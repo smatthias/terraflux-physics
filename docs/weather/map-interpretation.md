@@ -7,9 +7,15 @@ Convert supported weather sources into georeferenced observations that the simul
 ## Input routes
 
 1. **Structured grids:** machine-readable products with explicit coordinates, units, levels, and valid times.
-2. **Rendered maps:** image products such as radar, satellite, parameter maps, and synoptic charts containing legends, contours, symbols, or color scales.
+2. **Rendered maps:** image products containing legends, contours, symbols, or color scales.
 
 Keep format decoding, image interpretation, georeferencing, and weather physics in separate modules.
+
+## First rendered-map target: radar reflectivity
+
+Start with a radar reflectivity map whose palette or legend and georeferencing are known. Accept an image plus its source metadata, valid time, projection or map bounds, and legend/palette definition. The first output is a spatial field of reflectivity observations in dBZ, with no-data and confidence/provenance recorded per observation.
+
+Radar reflectivity represents returned radar energy; it is not a direct surface rainfall-rate measurement. Do not convert dBZ to rain rate in this reader. A later precipitation-estimation module must choose and document an empirical reflectivity-to-rainfall relationship and its limits. See [NOAA's reflectivity overview](https://www.noaa.gov/jetstream/reflectivity) and the [NWS discussion of radar rainfall-estimation limits](https://www.weather.gov/mrx/radarrainfallestimates).
 
 ## Observation record
 
@@ -23,6 +29,8 @@ An interpreted observation should retain, where available:
 - confidence or uncertainty
 - missing, masked, or ambiguous status
 
+For radar products, retain the product type and radar scan/elevation context when supplied.
+
 ## Interpretation steps
 
 - Identify source type and available metadata.
@@ -33,6 +41,6 @@ An interpreted observation should retain, where available:
 
 Unknown or ambiguous inputs must remain flagged as such. The interpreter should not turn an unlabeled color or uncertain contour into an exact physical value.
 
-## Initial scope
+## Follow-on map classes
 
-Start with a small, named set of map products with known legends and georeferencing. General-purpose interpretation of arbitrary map images is out of scope until the supported products and required accuracy are defined.
+After the radar path is validated, consider synoptic charts for pressure contours, fronts, and wind symbols, then satellite imagery and other parameter maps. General-purpose interpretation of arbitrary map images is out of scope until supported products and required accuracy are defined.

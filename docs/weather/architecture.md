@@ -30,7 +30,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 1. Agree the target scale, dimensions, state variables, units, coordinate frame, and boundary conditions.
 2. Define the observation schema, metadata requirements, confidence, and provenance.
-3. Select one structured weather dataset and one bounded rendered-map class for initial input support.
+3. Select one structured weather dataset and one bounded rendered-map class for initial input support. The first rendered-map class is radar reflectivity with a known legend and georeferencing.
 4. Implement map decoding and georeferencing with explicit uncertainty and test fixtures.
 5. Define immutable simulation configuration and state contracts with validation.
 6. Implement the smallest dry-air transport case and compare it with analytic expectations.
@@ -40,7 +40,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 ## Decisions still open
 
-Before numerical implementation, choose the target spatial and temporal scales, vertical representation, time integration method, and intended scenario class. Choose which map products to support first, such as radar imagery, satellite imagery, or synoptic charts. The numerical method should follow the model scale. Avoid implying cloud-resolving or operational forecast fidelity unless the equations, resolution, inputs, and validation support it.
+Choose the target spatial and temporal scales, vertical representation, time integration method, intended scenario class, and structured weather dataset. The first image reader is limited to radar reflectivity maps with a known palette/legend and recoverable map coordinates. Choose the source and map packaging format before implementation. Synoptic charts, satellite imagery, and other parameter maps can follow once this path is validated. Avoid implying cloud-resolving or operational forecast fidelity unless the equations, resolution, inputs, and validation support it.
 
 ## Validation expectations
 
