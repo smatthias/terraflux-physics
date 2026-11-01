@@ -63,4 +63,20 @@ TemperatureInitializationResult overlay_air_temperature_observations(
     const GriddedObservationField& field,
     const DryTransportConfig& config);
 
+// Apply a time-matched temperature field to an existing forecast state.
+// The field valid time must correspond to config.start_time_utc plus the
+// state's elapsed_seconds.
+TemperatureInitializationResult apply_air_temperature_observation_update(
+    const DryTransportState& state,
+    const GriddedObservationField& field,
+    const DryTransportConfig& config);
+
+// Advance one timestep at a time and apply each chronological observation
+// field at its valid time. Observation times must fall on timestep boundaries
+// within the configured run, including its start or end time.
+DryTransportState advance_dry_transport_with_temperature_observations(
+    const DryTransportState& initial,
+    const DryTransportConfig& config,
+    const std::vector<GriddedObservationField>& observation_updates);
+
 }  // namespace terraflux::weather
