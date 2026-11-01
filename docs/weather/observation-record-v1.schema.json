@@ -15,7 +15,8 @@
         "source_id": { "type": "string", "minLength": 1 },
         "source_kind": { "enum": ["synthetic_fixture", "licensed_feed", "public_dataset", "user_supplied"] },
         "product_id": { "type": "string" },
-        "interpretation": { "enum": ["palette_lookup", "structured_grid_value", "direct_measurement", "contour_interpolation", "manual_annotation"] },
+        "interpretation": { "enum": ["palette_lookup", "structured_grid_value", "direct_measurement", "contour_interpolation", "manual_annotation", "derived_empirical_conversion"] },
+        "derivation": { "type": "string" },
         "sidecar": { "type": "string" }
       }
     },
