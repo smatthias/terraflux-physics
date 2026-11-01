@@ -1,3 +1,4 @@
+#include "terraflux/weather/observation_grid.hpp"
 #include "terraflux/weather/transport_model.hpp"
 
 #include <cmath>
@@ -12,6 +13,9 @@ namespace {
 
 using terraflux::weather::DryTransportConfig;
 using terraflux::weather::DryTransportState;
+using terraflux::weather::ObservationStatus;
+using terraflux::weather::WeatherObservation;
+using terraflux::weather::map_weather_observations_to_grid;
 using terraflux::weather::TransportGrid2D;
 using terraflux::weather::advance_dry_transport;
 
@@ -126,6 +130,104 @@ void divergent_wind_is_rejected() {
     require(rejected, "solver must reject a discretely divergent wind field");
 }
 
+
+WeatherObservation make_observation(
+    double longitude,
+    ObservationStatus status,
+    std::optional<double> value = std::nullopt,
+    std::string reason = {}) {
+    WeatherObservation observation;
+    observation.source_id = "synthetic-grid-test";
+    observation.source_kind = "synthetic_fixture";
+    observation.valid_time_utc = "2026-11-01T00:00:00Z";
+    observation.variable = "radar_reflectivity";
+    observation.value = value;
+    observation.units = "dBZ";
+    observation.location = {"EPSG:4326", longitude, 0.0};
+    observation.vertical_reference = "synthetic test level";
+    observation.status = status;
+    observation.reason = std::move(reason);
+    return observation;
+}
+
+DryTransportConfig make_mapping_config() {
+    auto config = make_config(0.1, 1);
+    config.grid.origin_east_m = -200.0;
+    config.grid.origin_north_m = -100.0;
+    config.grid.spacing_east_m = 100.0;
+    config.grid.spacing_north_m = 100.0;
+    config.grid.geographic_anchor_longitude_deg = 0.0;
+    config.grid.geographic_anchor_latitude_deg = 0.0;
+    return config;
+}
+
+void observations_project_and_preserve_quality_on_grid() {
+    const auto config = make_mapping_config();
+    const std::vector<WeatherObservation> observations{
+        make_observation(0.0, ObservationStatus::decoded, 30.0),
+        make_observation(-0.001, ObservationStatus::no_data),
+        make_observation(0.001, ObservationStatus::ambiguous, std::nullopt,
+                         "pixel color has no verified legend value"),
+        make_observation(0.01, ObservationStatus::decoded, 45.0),
+    };
+    const auto field = map_weather_observations_to_grid(
+        observations, config, "radar_reflectivity", "dBZ");
+
+    require(field.valid_time_utc == "2026-11-01T00:00:00Z",
+            "mapped field must retain its valid time");
+    require(field.outside_domain_count == 1,
+            "one observation should be counted outside the grid");
+    require(field.cells.size() == 8, "mapped field must match grid dimensions");
+    require(field.cells[6].status == ObservationStatus::decoded,
+            "anchor point should map to its decoded cell");
+    require_near(*field.cells[6].value, 30.0,
+                 "decoded observation value must be retained");
+    require(field.cells[0].status == ObservationStatus::no_data,
+            "explicit no-data status must be retained");
+    require(!field.cells[0].value, "no-data cells must remain nonnumeric");
+    require(field.cells[7].status == ObservationStatus::ambiguous,
+            "ambiguous status must be retained");
+    require(!field.cells[7].value, "ambiguous cells must remain nonnumeric");
+    require(field.cells[5].status == ObservationStatus::no_data &&
+                field.cells[5].observation_count == 0,
+            "empty cells must remain marked as missing");
+    require(field.source_offsets[7] - field.source_offsets[6] == 1 &&
+                field.source_observation_indices[field.source_offsets[6]] == 0,
+            "mapped cell must retain its source observation index");
+}
+
+void duplicate_observations_are_ambiguous_not_averaged() {
+    const auto config = make_mapping_config();
+    const std::vector<WeatherObservation> observations{
+        make_observation(0.0, ObservationStatus::decoded, 20.0),
+        make_observation(0.0001, ObservationStatus::decoded, 40.0),
+    };
+    const auto field = map_weather_observations_to_grid(
+        observations, config, "radar_reflectivity", "dBZ");
+    const auto& cell = field.cells[6];
+    require(cell.status == ObservationStatus::ambiguous,
+            "colliding observations must become ambiguous");
+    require(!cell.value && cell.observation_count == 2,
+            "colliding values must not be averaged or selected");
+    require(field.source_offsets[7] - field.source_offsets[6] == 2,
+            "all duplicate source indices must be retained");
+}
+
+void radar_reflectivity_is_not_accepted_as_temperature() {
+    const auto config = make_mapping_config();
+    const std::vector<WeatherObservation> observations{
+        make_observation(0.0, ObservationStatus::decoded, 30.0),
+    };
+    bool rejected = false;
+    try {
+        (void)map_weather_observations_to_grid(
+            observations, config, "air_temperature", "K");
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "reflectivity must not be mapped as air temperature");
+}
+
 }  // namespace
 
 int main() {
@@ -135,10 +237,13 @@ int main() {
         diffusion_matches_single_explicit_step();
         unstable_timestep_is_rejected();
         divergent_wind_is_rejected();
+        observations_project_and_preserve_quality_on_grid();
+        duplicate_observations_are_ambiguous_not_averaged();
+        radar_reflectivity_is_not_accepted_as_temperature();
     } catch (const std::exception& error) {
         std::cerr << "dry scalar transport test failed: " << error.what() << '\n';
         return 1;
     }
-    std::cout << "dry scalar transport analytic cases passed\n";
+    std::cout << "weather transport and observation-grid cases passed\n";
     return 0;
 }
