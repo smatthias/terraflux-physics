@@ -76,6 +76,7 @@ struct WeatherObservation {
     std::string reason;
     std::string interpretation{"palette_lookup"};
     std::string derivation;
+    std::string period_start_utc;
 };
 
 struct DecodeLimits {
