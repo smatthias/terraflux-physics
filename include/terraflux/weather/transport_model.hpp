@@ -15,6 +15,10 @@ struct TransportGrid2D {
     double origin_north_m{0.0};
     double spacing_east_m{0.0};
     double spacing_north_m{0.0};
+    // Center of the spherical azimuthal-equidistant projection used to map
+    // EPSG:4326 observations into the local grid frame.
+    double geographic_anchor_longitude_deg{0.0};
+    double geographic_anchor_latitude_deg{0.0};
 };
 
 struct DryTransportConfig {
