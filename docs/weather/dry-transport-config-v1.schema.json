@@ -11,15 +11,35 @@
     "grid": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nx", "ny", "coordinate_system", "origin_east_m", "origin_north_m", "spacing_east_m", "spacing_north_m"],
+      "required": [
+        "nx",
+        "ny",
+        "coordinate_system",
+        "origin_east_m",
+        "origin_north_m",
+        "spacing_east_m",
+        "spacing_north_m",
+        "geographic_anchor_longitude_deg",
+        "geographic_anchor_latitude_deg"
+      ],
       "properties": {
         "nx": { "type": "integer", "minimum": 2 },
         "ny": { "type": "integer", "minimum": 2 },
-        "coordinate_system": { "const": "local_east_north_m" },
+        "coordinate_system": { "const": "local_azimuthal_equidistant_m" },
         "origin_east_m": { "type": "number" },
         "origin_north_m": { "type": "number" },
         "spacing_east_m": { "type": "number", "exclusiveMinimum": 0 },
-        "spacing_north_m": { "type": "number", "exclusiveMinimum": 0 }
+        "spacing_north_m": { "type": "number", "exclusiveMinimum": 0 },
+        "geographic_anchor_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geographic_anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        }
       }
     },
     "time": {
