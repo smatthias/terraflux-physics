@@ -46,6 +46,19 @@ terraflux-decode-temperature-map \
 
 The result can be passed to `advance_dry_transport_from_observation_json`. Radar sidecars continue through the separate reflectivity decoder and are rejected if sent to the temperature pipeline.
 
+Run the decoded map directly through the model with a config/background request:
+
+~~~sh
+terraflux-run-temperature-map \
+  examples/temperature-map-sidecar.json \
+  examples/temperature-map.ppm \
+  examples/temperature-run-request.json \
+  /tmp/temperature-forecast.json
+~~~
+
+The request schema is `terraflux.weather.temperature-run/v1`. It contains the model start time, timestep and step count, diffusivity, periodic boundary setting, grid geometry/projection anchor, and complete initial temperature/east-wind/north-wind arrays in row-major order. The forecast output uses `terraflux.weather.forecast/v1` and includes the grid plus updated temperature and wind fields.
+
+
 ## Canonical JSON to forecast
 
 The canonical observation JSON reader reconstructs validated `WeatherObservation` records. `advance_dry_transport_from_observation_json` then reads the records, groups air-temperature values by valid time, maps each group, and runs the timed forecast.
