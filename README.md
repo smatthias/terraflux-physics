@@ -13,6 +13,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
+- `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
 - `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
@@ -21,6 +22,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 - `tests/weather/` — analytic transport cases and planned map/reference coverage
 - `examples/weather/maps/` — synthetic palette rasters and metadata
 - `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
+- `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
