@@ -44,13 +44,16 @@ ProjectedPoint project_epsg4326(
     const double cos_latitude = std::cos(latitude);
     const double sin_anchor = std::sin(anchor_latitude);
     const double cos_anchor = std::cos(anchor_latitude);
-    const double cosine_central_angle =
-        std::clamp(
-            sin_anchor * sin_latitude +
-                cos_anchor * cos_latitude * std::cos(delta_longitude),
-            -1.0,
-            1.0);
-    const double central_angle = std::acos(cosine_central_angle);
+    const double sin_half_latitude_difference =
+        std::sin((latitude - anchor_latitude) * 0.5);
+    const double sin_half_longitude_difference =
+        std::sin(delta_longitude * 0.5);
+    const double haversine =
+        sin_half_latitude_difference * sin_half_latitude_difference +
+        cos_anchor * cos_latitude *
+            sin_half_longitude_difference * sin_half_longitude_difference;
+    const double central_angle =
+        2.0 * std::asin(std::sqrt(std::clamp(haversine, 0.0, 1.0)));
 
     if (central_angle < 1.0e-12) {
         return {0.0, 0.0};
