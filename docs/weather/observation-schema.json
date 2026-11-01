@@ -4,51 +4,148 @@
   "title": "TerraFlux weather map sidecar v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "source", "valid_time_utc", "raster", "georeferencing", "observation", "palette"],
+  "required": [
+    "schema_version",
+    "source",
+    "valid_time_utc",
+    "raster",
+    "georeferencing",
+    "observation",
+    "palette"
+  ],
   "properties": {
-    "schema_version": { "const": "terraflux.weather.map-sidecar/v1" },
+    "schema_version": {
+      "const": "terraflux.weather.map-sidecar/v1"
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "source_id", "source_kind"],
+      "required": [
+        "provider",
+        "source_id",
+        "source_kind"
+      ],
       "properties": {
-        "provider": { "type": "string", "minLength": 1 },
-        "source_id": { "type": "string", "minLength": 1 },
-        "source_kind": { "enum": ["synthetic_fixture", "licensed_feed", "public_dataset", "user_supplied"] },
-        "product_id": { "type": "string" },
-        "product_candidate": { "type": "string" },
-        "source_url": { "type": "string", "format": "uri" },
-        "licence_id": { "type": "string" }
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_kind": {
+          "enum": [
+            "synthetic_fixture",
+            "licensed_feed",
+            "public_dataset",
+            "user_supplied"
+          ]
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "product_candidate": {
+          "type": "string"
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "licence_id": {
+          "type": "string"
+        }
       }
     },
-    "valid_time_utc": { "type": "string", "format": "date-time" },
+    "valid_time_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
     "raster": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["file", "width", "height", "format", "color_encoding"],
+      "required": [
+        "file",
+        "width",
+        "height",
+        "format",
+        "color_encoding"
+      ],
       "properties": {
-        "file": { "type": "string", "minLength": 1 },
-        "width": { "type": "integer", "minimum": 1 },
-        "height": { "type": "integer", "minimum": 1 },
-        "format": { "enum": ["png", "ppm-p3"] },
-        "color_encoding": { "enum": ["indexed", "rgb"] },
-        "palette_id": { "type": "string" }
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "format": {
+          "enum": [
+            "png",
+            "ppm-p3"
+          ]
+        },
+        "color_encoding": {
+          "enum": [
+            "indexed",
+            "rgb"
+          ]
+        },
+        "palette_id": {
+          "type": "string"
+        }
       }
     },
     "georeferencing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["crs", "axis_order", "transform_convention", "pixel_to_world"],
+      "required": [
+        "crs",
+        "axis_order",
+        "transform_convention",
+        "pixel_to_world"
+      ],
       "properties": {
-        "crs": { "type": "string", "minLength": 1 },
-        "axis_order": { "const": ["longitude", "latitude"] },
-        "transform_convention": { "const": "pixel_corner_affine" },
+        "crs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axis_order": {
+          "const": [
+            "longitude",
+            "latitude"
+          ]
+        },
+        "transform_convention": {
+          "const": "pixel_corner_affine"
+        },
         "pixel_to_world": {
           "type": "array",
           "description": "[x_origin, x_pixel, x_line, y_origin, y_pixel, y_line]; maps pixel-corner coordinates to CRS coordinates.",
           "prefixItems": [
-            { "type": "number" }, { "type": "number" }, { "type": "number" },
-            { "type": "number" }, { "type": "number" }, { "type": "number" }
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
           ],
           "minItems": 6,
           "maxItems": 6
@@ -58,11 +155,22 @@
     "observation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["variable", "units", "vertical_reference"],
+      "required": [
+        "variable",
+        "units",
+        "vertical_reference"
+      ],
       "properties": {
-        "variable": { "const": "radar_reflectivity" },
-        "units": { "const": "dBZ" },
-        "vertical_reference": { "type": "string", "minLength": 1 }
+        "variable": {
+          "const": "radar_reflectivity"
+        },
+        "units": {
+          "const": "dBZ"
+        },
+        "vertical_reference": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "palette": {
@@ -71,34 +179,114 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["rgb", "status"],
+        "required": [
+          "rgb",
+          "status"
+        ],
         "properties": {
           "rgb": {
             "type": "array",
             "prefixItems": [
-              { "type": "integer", "minimum": 0, "maximum": 255 },
-              { "type": "integer", "minimum": 0, "maximum": 255 },
-              { "type": "integer", "minimum": 0, "maximum": 255 }
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
             ],
             "minItems": 3,
             "maxItems": 3
           },
-          "status": { "enum": ["decoded", "no_data", "ambiguous"] },
-          "value": { "type": "number" },
-          "reason": { "type": "string" }
+          "status": {
+            "enum": [
+              "decoded",
+              "no_data",
+              "ambiguous"
+            ]
+          },
+          "value": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "alpha": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "PNG alpha channel; omitted alpha means fully opaque (255)."
+          }
         },
         "allOf": [
           {
-            "if": { "properties": { "status": { "const": "decoded" } }, "required": ["status"] },
-            "then": { "required": ["value"], "not": { "required": ["reason"] } }
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "decoded"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "value"
+              ],
+              "not": {
+                "required": [
+                  "reason"
+                ]
+              }
+            }
           },
           {
-            "if": { "properties": { "status": { "enum": ["no_data", "ambiguous"] } }, "required": ["status"] },
-            "then": { "not": { "required": ["value"] } }
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "no_data",
+                    "ambiguous"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "value"
+                ]
+              }
+            }
           },
           {
-            "if": { "properties": { "status": { "const": "ambiguous" } }, "required": ["status"] },
-            "then": { "required": ["reason"] }
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ambiguous"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "reason"
+              ]
+            }
           }
         ]
       }
