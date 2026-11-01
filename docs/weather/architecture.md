@@ -40,7 +40,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 ## Decisions still open
 
-Choose the target spatial and temporal scales, vertical representation, time integration method, intended scenario class, and structured weather dataset. The first image reader is limited to radar reflectivity maps with a known palette/legend and recoverable map coordinates. Choose the source and map packaging format before implementation. Synoptic charts, satellite imagery, and other parameter maps can follow once this path is validated. Avoid implying cloud-resolving or operational forecast fidelity unless the equations, resolution, inputs, and validation support it.
+The first radar reference candidate is BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012). Its documented PNG and coordinate-sidecar package gives us a concrete ingestion target, while source licensing remains a production gate. Use synthetic fixtures until terms for live data use are confirmed. Still choose the target spatial and temporal scales, vertical representation, time integration method, intended scenario class, and structured weather dataset. The numerical method should follow the model scale. Synoptic charts, satellite imagery, and other parameter maps can follow after this path is validated. Avoid implying cloud-resolving or operational forecast fidelity unless the equations, resolution, inputs, and validation support it.
 
 ## Validation expectations
 
