@@ -39,3 +39,7 @@ cmake --build build
 ~~~
 
 The reader does not fetch live BOM products, estimate rainfall rate, or run weather physics. PNG and PPM inputs are decoded locally; provider retrieval remains separate.
+
+## Native BOM coordinate files
+
+The BOM Radar Images User Guide identifies the coordinate files as `IDRnnnx.map` and explains that the final digit selects a radar-image radius. The public guide does not describe the file contents or coordinate convention. The decoder therefore accepts the documented, normalized JSON sidecar; it does not claim to parse BOM `.map` files. Add that adapter only after a real sample or a format specification is available, and keep the synthetic fixture separate from BOM source files.
