@@ -21,7 +21,7 @@ Map interpretation is a data-input process, not part of the physical solver. Kee
 1. Read source metadata, valid time, units, and projection where available.
 2. Decode structured grids directly; for rendered maps, identify the map class, legend, symbols, and geospatial control points.
 3. Convert extracted features into a canonical observation representation with location, variable, value, units, confidence, and provenance.
-4. Reproject, align in time, and map observations onto the simulation grid.
+4. Reproject, align in time, and map observations onto the simulation grid. The first mapper supports EPSG:4326 to local azimuthal-equidistant coordinates and preserves cell quality states.
 5. Provide observations as initial conditions, boundary inputs, constraints, or validation data according to their type and quality.
 
 If a legend, projection, timestamp, or feature is ambiguous, preserve that uncertainty or mark the value unknown. Do not silently invent a precise value.
@@ -40,9 +40,9 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 ## First solver contract selected
 
-The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
+The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres, a geographic anchor for the spherical azimuthal-equidistant map transform, and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
 
-The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
+The observation mapper gridded EPSG:4326 fields on the configured local metric grid while keeping variable and quality state separate; radar reflectivity remains dBZ and is not converted into temperature. See [observation gridding](observation-grid.md). The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
 
 ## Map-source decisions
 
