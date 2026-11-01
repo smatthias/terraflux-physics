@@ -36,10 +36,17 @@ struct DryTransportState {
 };
 
 // Validate structure, units' physical ranges, and grid/array size consistency.
-// Numerical stability constraints belong to the solver selected in a later step.
 void validate_dry_transport_config(const DryTransportConfig& config);
 void validate_dry_transport_state(
     const DryTransportState& state,
+    const DryTransportConfig& config);
+
+// Apply all configured steps using conservative first-order upwind advection
+// and centered diffusion with periodic boundaries. Wind is fixed and must be
+// discretely divergence-free. Throws if the combined advection/diffusion
+// stability bound is exceeded or an update becomes non-finite/non-positive.
+DryTransportState advance_dry_transport(
+    const DryTransportState& initial,
     const DryTransportConfig& config);
 
 }  // namespace terraflux::weather
