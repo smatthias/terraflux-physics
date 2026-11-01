@@ -23,7 +23,7 @@ Wind is supplied in the initial state and remains fixed during a run. It must be
 - Arrays are row-major: `index = y * nx + x`.
 - Temperature and both wind arrays each contain exactly `nx * ny` finite values.
 
-A map observation must be reprojected into this local metric frame before it initializes a solver cell. The coordinate conversion and observation-to-grid interpolation are not part of this contract.
+Georeferenced observations can be mapped to this grid with the separate [observation-grid adapter](observation-grid.md). It currently projects EPSG:4326 using the spherical azimuthal-equidistant transform centered at the configured geographic anchor. The mapper keeps source variable and quality separate; dBZ reflectivity is not a temperature input. The model still requires a complete positive temperature field before stepping.
 
 ## Numerical update
 
