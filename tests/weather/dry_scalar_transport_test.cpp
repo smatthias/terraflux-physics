@@ -1,7 +1,9 @@
 #include "terraflux/weather/observation_grid.hpp"
 #include "terraflux/weather/temperature_observation_pipeline.hpp"
+#include "terraflux/weather/temperature_map_decoder.hpp"
 #include "terraflux/weather/transport_model.hpp"
 
+#include <array>
 #include <cmath>
 #include <exception>
 #include <iostream>
@@ -535,6 +537,104 @@ void canonical_json_pipeline_advances_temperature_and_rejects_radar() {
             "canonical radar dBZ JSON must not enter temperature simulation");
 }
 
+
+std::string make_temperature_map_sidecar(
+    const std::string& format,
+    const std::string& variable = "air_temperature",
+    const std::string& units = "K",
+    const std::string& value = "280.0") {
+    return std::string("{") +
+        "\"schema_version\":\"terraflux.weather.map-sidecar/v1\"," +
+        "\"valid_time_utc\":\"2026-11-01T00:00:00Z\"," +
+        "\"source\":{\"provider\":\"test\",\"source_id\":\"temp-test\","
+            "\"source_kind\":\"synthetic_fixture\"}," +
+        "\"raster\":{\"file\":\"test-raster\",\"width\":1,\"height\":1,"
+            "\"format\":\"" + format + "\",\"color_encoding\":\"rgb\"}," +
+        "\"georeferencing\":{\"crs\":\"EPSG:4326\","
+            "\"axis_order\":[\"longitude\",\"latitude\"],"
+            "\"transform_convention\":\"pixel_corner_affine\","
+            "\"pixel_to_world\":[-1,1,0,1,0,-1]}," +
+        "\"observation\":{\"variable\":\"" + variable +
+            "\",\"units\":\"" + units +
+            "\",\"vertical_reference\":\"2 m above ground\"}," +
+        "\"palette\":[{\"rgb\":[255,0,0],\"status\":\"decoded\","
+            "\"value\":" + value + "}]}";
+}
+
+void temperature_sidecar_decodes_ppm_as_kelvin() {
+    std::istringstream sidecar_json(
+        make_temperature_map_sidecar("ppm-p3"));
+    const auto metadata =
+        terraflux::weather::read_temperature_map_sidecar_json(
+            sidecar_json, "test-temperature-sidecar.json");
+    std::istringstream raster("P3\n1 1\n255\n255 0 0\n");
+    const auto observations =
+        terraflux::weather::decode_temperature_map(raster, metadata);
+
+    require(observations.size() == 1,
+            "temperature PPM decoder must emit one observation per pixel");
+    require(observations[0].variable == "air_temperature" &&
+                observations[0].units == "K",
+            "temperature map output must be explicitly typed in kelvin");
+    require(observations[0].status == ObservationStatus::decoded,
+            "palette match must be decoded");
+    require_near(*observations[0].value, 280.0,
+                 "temperature palette value must be retained in kelvin");
+    require_near(observations[0].location.x, -0.5,
+                 "pixel center longitude must use affine georeferencing");
+    require_near(observations[0].location.y, 0.5,
+                 "pixel center latitude must use affine georeferencing");
+}
+
+void temperature_sidecar_decodes_png_palette() {
+    static constexpr std::array<std::uint8_t, 70> png_bytes{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+        0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
+        0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99,
+        0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+        0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    const std::string encoded(
+        reinterpret_cast<const char*>(png_bytes.data()), png_bytes.size());
+    std::istringstream sidecar_json(make_temperature_map_sidecar("png"));
+    const auto metadata =
+        terraflux::weather::read_temperature_map_sidecar_json(sidecar_json);
+    std::istringstream raster(encoded);
+    const auto observations =
+        terraflux::weather::decode_temperature_map(raster, metadata);
+
+    require(observations.size() == 1 &&
+                observations[0].status == ObservationStatus::decoded,
+            "PNG palette pixel must decode to one observation");
+    require_near(*observations[0].value, 280.0,
+                 "PNG palette value must be retained in kelvin");
+}
+
+void temperature_sidecar_rejects_radar_units_and_invalid_kelvin() {
+    const auto must_reject = [](const std::string& sidecar, const std::string& label) {
+        std::istringstream input(sidecar);
+        bool rejected = false;
+        try {
+            (void)terraflux::weather::read_temperature_map_sidecar_json(input);
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
+        require(rejected, label + " must be rejected by temperature sidecar parser");
+    };
+    must_reject(
+        make_temperature_map_sidecar("ppm-p3", "radar_reflectivity", "dBZ"),
+        "radar reflectivity sidecar");
+    must_reject(
+        make_temperature_map_sidecar("ppm-p3", "air_temperature", "C"),
+        "non-kelvin sidecar");
+    must_reject(
+        make_temperature_map_sidecar("ppm-p3", "air_temperature", "K", "0.0"),
+        "zero-kelvin palette value");
+}
+
 }  // namespace
 
 int main() {
@@ -556,6 +656,9 @@ int main() {
         raw_temperature_observations_group_chronologically_and_keep_global_indices();
         raw_temperature_adapter_rejects_mixed_variable_units_and_bad_timestamp();
         canonical_json_pipeline_advances_temperature_and_rejects_radar();
+        temperature_sidecar_decodes_ppm_as_kelvin();
+        temperature_sidecar_decodes_png_palette();
+        temperature_sidecar_rejects_radar_units_and_invalid_kelvin();
     } catch (const std::exception& error) {
         std::cerr << "dry scalar transport test failed: " << error.what() << '\n';
         return 1;
