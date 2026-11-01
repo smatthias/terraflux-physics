@@ -30,6 +30,22 @@ The background input is not mutated. The original gridded observation field rema
 
 
 
+
+## Temperature raster maps
+
+The temperature map decoder accepts the shared v1 sidecar layout only when its observation declaration is `air_temperature` with units `K`. Palette values are interpreted as kelvin, validated as finite and greater than zero, and emitted as canonical observations. PNG and ASCII PPM P3 are supported. Unlisted pixel colors remain ambiguous; no-data and ambiguous palette entries carry no numeric value.
+
+Decode the included synthetic example with:
+
+~~~sh
+terraflux-decode-temperature-map \
+  examples/temperature-map-sidecar.json \
+  examples/temperature-map.ppm \
+  /tmp/temperature-observations.json
+~~~
+
+The result can be passed to `advance_dry_transport_from_observation_json`. Radar sidecars continue through the separate reflectivity decoder and are rejected if sent to the temperature pipeline.
+
 ## Canonical JSON to forecast
 
 The canonical observation JSON reader reconstructs validated `WeatherObservation` records. `advance_dry_transport_from_observation_json` then reads the records, groups air-temperature values by valid time, maps each group, and runs the timed forecast.
