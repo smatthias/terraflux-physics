@@ -32,10 +32,19 @@ target_link_libraries(terraflux_weather_map
 )
 
 add_executable(terraflux-decode-radar-map src/weather/decode_radar_map.cpp)
-target_link_libraries(terraflux-decode-radar-map PRIVATE terraflux_weather_map)
+target_link_libraries(terraflux-decode-radar-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
 
 add_executable(terraflux-decode-temperature-map src/weather/decode_temperature_map.cpp)
-target_link_libraries(terraflux-decode-temperature-map PRIVATE terraflux_weather_map)
+target_link_libraries(terraflux-decode-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-temperature-map src/weather/run_temperature_map.cpp)
+target_link_libraries(terraflux-run-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
 
 if(BUILD_TESTING)
     add_executable(terraflux-weather-transport-test
@@ -46,13 +55,31 @@ if(BUILD_TESTING)
         NAME weather.dry_scalar_transport
         COMMAND terraflux-weather-transport-test
     )
+
+    add_executable(terraflux-temperature-map-cli-test
+        tests/weather/temperature_map_cli_test.cpp
+    )
+    target_compile_definitions(terraflux-temperature-map-cli-test
+        PRIVATE TERRAFLUX_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    target_link_libraries(terraflux-temperature-map-cli-test
+        PRIVATE
+            terraflux_weather_map
+            nlohmann_json::nlohmann_json
+    )
+    add_test(
+        NAME weather.temperature_map_cli
+        COMMAND terraflux-temperature-map-cli-test
+    )
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux_weather_map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-decode-radar-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-decode-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
         target_compile_options(terraflux-weather-transport-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

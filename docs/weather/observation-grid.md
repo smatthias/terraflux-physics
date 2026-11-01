@@ -46,6 +46,19 @@ terraflux-decode-temperature-map \
 
 The result can be passed to `advance_dry_transport_from_observation_json`. Radar sidecars continue through the separate reflectivity decoder and are rejected if sent to the temperature pipeline.
 
+Run the decoded map directly through the model with a config/background request:
+
+~~~sh
+terraflux-run-temperature-map \
+  examples/temperature-map-sidecar.json \
+  examples/temperature-map.ppm \
+  examples/temperature-run-request.json \
+  /tmp/temperature-forecast.json
+~~~
+
+The request schema is `terraflux.weather.temperature-run/v1`. It contains the model start time, timestep and step count, diffusivity, periodic boundary setting, grid geometry/projection anchor, and complete initial temperature/east-wind/north-wind arrays in row-major order. The forecast output uses `terraflux.weather.forecast/v1` and includes the grid plus updated temperature and wind fields.
+
+
 ## Canonical JSON to forecast
 
 The canonical observation JSON reader reconstructs validated `WeatherObservation` records. `advance_dry_transport_from_observation_json` then reads the records, groups air-temperature values by valid time, maps each group, and runs the timed forecast.
@@ -91,3 +104,17 @@ auto initialized =
 ~~~
 
 `field.cells` is row-major with index `y * nx + x`. The grid and its geographic anchor are copied into the result so callers retain the exact mapping context.
+
+
+## Tracking a sequence of temperature maps
+
+A caller can supply timestamped map snapshots as a v1 series manifest. Each entry pairs a sidecar and raster; relative file paths are resolved from the manifest directory. The runner decodes every frame, groups observations by valid time, checks that each update falls on a configured timestep boundary, and applies the updates chronologically. The forecast output lists each update time and its decoded, no-data, ambiguous, and outside-domain cell counts.
+
+~~~sh
+terraflux-run-temperature-map \
+  --series examples/temperature-map-series.json \
+  examples/temperature-run-request.json \
+  /tmp/temperature-track.json
+~~~
+
+The manifest format is defined in [temperature map series v1](temperature-map-series-v1.schema.json). The included series is synthetic and demonstrates the time-alignment contract. This interface accepts caller-supplied maps; it does not download provider data or imply permission to use a live feed. Confirm source terms and provide trustworthy sidecars before connecting an external provider.

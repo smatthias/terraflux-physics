@@ -1,0 +1,13 @@
+{
+  "schema_version": "terraflux.weather.temperature-map-series/v1",
+  "maps": [
+    {
+      "sidecar_file": "temperature-map-sidecar.json",
+      "raster_file": "temperature-map.ppm"
+    },
+    {
+      "sidecar_file": "temperature-map-sidecar-60s.json",
+      "raster_file": "temperature-map.ppm"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": "terraflux.weather.temperature-run/v1",
+  "start_time_utc": "2026-11-01T00:00:00Z",
+  "timestep_seconds": 60.0,
+  "steps": 1,
+  "horizontal_mixing_diffusivity_m2_s": 0.0,
+  "boundary_condition": "periodic",
+  "grid": {
+    "nx": 4,
+    "ny": 4,
+    "origin_east_m": -100000.0,
+    "origin_north_m": -100000.0,
+    "spacing_east_m": 50000.0,
+    "spacing_north_m": 50000.0,
+    "geographic_anchor_longitude_deg": 0.0,
+    "geographic_anchor_latitude_deg": 0.0
+  },
+  "initial_state": {
+    "elapsed_seconds": 0.0,
+    "air_temperature_k": [
+      280.0, 280.0, 280.0, 280.0,
+      280.0, 280.0, 280.0, 280.0,
+      280.0, 280.0, 280.0, 280.0,
+      280.0, 280.0, 280.0, 280.0
+    ],
+    "wind_east_m_s": [
+      0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0
+    ],
+    "wind_north_m_s": [
+      0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0
+    ]
+  }
+}
