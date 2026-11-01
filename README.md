@@ -16,6 +16,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
 - `docs/weather/precipitation-estimation.md` — configurable empirical conversion from radar reflectivity to rain-rate estimates
 - `docs/weather/precipitation-accumulation.md` — timestamped rain-rate integration and interval quality rules
+- `docs/weather/mobile-weather-response-v1.schema.json` and `mobile-weather-response-v1.md` — versioned mobile envelope combining forecast and aligned precipitation accumulation
 - `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
