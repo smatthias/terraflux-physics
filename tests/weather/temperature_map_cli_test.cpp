@@ -120,6 +120,47 @@ void valid_request_writes_forecast_json(const std::filesystem::path& temporary) 
             "forecast must contain the map's expected 280 K and 290 K values");
 }
 
+void multi_map_series_applies_each_frame_at_its_valid_time(
+    const std::filesystem::path& temporary) {
+    const std::filesystem::path root(TERRAFLUX_SOURCE_DIR);
+    const auto request_path = root / "examples/temperature-run-request.json";
+    const auto series_path = root / "examples/temperature-map-series.json";
+    const auto forecast_path = temporary / "tracked-forecast.json";
+
+    require(run_cli({"terraflux-run-temperature-map",
+                     "--series",
+                     series_path.string(),
+                     request_path.string(),
+                     forecast_path.string()}) == 0,
+            "valid temperature map series should succeed");
+
+    std::ifstream forecast_file(forecast_path);
+    require(static_cast<bool>(forecast_file),
+            "successful map-series run must create its forecast output");
+    const Json forecast = Json::parse(forecast_file);
+    require(forecast.at("elapsed_seconds") == 60.0,
+            "map-series run must advance through the configured model duration");
+    const auto& updates = forecast.at("observation_updates");
+    require(updates.size() == 2,
+            "forecast must report both timestamped map updates");
+    require(updates[0].at("elapsed_seconds") == 0.0 &&
+                updates[1].at("elapsed_seconds") == 60.0,
+            "map updates must be aligned to the model's start and final time");
+    require(updates[1].at("valid_time_utc") == "2026-11-01T00:01:00Z",
+            "later map update must retain its source valid time");
+
+    const auto& temperatures =
+        forecast.at("fields").at("air_temperature").at("values");
+    bool found_300_k = false;
+    bool found_310_k = false;
+    for (const auto& value : temperatures) {
+        found_300_k = found_300_k || value.get<double>() == 300.0;
+        found_310_k = found_310_k || value.get<double>() == 310.0;
+    }
+    require(found_300_k && found_310_k,
+            "final forecast must include values from the later map frame");
+}
+
 void invalid_request_schema_is_rejected(const std::filesystem::path& temporary) {
     const std::filesystem::path root(TERRAFLUX_SOURCE_DIR);
     Json request = Json::parse(read_file(
@@ -164,6 +205,7 @@ int main() {
     try {
         TemporaryDirectory temporary;
         valid_request_writes_forecast_json(temporary.path());
+        multi_map_series_applies_each_frame_at_its_valid_time(temporary.path());
         invalid_request_schema_is_rejected(temporary.path());
         incomplete_initial_state_is_rejected(temporary.path());
         std::cout << "Temperature map CLI tests passed\n";

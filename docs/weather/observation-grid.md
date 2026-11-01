@@ -104,3 +104,17 @@ auto initialized =
 ~~~
 
 `field.cells` is row-major with index `y * nx + x`. The grid and its geographic anchor are copied into the result so callers retain the exact mapping context.
+
+
+## Tracking a sequence of temperature maps
+
+A caller can supply timestamped map snapshots as a v1 series manifest. Each entry pairs a sidecar and raster; relative file paths are resolved from the manifest directory. The runner decodes every frame, groups observations by valid time, checks that each update falls on a configured timestep boundary, and applies the updates chronologically. The forecast output lists each update time and its decoded, no-data, ambiguous, and outside-domain cell counts.
+
+~~~sh
+terraflux-run-temperature-map \
+  --series examples/temperature-map-series.json \
+  examples/temperature-run-request.json \
+  /tmp/temperature-track.json
+~~~
+
+The manifest format is defined in [temperature map series v1](temperature-map-series-v1.schema.json). The included series is synthetic and demonstrates the time-alignment contract. This interface accepts caller-supplied maps; it does not download provider data or imply permission to use a live feed. Confirm source terms and provide trustworthy sidecars before connecting an external provider.

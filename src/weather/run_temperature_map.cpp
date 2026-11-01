@@ -5,9 +5,12 @@
 #include <nlohmann/json.hpp>
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <iterator>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -126,6 +129,102 @@ terraflux::weather::DryTransportState parse_initial_state(const Json& request) {
     return state;
 }
 
+std::vector<terraflux::weather::WeatherObservation> read_temperature_map_series(
+    const std::filesystem::path& manifest_path) {
+    std::ifstream manifest_file(manifest_path);
+    if (!manifest_file) {
+        throw std::runtime_error(
+            "cannot open temperature map series: " + manifest_path.string());
+    }
+
+    Json manifest;
+    try {
+        manifest = Json::parse(manifest_file);
+    } catch (const Json::exception& error) {
+        throw std::invalid_argument(
+            std::string("invalid map series JSON: ") + error.what());
+    }
+    if (!manifest.is_object() ||
+        required_string(manifest, "schema_version") !=
+            "terraflux.weather.temperature-map-series/v1") {
+        throw std::invalid_argument("unsupported temperature map series schema");
+    }
+
+    const Json& maps = required(manifest, "maps");
+    if (!maps.is_array() || maps.empty()) {
+        throw std::invalid_argument("temperature map series must contain at least one map");
+    }
+
+    std::vector<terraflux::weather::WeatherObservation> observations;
+    std::set<std::string> valid_times;
+    for (const Json& map : maps) {
+        const std::string sidecar_name = required_string(map, "sidecar_file");
+        const std::string raster_name = required_string(map, "raster_file");
+        const auto resolve_path = [&](const std::string& value) {
+            const std::filesystem::path path(value);
+            return path.is_absolute() ? path : manifest_path.parent_path() / path;
+        };
+        const auto sidecar_path = resolve_path(sidecar_name);
+        const auto raster_path = resolve_path(raster_name);
+
+        std::ifstream sidecar(sidecar_path);
+        if (!sidecar) {
+            throw std::runtime_error(
+                "cannot open temperature sidecar: " + sidecar_path.string());
+        }
+        const auto metadata =
+            terraflux::weather::read_temperature_map_sidecar_json(
+                sidecar, sidecar_path.string());
+        if (!valid_times.insert(metadata.valid_time_utc).second) {
+            throw std::invalid_argument(
+                "temperature map series contains duplicate valid times");
+        }
+
+        std::ifstream raster(raster_path, std::ios::binary);
+        if (!raster) {
+            throw std::runtime_error(
+                "cannot open temperature raster: " + raster_path.string());
+        }
+        auto decoded =
+            terraflux::weather::decode_temperature_map(raster, metadata);
+        observations.insert(
+            observations.end(),
+            std::make_move_iterator(decoded.begin()),
+            std::make_move_iterator(decoded.end()));
+    }
+    return observations;
+}
+
+Json observation_updates_json(
+    const std::vector<terraflux::weather::TimeIndexedTemperatureField>& updates) {
+    Json result = Json::array();
+    for (const auto& update : updates) {
+        std::size_t decoded_cells = 0;
+        std::size_t no_data_cells = 0;
+        std::size_t ambiguous_cells = 0;
+        for (const auto& cell : update.field.cells) {
+            if (cell.status == terraflux::weather::ObservationStatus::decoded) {
+                ++decoded_cells;
+            } else if (cell.status ==
+                       terraflux::weather::ObservationStatus::no_data) {
+                ++no_data_cells;
+            } else if (cell.status ==
+                       terraflux::weather::ObservationStatus::ambiguous) {
+                ++ambiguous_cells;
+            }
+        }
+        result.push_back({
+            {"valid_time_utc", update.field.valid_time_utc},
+            {"elapsed_seconds", update.elapsed_seconds},
+            {"decoded_cells", decoded_cells},
+            {"no_data_cells", no_data_cells},
+            {"ambiguous_cells", ambiguous_cells},
+            {"outside_domain_count", update.field.outside_domain_count},
+        });
+    }
+    return result;
+}
+
 Json grid_json(const terraflux::weather::TransportGrid2D& grid) {
     return {
         {"nx", grid.nx},
@@ -146,7 +245,9 @@ Json grid_json(const terraflux::weather::TransportGrid2D& grid) {
 void print_usage(const char* executable) {
     std::cerr << "Usage: " << executable
               << " <temperature-sidecar.json> <raster.png|ppm>"
-                 " <run-request.json> <forecast.json>\n";
+                 " <run-request.json> <forecast.json>\n"
+              << "   or: " << executable
+              << " --series <map-series.json> <run-request.json> <forecast.json>\n";
 }
 
 }  // namespace
@@ -157,23 +258,9 @@ int main(int argc, char** argv) {
         return 2;
     }
     try {
-        const std::string sidecar_path = argv[1];
-        const std::string raster_path = argv[2];
+        const bool series_mode = std::string(argv[1]) == "--series";
         const std::string request_path = argv[3];
         const std::string output_path = argv[4];
-
-        std::ifstream sidecar(sidecar_path);
-        if (!sidecar) {
-            throw std::runtime_error("cannot open temperature sidecar: " + sidecar_path);
-        }
-        const auto metadata =
-            terraflux::weather::read_temperature_map_sidecar_json(
-                sidecar, sidecar_path);
-
-        std::ifstream raster(raster_path, std::ios::binary);
-        if (!raster) {
-            throw std::runtime_error("cannot open temperature raster: " + raster_path);
-        }
 
         std::ifstream request_file(request_path);
         if (!request_file) {
@@ -194,8 +281,30 @@ int main(int argc, char** argv) {
         const auto initial = parse_initial_state(request);
         terraflux::weather::validate_dry_transport_state(initial, config);
 
-        const auto observations =
-            terraflux::weather::decode_temperature_map(raster, metadata);
+        std::vector<terraflux::weather::WeatherObservation> observations;
+        if (series_mode) {
+            observations = read_temperature_map_series(argv[2]);
+        } else {
+            const std::string sidecar_path = argv[1];
+            const std::string raster_path = argv[2];
+            std::ifstream sidecar(sidecar_path);
+            if (!sidecar) {
+                throw std::runtime_error(
+                    "cannot open temperature sidecar: " + sidecar_path);
+            }
+            const auto metadata =
+                terraflux::weather::read_temperature_map_sidecar_json(
+                    sidecar, sidecar_path);
+
+            std::ifstream raster(raster_path, std::ios::binary);
+            if (!raster) {
+                throw std::runtime_error(
+                    "cannot open temperature raster: " + raster_path);
+            }
+            observations =
+                terraflux::weather::decode_temperature_map(raster, metadata);
+        }
+
         const auto updates =
             terraflux::weather::map_air_temperature_observations_to_updates(
                 observations, config);
@@ -208,6 +317,7 @@ int main(int argc, char** argv) {
             {"start_time_utc", config.start_time_utc},
             {"elapsed_seconds", forecast.elapsed_seconds},
             {"grid", grid_json(config.grid)},
+            {"observation_updates", observation_updates_json(updates)},
             {"fields", {
                 {"air_temperature", {
                     {"units", "K"},
@@ -228,14 +338,14 @@ int main(int argc, char** argv) {
         if (!output_file) {
             throw std::runtime_error("cannot open forecast output: " + output_path);
         }
-        output_file << output.dump(2) << "\n";
+        output_file << output.dump(2) << std::endl;
         if (!output_file) {
             throw std::runtime_error("failed to write forecast output");
         }
-        std::cerr << "Wrote temperature forecast to " << output_path << "\n";
+        std::cerr << "Wrote temperature forecast to " << output_path << std::endl;
         return 0;
     } catch (const std::exception& error) {
-        std::cerr << "error: " << error.what() << "\n";
+        std::cerr << "error: " << error.what() << std::endl;
         return 1;
     }
 }
