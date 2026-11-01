@@ -8,6 +8,7 @@ add_library(terraflux_weather_map
     src/weather/map_sidecar.cpp
     src/weather/png_reflectivity_decoder.cpp
     src/weather/radar_reflectivity_decoder.cpp
+    src/weather/weather_observation_json.cpp
 )
 target_include_directories(terraflux_weather_map
     PUBLIC
