@@ -1,29 +1,29 @@
 # Live map-source status
 
-## Selected candidate
+## Temporary prototype source: NOAA MRMS
 
-The first provider candidate remains the Bureau of Meteorology's 256 km Melbourne (Broadmeadows) radar. The Bureau's radar guide describes radar reflectivity images, their timestamped PNG naming pattern, and separate .map coordinate files. It also says individual radar images are issued every five minutes.
+Use NOAA's Multi-Radar/Multi-Sensor System (MRMS) merged reflectivity composite as the temporary live radar source for development. The selected product is the current `MergedReflectivityComposite` GRIB2 file, published over HTTPS by NCEP. It combines radar-derived reflectivity into a gridded composite, so it is a better fit for the map/grid ingestion work than individual raw NEXRAD radar volumes.
+
+- Product feed: [MRMS merged reflectivity composite](https://mrms.ncep.noaa.gov/2D/MergedReflectivityComposite/)
+- Access documentation: [NOAA/NSSL MRMS data access](https://www.nssl.noaa.gov/projects/mrms/MRMS_data.php)
+- Product and GRIB2 field tables: [Operational MRMS GRIB2 tables](https://www.nssl.noaa.gov/projects/mrms/operational/tables.php)
+- Data terms: [NOAA MRMS on AWS Open Data](https://registry.opendata.aws/noaa-mrms-pds/)
+
+NOAA NODD says its MRMS data are open for public use and requests attribution for unaltered data. Do not imply NOAA endorsement; identify transformed data as modified. This temporary feed is U.S.-coverage data and does not replace the planned Victoria/Australia source.
+
+The repository includes `tools/fetch_noaa_mrms.py` to retrieve the current compressed GRIB2 file, expand it, and write a provenance record. It does not yet decode GRIB2 into TerraFlux observations, PNG, or a v1 geospatial sidecar. Retrieval time is explicitly kept separate from the product valid time. Do not run the model on a downloaded file until its GRIB2 valid time, projection/grid, reflectivity units, and missing-value encoding have been read and mapped.
+
+## Planned licensed source: BOM Victoria radar
+
+The Bureau of Meteorology's 256 km Melbourne (Broadmeadows) radar remains the target source for the Victoria use case. The Bureau documents timestamped radar PNGs and separate `.map` coordinate files.
 
 - Product page: [256 km Melbourne (Broadmeadows) Radar](https://www.bom.gov.au/products/IDR012.shtml)
 - File and coordinate guide: [BOM Radar Images User Guide](https://www.bom.gov.au/catalogue/Bureau_of_Meteorology_radar_images_user_guide.pdf)
 
-## Usage status
+As checked on 1 November 2026, the Bureau's public anonymous FTP terms say the products may be used for personal use or within an organisation, but not for commercial use or supply to another person. Its real-time data service provides the licensing route. Do not add automated retrieval of real BOM imagery until the licence covers retrieval, storage, processing, derived outputs, and distribution.
 
-As checked on 1 November 2026, the Bureau's public anonymous FTP terms say the products may be used for personal use or within an organisation, but not for commercial use or supply to another person. The Bureau's copyright notice also says specialized radar imagery may require a data licence and prohibits automated scraping of its public website. Its real-time data services page identifies radar data as a registered-user service.
+Before that adapter is implemented, obtain a licensed sample PNG, matching `.map` file, authoritative legend/palette, projection details, valid-time convention, and required attribution.
 
-- [Anonymous FTP terms](https://www.bom.gov.au/catalogue/anon-ftp.shtml)
-- [BOM copyright notice](https://www.bom.gov.au/copyright)
-- [Real-time data services](https://www.bom.gov.au/resources/data-services)
+## Adapter boundary
 
-Therefore, the anonymous feed is not cleared for TerraFlux commercial use. Do not add automated live retrieval or check real BOM radar images into this repository unless a data licence covers the intended retrieval, storage, processing, derived outputs, and distribution.
-
-## Adapter inputs still needed
-
-Before implementing the BOM provider adapter, obtain a sample covered by the required licence and its source documentation:
-
-1. One timestamped radar PNG and the matching .map coordinate file.
-2. The authoritative palette or legend mapping image colors to reflectivity values and missing/quality states.
-3. The product's valid-time convention, projection details, and required attribution.
-4. Written confirmation that the intended commercial processing and any output distribution are permitted.
-
-The existing series runner accepts caller-supplied sidecar/raster pairs and applies each valid-time update at a model timestep boundary. The committed two-frame example is synthetic; no real BOM product has been downloaded or embedded. After licensing and sample details are available, the adapter can parse the source metadata into the existing v1 sidecar and map-series contracts.
+The existing series runner accepts caller-supplied sidecar/raster pairs and applies each valid-time update at a model timestep boundary. Synthetic fixtures remain the test input. NOAA acquisition is kept outside the C++ physics kernels; its GRIB2 decoder must normalize the product grid, field values, timestamps, and quality codes into documented TerraFlux inputs.
