@@ -115,6 +115,7 @@ RadarMapMetadata read_radar_map_sidecar_json(
     metadata.valid_time_utc = required_string(root, "valid_time_utc");
 
     const Json& source = required(root, "source");
+    (void)required_string(source, "provider");
     metadata.source_id = required_string(source, "source_id");
     metadata.source_kind = required_string(source, "source_kind");
     if (source.contains("product_id")) {
