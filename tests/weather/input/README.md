@@ -2,6 +2,6 @@
 
 Use known, small fixtures to verify decoding, projection, coordinate registration, legend or symbol interpretation, units, valid time, confidence, and source provenance. Include ambiguous and incomplete inputs and verify they remain flagged instead of becoming guessed values.
 
-For the first radar-reflectivity fixture, verify palette-to-dBZ decoding, georeferencing, no-data handling, timestamp/product metadata, and that the reader emits reflectivity rather than silently converting it to rainfall rate.
+The reader accepts PPM P3 and PNG rasters with a v1 JSON sidecar. Check exact palette-to-dBZ decoding, pixel-center georeferencing, no-data handling, and metadata/raster dimension agreement. For PNG, check indexed and RGBA colors, transparent palette entries, and rejection of unsupported bit depths.
 
-The first image fixture is synthetic. Its sidecar follows [map-sidecar v1](../../../docs/weather/observation-schema.json); each decoded cell is represented by [weather observation v1](../../../docs/weather/observation-record-v1.schema.json). Check that no-data and ambiguous cells remain distinct and never acquire a guessed numeric value. Do not include live BOM imagery until applicable source-use terms are cleared.
+The first image fixture remains synthetic. Its sidecar follows [map-sidecar v1](../../../docs/weather/observation-schema.json); each output cell follows [weather observation v1](../../../docs/weather/observation-record-v1.schema.json). Check that no-data and ambiguous cells remain distinct and never acquire a guessed numeric value. Do not include live BOM imagery until applicable source-use terms are cleared.
