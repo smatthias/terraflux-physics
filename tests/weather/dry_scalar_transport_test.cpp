@@ -16,6 +16,7 @@ using terraflux::weather::DryTransportState;
 using terraflux::weather::ObservationStatus;
 using terraflux::weather::WeatherObservation;
 using terraflux::weather::map_weather_observations_to_grid;
+using terraflux::weather::overlay_air_temperature_observations;
 using terraflux::weather::TransportGrid2D;
 using terraflux::weather::advance_dry_transport;
 
@@ -228,6 +229,107 @@ void radar_reflectivity_is_not_accepted_as_temperature() {
     require(rejected, "reflectivity must not be mapped as air temperature");
 }
 
+
+WeatherObservation make_temperature_observation(
+    double longitude,
+    ObservationStatus status,
+    std::optional<double> value = std::nullopt,
+    std::string reason = {}) {
+    auto observation = make_observation(longitude, status, value, std::move(reason));
+    observation.variable = "air_temperature";
+    observation.units = "K";
+    return observation;
+}
+
+DryTransportState make_temperature_background() {
+    return make_state(
+        {280.0, 281.0, 282.0, 283.0, 284.0, 285.0, 286.0, 287.0},
+        std::vector<double>(8, 0.0),
+        std::vector<double>(8, 0.0));
+}
+
+void temperature_overlay_applies_valid_values_and_keeps_background_for_gaps() {
+    auto config = make_mapping_config();
+    const auto background = make_temperature_background();
+    const std::vector<WeatherObservation> observations{
+        make_temperature_observation(0.0, ObservationStatus::decoded, 291.25),
+        make_temperature_observation(-0.001, ObservationStatus::no_data),
+        make_temperature_observation(
+            0.001, ObservationStatus::ambiguous, std::nullopt,
+            "uncertain source value"),
+    };
+    const auto field = map_weather_observations_to_grid(
+        observations, config, "air_temperature", "K");
+    const auto result = overlay_air_temperature_observations(
+        background, field, config);
+
+    require(result.observation_cells_applied == 1,
+            "one decoded temperature cell should be applied");
+    require(result.no_data_cells == 6 && result.ambiguous_cells == 1,
+            "empty and explicit no-data cells plus ambiguous cell must be counted");
+    require(result.background_cells_retained == 7,
+            "background must remain for all no-data and ambiguous cells");
+    require_near(result.state.air_temperature_k[6], 291.25,
+                 "decoded observation must replace its background cell");
+    require_near(result.state.air_temperature_k[4], 284.0,
+                 "explicit no-data must retain its background value");
+    require_near(result.state.air_temperature_k[7], 287.0,
+                 "ambiguous value must retain its background value");
+    require_near(result.state.air_temperature_k[0], 280.0,
+                 "empty cell must retain its background value");
+    require_near(background.air_temperature_k[6], 286.0,
+                 "overlay must not mutate the input background state");
+}
+
+void temperature_overlay_rejects_duplicate_cell_collisions() {
+    const auto config = make_mapping_config();
+    const auto background = make_temperature_background();
+    const std::vector<WeatherObservation> observations{
+        make_temperature_observation(0.0, ObservationStatus::decoded, 290.0),
+        make_temperature_observation(0.0001, ObservationStatus::decoded, 300.0),
+    };
+    const auto field = map_weather_observations_to_grid(
+        observations, config, "air_temperature", "K");
+    const auto result = overlay_air_temperature_observations(
+        background, field, config);
+
+    require(result.ambiguous_cells == 1 && result.background_cells_retained == 8,
+            "colliding observations must be counted as ambiguous and retain background");
+    require_near(result.state.air_temperature_k[6], 286.0,
+                 "colliding values must not replace or average the background");
+}
+
+void temperature_overlay_rejects_variable_time_and_grid_mismatches() {
+    const auto config = make_mapping_config();
+    const auto background = make_temperature_background();
+    const std::vector<WeatherObservation> observations{
+        make_temperature_observation(0.0, ObservationStatus::decoded, 290.0),
+    };
+    const auto valid_field = map_weather_observations_to_grid(
+        observations, config, "air_temperature", "K");
+    const auto must_reject = [&](const terraflux::weather::GriddedObservationField& field,
+                                 const std::string& case_name) {
+        bool rejected = false;
+        try {
+            (void)overlay_air_temperature_observations(background, field, config);
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
+        require(rejected, case_name + " must be rejected");
+    };
+
+    auto field = valid_field;
+    field.variable = "radar_reflectivity";
+    field.units = "dBZ";
+    must_reject(field, "reflectivity field");
+    field = valid_field;
+    field.valid_time_utc = "2026-11-01T01:00:00Z";
+    must_reject(field, "time mismatch");
+    field = valid_field;
+    field.grid.origin_east_m += 1.0;
+    must_reject(field, "grid mismatch");
+}
+
 }  // namespace
 
 int main() {
@@ -240,6 +342,9 @@ int main() {
         observations_project_and_preserve_quality_on_grid();
         duplicate_observations_are_ambiguous_not_averaged();
         radar_reflectivity_is_not_accepted_as_temperature();
+        temperature_overlay_applies_valid_values_and_keeps_background_for_gaps();
+        temperature_overlay_rejects_duplicate_cell_collisions();
+        temperature_overlay_rejects_variable_time_and_grid_mismatches();
     } catch (const std::exception& error) {
         std::cerr << "dry scalar transport test failed: " << error.what() << '\n';
         return 1;
