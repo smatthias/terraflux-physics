@@ -33,7 +33,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 3. Select one structured weather dataset and one bounded rendered-map class for initial input support. The first rendered-map class is radar reflectivity with a known legend and georeferencing.
 4. Implement map decoding and georeferencing with explicit uncertainty and test fixtures.
 5. Define immutable simulation configuration and state contracts with validation. **Completed for the dry scalar transport v1 contract.**
-6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Kernel implemented; analytic/reference verification remains.**
+6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Kernel implemented; constant-field, periodic-advection, diffusion, and rejection cases pass.**
 7. Add thermodynamic and moisture processes one at a time, with invariants and reference cases.
 8. Add terrain and surface exchange after the atmospheric baseline is stable.
 9. Add adapters for fire physics without making weather depend on the renderer or fire model.
