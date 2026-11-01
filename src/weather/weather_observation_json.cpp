@@ -35,6 +35,7 @@ bool supported_interpretation(const std::string& interpretation) {
            interpretation == "direct_measurement" ||
            interpretation == "contour_interpolation" ||
            interpretation == "derived_empirical_conversion" ||
+           interpretation == "derived_temporal_integration" ||
            interpretation == "manual_annotation";
 }
 
@@ -105,7 +106,7 @@ Json serialize_observation(const WeatherObservation& observation) {
         quality["reason"] = observation.reason;
     }
 
-    return {
+    Json record = {
         {"schema_version", "terraflux.weather.observation/v1"},
         {"source", std::move(source)},
         {"valid_time_utc", observation.valid_time_utc},
@@ -119,6 +120,13 @@ Json serialize_observation(const WeatherObservation& observation) {
         {"vertical_reference", observation.vertical_reference},
         {"quality", std::move(quality)},
     };
+    if (!observation.period_start_utc.empty()) {
+        if (observation.period_start_utc.back() != 'Z') {
+            throw std::invalid_argument("period_start_utc must end in Z");
+        }
+        record["period_start_utc"] = observation.period_start_utc;
+    }
+    return record;
 }
 
 
@@ -226,6 +234,11 @@ std::vector<WeatherObservation> read_weather_observations_json(
         }
 
         observation.valid_time_utc = required_string(record, "valid_time_utc");
+        observation.period_start_utc = optional_string(record, "period_start_utc");
+        if (!observation.period_start_utc.empty() &&
+            observation.period_start_utc.back() != 'Z') {
+            throw std::invalid_argument("canonical observation period_start_utc must end in Z");
+        }
         if (observation.valid_time_utc.empty() ||
             observation.valid_time_utc.back() != 'Z') {
             throw std::invalid_argument(
