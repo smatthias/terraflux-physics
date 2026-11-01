@@ -18,15 +18,19 @@ enum class ObservationStatus {
     ambiguous,
 };
 
+enum class RasterFormat {
+    ppm_p3,
+    png,
+};
+
 struct PaletteEntry {
     Rgb8 rgb{};
+    std::uint8_t alpha{255};
     ObservationStatus status{ObservationStatus::ambiguous};
     std::optional<double> value_dbz;
     std::string reason;
 };
 
-// Values are supplied by a source adapter after it reads and validates the
-// map sidecar. The decoder itself does not depend on a JSON library.
 struct RadarMapMetadata {
     std::string source_id;
     std::string source_kind;
@@ -34,6 +38,8 @@ struct RadarMapMetadata {
     std::string sidecar;
     std::string valid_time_utc;
 
+    std::string raster_file;
+    RasterFormat raster_format{RasterFormat::ppm_p3};
     std::size_t raster_width{0};
     std::size_t raster_height{0};
 
@@ -70,12 +76,30 @@ struct WeatherObservation {
 
 struct DecodeLimits {
     std::size_t max_pixels{1'000'000};
+    std::size_t max_encoded_bytes{64U * 1024U * 1024U};
 };
 
-// Reads an ASCII PPM P3 raster and converts exact RGB palette matches to
-// georeferenced dBZ observations. Unknown colors are preserved as ambiguous;
-// explicit no-data and ambiguous palette entries produce null values.
+// Reads and type-checks the v1 JSON sidecar. The caller supplies sidecar_name
+// so emitted observations retain the metadata source path.
+RadarMapMetadata read_radar_map_sidecar_json(
+    std::istream& sidecar_json,
+    std::string sidecar_name = {});
+
+// Reads an ASCII PPM P3 raster and converts exact RGBA palette matches to
+// georeferenced dBZ observations.
 std::vector<WeatherObservation> decode_reflectivity_ppm_p3(
+    std::istream& raster,
+    const RadarMapMetadata& metadata,
+    DecodeLimits limits = {});
+
+// Reads a PNG raster through libpng and converts exact RGBA palette matches.
+std::vector<WeatherObservation> decode_reflectivity_png(
+    std::istream& raster,
+    const RadarMapMetadata& metadata,
+    DecodeLimits limits = {});
+
+// Dispatches by the raster format declared in the validated sidecar.
+std::vector<WeatherObservation> decode_reflectivity_map(
     std::istream& raster,
     const RadarMapMetadata& metadata,
     DecodeLimits limits = {});
