@@ -53,6 +53,10 @@ Here `u_e`, `u_w`, `v_n`, and `v_s` are the averaged velocities on a cell's four
 
 The C++ contract types, validators, and `advance_dry_transport` are in `include/terraflux/weather/transport_model.hpp` and `src/weather/`. The JSON schemas are [configuration v1](dry-transport-config-v1.schema.json) and [state v1](dry-transport-state-v1.schema.json).
 
+## Analytic cases
+
+The registered test executable covers constant-temperature preservation, expected values after a periodic upwind step, a hand-computed diffusion step, timestep stability rejection, and rejection of divergent wind. These checks passed when compiled and run directly with g++ in the development workspace. Run the full project target through CTest using the commands in [weather validation](../../tests/weather/README.md).
+
 ## Scope limits
 
 This is a transport baseline, not a complete atmospheric model: temperature is advected as a scalar, wind is prescribed, and there is no pressure, vertical structure, moisture, terrain coupling, or open-boundary forcing. Keep each new process behind an explicit model-version change.
