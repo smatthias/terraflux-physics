@@ -79,6 +79,14 @@ struct TimeIndexedTemperatureField {
     GriddedObservationField field;
 };
 
+// Group raw air-temperature observations by UTC valid time, map each group to
+// the configured grid, and return updates in chronological order. Source
+// indices in each field refer to positions in the original input vector.
+std::vector<TimeIndexedTemperatureField>
+map_air_temperature_observations_to_updates(
+    const std::vector<WeatherObservation>& observations,
+    const DryTransportConfig& config);
+
 DryTransportState advance_dry_transport_with_temperature_observations(
     const DryTransportState& initial,
     const DryTransportConfig& config,
