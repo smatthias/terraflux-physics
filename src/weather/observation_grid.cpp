@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -111,10 +112,16 @@ GriddedObservationField map_weather_observations_to_grid(
 
     const auto& grid = config.grid;
     const std::size_t cell_count = grid.nx * grid.ny;
+    if (cell_count == std::numeric_limits<std::size_t>::max()) {
+        throw std::invalid_argument("observation grid is too large");
+    }
     const double east_max =
         grid.origin_east_m + static_cast<double>(grid.nx) * grid.spacing_east_m;
     const double north_max =
         grid.origin_north_m + static_cast<double>(grid.ny) * grid.spacing_north_m;
+    if (!std::isfinite(east_max) || !std::isfinite(north_max)) {
+        throw std::invalid_argument("observation grid extent is not finite");
+    }
 
     GriddedObservationField field;
     field.variable = variable;
