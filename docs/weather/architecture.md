@@ -46,7 +46,7 @@ The observation mapper grids EPSG:4326 fields on the configured local metric gri
 
 ## Map-source decisions
 
-The first radar reference candidate is BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012). Use synthetic fixtures until terms for live data use are confirmed. The public guide identifies the coordinate sidecar naming pattern but does not specify its internal format; native BOM map parsing remains blocked on a sample or specification. Synoptic charts, satellite imagery, and other parameter maps can follow after the radar path is validated.
+The first radar reference candidate is BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012). Keep synthetic fixtures until the intended commercial use is covered by a BOM data licence. The public radar guide lists timestamped PNG files and matching .map coordinate files, but a licensed sample and the .map format are still needed for a provider adapter. See [live map-source status](map-source-status.md).
 
 ## Validation expectations
 
