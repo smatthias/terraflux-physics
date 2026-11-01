@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/dry-transport-config-v1.json",
+  "title": "TerraFlux dry scalar transport configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "model", "grid", "time", "boundary_conditions", "physics"],
+  "properties": {
+    "schema_version": { "const": "terraflux.weather.dry-transport-config/v1" },
+    "model": { "const": "dry_scalar_advection_diffusion" },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nx", "ny", "coordinate_system", "origin_east_m", "origin_north_m", "spacing_east_m", "spacing_north_m"],
+      "properties": {
+        "nx": { "type": "integer", "minimum": 2 },
+        "ny": { "type": "integer", "minimum": 2 },
+        "coordinate_system": { "const": "local_east_north_m" },
+        "origin_east_m": { "type": "number" },
+        "origin_north_m": { "type": "number" },
+        "spacing_east_m": { "type": "number", "exclusiveMinimum": 0 },
+        "spacing_north_m": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_time_utc", "timestep_seconds", "steps"],
+      "properties": {
+        "start_time_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestep_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "steps": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "boundary_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["east_west", "north_south"],
+      "properties": {
+        "east_west": { "const": "periodic" },
+        "north_south": { "const": "periodic" }
+      }
+    },
+    "physics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transported_variable", "wind_mode", "horizontal_mixing_diffusivity_m2_s"],
+      "properties": {
+        "transported_variable": { "const": "air_temperature_k" },
+        "wind_mode": { "const": "prescribed_static" },
+        "horizontal_mixing_diffusivity_m2_s": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}
