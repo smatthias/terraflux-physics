@@ -10,6 +10,7 @@ add_library(terraflux_weather_map
     src/weather/radar_reflectivity_decoder.cpp
     src/weather/weather_observation_json.cpp
     src/weather/transport_model_contract.cpp
+    src/weather/dry_scalar_transport.cpp
 )
 target_include_directories(terraflux_weather_map
     PUBLIC
