@@ -22,7 +22,7 @@ inline std::uint32_t color_key(const Rgba8& rgba) {
 }
 
 inline std::uint32_t color_key(const PaletteEntry& entry) {
-    return color_key({entry.rgb[0], entry.rgb[1], entry.rgb[2], entry.alpha});
+    return color_key(Rgba8{entry.rgb[0], entry.rgb[1], entry.rgb[2], entry.alpha});
 }
 
 inline void validate_metadata(const RadarMapMetadata& metadata, const DecodeLimits& limits) {
