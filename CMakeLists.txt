@@ -16,6 +16,7 @@ add_library(terraflux_weather_map
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
+    src/weather/time_indexed_observation_mapper.cpp
 )
 target_include_directories(terraflux_weather_map
     PUBLIC
