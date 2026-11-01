@@ -15,6 +15,9 @@ The dry scalar transport suite currently covers:
 - one-step diffusion with hand-computed expected cell values
 - rejection of a timestep above the combined stability limit
 - rejection of a discretely divergent wind field
+- EPSG:4326 projection, observation/status preservation, and outside-domain counting
+- duplicate-cell ambiguity with all source indices retained
+- rejection of mapping radar reflectivity into an air-temperature field
 
 Build and run the registered CTest case with:
 
