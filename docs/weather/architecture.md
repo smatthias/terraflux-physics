@@ -21,7 +21,7 @@ Map interpretation is a data-input process, not part of the physical solver. Kee
 1. Read source metadata, valid time, units, and projection where available.
 2. Decode structured grids directly; for rendered maps, identify the map class, legend, symbols, and geospatial control points.
 3. Convert extracted features into a canonical observation representation with location, variable, value, units, confidence, and provenance.
-4. Reproject, align in time, and map observations onto the simulation grid.
+4. Reproject, align in time, and map observations onto the simulation grid. The first mapper supports EPSG:4326 to local azimuthal-equidistant coordinates and preserves cell quality states.
 5. Provide observations as initial conditions, boundary inputs, constraints, or validation data according to their type and quality.
 
 If a legend, projection, timestamp, or feature is ambiguous, preserve that uncertainty or mark the value unknown. Do not silently invent a precise value.
@@ -30,18 +30,24 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 
 1. Agree the target scale, dimensions, state variables, units, coordinate frame, and boundary conditions.
 2. Define the observation schema, metadata requirements, confidence, and provenance.
-3. Select one structured weather dataset and one bounded rendered-map class for initial input support.
+3. Select one structured weather dataset and one bounded rendered-map class for initial input support. The first rendered-map class is radar reflectivity with a known legend and georeferencing.
 4. Implement map decoding and georeferencing with explicit uncertainty and test fixtures.
-5. Define immutable simulation configuration and state contracts with validation.
-6. Implement the smallest dry-air transport case and compare it with analytic expectations.
+5. Define immutable simulation configuration and state contracts with validation. **Completed for the dry scalar transport v1 contract.**
+6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Kernel implemented; constant-field, periodic-advection, diffusion, and rejection cases pass.**
 7. Add thermodynamic and moisture processes one at a time, with invariants and reference cases.
 8. Add terrain and surface exchange after the atmospheric baseline is stable.
 9. Add adapters for fire physics without making weather depend on the renderer or fire model.
 
-## Decisions still open
+## First solver contract selected
 
-Before numerical implementation, choose the target spatial and temporal scales, vertical representation, time integration method, and intended scenario class. Choose which map products to support first, such as radar imagery, satellite imagery, or synoptic charts. The numerical method should follow the model scale. Avoid implying cloud-resolving or operational forecast fidelity unless the equations, resolution, inputs, and validation support it.
+The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres, a geographic anchor for the spherical azimuthal-equidistant map transform, and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
+
+The observation mapper grids EPSG:4326 fields on the configured local metric grid while keeping variable and quality state separate; radar reflectivity remains dBZ and is not converted into temperature. See [observation gridding](observation-grid.md). The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
+
+## Map-source decisions
+
+The first radar reference candidate is BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012). Use synthetic fixtures until terms for live data use are confirmed. The public guide identifies the coordinate sidecar naming pattern but does not specify its internal format; native BOM map parsing remains blocked on a sample or specification. Synoptic charts, satellite imagery, and other parameter maps can follow after the radar path is validated.
 
 ## Validation expectations
 
-Every process should document its inputs, outputs, units, assumptions, and valid range. Tests should cover conservation where applicable, positivity and boundedness, deterministic repeatability, limiting cases, map georeferencing, known legend values, missing metadata, and regression fixtures. Reference data must record its source and conditions.
+Every process should document its inputs, outputs, units, assumptions, and valid range. Validation should cover conservation where applicable, positivity and boundedness, deterministic repeatability, limiting cases, map georeferencing, known legend values, missing metadata, and regression fixtures. Reference data must record its source and conditions. Do not claim operational forecast fidelity without suitable equations, resolution, inputs, and validation.

@@ -1,0 +1,34 @@
+{
+  "schema_version": "terraflux.weather.map-sidecar/v1",
+  "valid_time_utc": "2026-11-01T00:00:00Z",
+  "source": {
+    "provider": "TerraFlux synthetic example",
+    "source_id": "synthetic-temperature-grid",
+    "source_kind": "synthetic_fixture",
+    "product_id": "temperature-demo"
+  },
+  "raster": {
+    "file": "temperature-map.ppm",
+    "width": 2,
+    "height": 2,
+    "format": "ppm-p3",
+    "color_encoding": "rgb"
+  },
+  "georeferencing": {
+    "crs": "EPSG:4326",
+    "axis_order": ["longitude", "latitude"],
+    "transform_convention": "pixel_corner_affine",
+    "pixel_to_world": [-1.0, 1.0, 0.0, 1.0, 0.0, -1.0]
+  },
+  "observation": {
+    "variable": "air_temperature",
+    "units": "K",
+    "vertical_reference": "2 m above ground"
+  },
+  "palette": [
+    {"rgb": [255, 0, 0], "status": "decoded", "value": 280.0},
+    {"rgb": [0, 0, 255], "status": "decoded", "value": 290.0},
+    {"rgb": [255, 255, 255], "status": "no_data"},
+    {"rgb": [0, 0, 0], "status": "ambiguous", "reason": "color legend is uncertain"}
+  ]
+}
