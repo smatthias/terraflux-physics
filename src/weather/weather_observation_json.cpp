@@ -34,6 +34,7 @@ bool supported_interpretation(const std::string& interpretation) {
            interpretation == "structured_grid_value" ||
            interpretation == "direct_measurement" ||
            interpretation == "contour_interpolation" ||
+           interpretation == "derived_empirical_conversion" ||
            interpretation == "manual_annotation";
 }
 
@@ -88,6 +89,9 @@ Json serialize_observation(const WeatherObservation& observation) {
     };
     if (!observation.product_id.empty()) {
         source["product_id"] = observation.product_id;
+    }
+    if (!observation.derivation.empty()) {
+        source["derivation"] = observation.derivation;
     }
     if (!observation.sidecar.empty()) {
         source["sidecar"] = observation.sidecar;
@@ -212,6 +216,7 @@ std::vector<WeatherObservation> read_weather_observations_json(
         observation.source_kind = required_string(source, "source_kind");
         observation.interpretation = required_string(source, "interpretation");
         observation.product_id = optional_string(source, "product_id");
+        observation.derivation = optional_string(source, "derivation");
         observation.sidecar = optional_string(source, "sidecar");
         if (observation.source_id.empty() ||
             !supported_source_kind(observation.source_kind) ||
