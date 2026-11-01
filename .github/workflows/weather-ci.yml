@@ -1,0 +1,48 @@
+name: Weather C++ CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential cmake ninja-build pkg-config curl tar zlib1g-dev
+
+      - name: Build and install nlohmann/json 3.12.0
+        run: |
+          curl -fsSL https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz -o json.tar.gz
+          tar -xzf json.tar.gz
+          cmake -S json-3.12.0 -B json-build -DJSON_BuildTests=OFF -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/terraflux-deps"
+          cmake --build json-build --parallel 2
+          cmake --install json-build
+
+      - name: Build and install libpng 1.6.59
+        run: |
+          curl -fsSL https://download.sourceforge.net/libpng/libpng-1.6.59.tar.gz -o libpng.tar.gz
+          tar -xzf libpng.tar.gz
+          cmake -S libpng-1.6.59 -B libpng-build -DPNG_TESTS=OFF -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/terraflux-deps"
+          cmake --build libpng-build --parallel 2
+          cmake --install libpng-build
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/terraflux-deps"
+          -DPNG_ROOT="$RUNNER_TEMP/terraflux-deps"
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
