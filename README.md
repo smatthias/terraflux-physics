@@ -14,15 +14,17 @@ The engine is intended to read structured weather datasets and rendered weather 
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
+- `docs/weather/precipitation-estimation.md` — configurable empirical conversion from radar reflectivity to rain-rate estimates
 - `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
 - `include/terraflux/weather/` — public observation, gridding, and transport model types
-- `src/weather/` — sidecar parsing, raster decoding, serialization, CLI, observation mapping, and transport solver
+- `src/weather/` — sidecar parsing, raster and GRIB2 observation import, serialization, empirical precipitation estimator, CLI, observation mapping, and transport solver
 - `tests/weather/` — analytic transport cases and planned map/reference coverage
 - `examples/weather/maps/` — synthetic palette rasters and metadata
 - `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
+- `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
