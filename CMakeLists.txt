@@ -19,6 +19,7 @@ add_library(terraflux_weather_map
     src/weather/time_indexed_temperature_observations.cpp
     src/weather/time_indexed_observation_mapper.cpp
     src/weather/temperature_observation_pipeline.cpp
+    src/weather/precipitation_estimator.cpp
 )
 target_include_directories(terraflux_weather_map
     PUBLIC
@@ -43,6 +44,11 @@ target_link_libraries(terraflux-decode-temperature-map
 
 add_executable(terraflux-run-temperature-map src/weather/run_temperature_map.cpp)
 target_link_libraries(terraflux-run-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-estimate-rain-rate src/weather/estimate_rain_rate.cpp)
+target_link_libraries(terraflux-estimate-rain-rate
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -78,6 +84,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-decode-radar-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-decode-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
         target_compile_options(terraflux-weather-transport-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
