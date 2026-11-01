@@ -45,4 +45,22 @@ GriddedObservationField map_weather_observations_to_grid(
     const std::string& variable,
     const std::string& units);
 
+struct TemperatureInitializationResult {
+    DryTransportState state;
+    std::size_t observation_cells_applied{0};
+    std::size_t background_cells_retained{0};
+    std::size_t no_data_cells{0};
+    std::size_t ambiguous_cells{0};
+};
+
+// Start from a complete background state at elapsed_seconds == 0, then
+// replace only cells containing one decoded air-temperature value in kelvin.
+// The gridded field must match the config grid and start time. No-data and
+// ambiguous cells retain their background temperatures and remain represented
+// in the original field, including its source-index provenance.
+TemperatureInitializationResult overlay_air_temperature_observations(
+    const DryTransportState& background,
+    const GriddedObservationField& field,
+    const DryTransportConfig& config);
+
 }  // namespace terraflux::weather
