@@ -2,7 +2,7 @@
 
 A C++ home for deterministic, testable physical models used by TerraFlux. The first planned area is weather physics, with a future interface for coupling weather to terrain and wildfire spread.
 
-The engine is intended to read both structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation reads a v1 map sidecar, decodes palette-based PPM P3 or PNG reflectivity rasters, and writes canonical weather observation JSON. A first-order dry scalar transport solver is implemented for a narrow 2D case; broader atmospheric dynamics and live provider adapters remain future work.
+The engine is intended to read structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation decodes sidecar-backed radar and temperature PNG/PPM maps, tracks timestamped temperature frames through a 2D dry transport model, and writes versioned forecast JSON. Examples remain synthetic; broader atmospheric dynamics and live provider adapters require further work.
 
 ## Layout
 
@@ -12,6 +12,7 @@ The engine is intended to read both structured weather datasets and rendered wea
 - `docs/weather/dry-transport-config-v1.schema.json` — dry transport configuration schema
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
+- `docs/weather/map-source-status.md` — BOM source terms and adapter prerequisites
 - `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
