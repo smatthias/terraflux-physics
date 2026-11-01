@@ -290,14 +290,14 @@ std::vector<Rgba8> read_png(
     }
     png_image image{};
     image.version = PNG_IMAGE_VERSION;
-    if (!png_image_begin_read_from_memory(&image, encoded.data(), encoded.size())) {
-        throw std::runtime_error(std::string("libpng could not read temperature map: ") +
-                                 image.message);
-    }
     struct ImageGuard {
         png_image* image;
         ~ImageGuard() { png_image_free(image); }
     } guard{&image};
+    if (!png_image_begin_read_from_memory(&image, encoded.data(), encoded.size())) {
+        throw std::runtime_error(std::string("libpng could not read temperature map: ") +
+                                 image.message);
+    }
 
     if (image.width != metadata.raster_width ||
         image.height != metadata.raster_height) {
@@ -305,6 +305,11 @@ std::vector<Rgba8> read_png(
     }
     image.format = PNG_FORMAT_RGBA;
     const std::size_t count = metadata.raster_width * metadata.raster_height;
+    if (count > std::numeric_limits<std::size_t>::max() / 4U ||
+        metadata.raster_width >
+            static_cast<std::size_t>(std::numeric_limits<png_int_32>::max()) / 4U) {
+        throw std::runtime_error("temperature PNG dimensions overflow the decoded buffer");
+    }
     std::vector<png_byte> bytes(count * 4U);
     if (!png_image_finish_read(
             &image, nullptr, bytes.data(),
