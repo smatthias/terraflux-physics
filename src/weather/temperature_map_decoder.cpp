@@ -103,7 +103,7 @@ std::uint32_t color_key(const Rgba8& color) {
 }
 
 std::uint32_t color_key(const TemperaturePaletteEntry& entry) {
-    return color_key({entry.rgb[0], entry.rgb[1], entry.rgb[2], entry.alpha});
+    return color_key(Rgba8{entry.rgb[0], entry.rgb[1], entry.rgb[2], entry.alpha});
 }
 
 void validate_metadata(
