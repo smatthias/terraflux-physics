@@ -14,6 +14,7 @@ add_library(terraflux_weather_map
     src/weather/transport_model_contract.cpp
     src/weather/dry_scalar_transport.cpp
     src/weather/observation_grid.cpp
+    src/weather/temperature_observation_overlay.cpp
 )
 target_include_directories(terraflux_weather_map
     PUBLIC
