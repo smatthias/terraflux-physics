@@ -18,6 +18,8 @@ using terraflux::weather::WeatherObservation;
 using terraflux::weather::map_weather_observations_to_grid;
 using terraflux::weather::overlay_air_temperature_observations;
 using terraflux::weather::TransportGrid2D;
+using terraflux::weather::TimeIndexedTemperatureField;
+using terraflux::weather::advance_dry_transport_with_temperature_observations;
 using terraflux::weather::advance_dry_transport;
 
 void require(bool condition, const std::string& message) {
@@ -330,6 +332,103 @@ void temperature_overlay_rejects_variable_time_and_grid_mismatches() {
     must_reject(field, "grid mismatch");
 }
 
+
+terraflux::weather::GriddedObservationField make_timed_temperature_field(
+    const DryTransportConfig& config,
+    const std::string& valid_time,
+    ObservationStatus status,
+    std::optional<double> value = std::nullopt,
+    std::string reason = {}) {
+    auto observation = make_temperature_observation(
+        0.0, status, value, std::move(reason));
+    observation.valid_time_utc = valid_time;
+    return map_weather_observations_to_grid(
+        {observation}, config, "air_temperature", "K");
+}
+
+void time_indexed_updates_apply_at_start_middle_and_end() {
+    auto config = make_mapping_config();
+    config.timestep_seconds = 60.0;
+    config.steps = 2;
+    const auto initial = make_temperature_background();
+
+    const std::vector<TimeIndexedTemperatureField> updates{
+        {0.0, make_timed_temperature_field(
+                  config, "2026-11-01T00:00:00Z",
+                  ObservationStatus::decoded, 290.0)},
+        {60.0, make_timed_temperature_field(
+                   config, "2026-11-01T00:01:00Z",
+                   ObservationStatus::decoded, 295.0)},
+        {120.0, make_timed_temperature_field(
+                    config, "2026-11-01T00:02:00Z",
+                    ObservationStatus::decoded, 300.0)},
+    };
+
+    const auto forecast =
+        advance_dry_transport_with_temperature_observations(
+            initial, config, updates);
+    require_near(forecast.air_temperature_k[6], 300.0,
+                 "final-boundary observation must set the returned forecast");
+    require_near(forecast.air_temperature_k[4], 284.0,
+                 "unobserved cells must continue from their background");
+    require_near(forecast.elapsed_seconds, 120.0,
+                 "timed updates must not change the configured run duration");
+}
+
+void time_indexed_no_data_retains_current_forecast_value() {
+    auto config = make_mapping_config();
+    config.timestep_seconds = 60.0;
+    config.steps = 2;
+    const auto initial = make_temperature_background();
+    const std::vector<TimeIndexedTemperatureField> updates{
+        {0.0, make_timed_temperature_field(
+                  config, "2026-11-01T00:00:00Z",
+                  ObservationStatus::decoded, 290.0)},
+        {60.0, make_timed_temperature_field(
+                   config, "2026-11-01T00:01:00Z",
+                   ObservationStatus::no_data)},
+    };
+
+    const auto forecast =
+        advance_dry_transport_with_temperature_observations(
+            initial, config, updates);
+    require_near(forecast.air_temperature_k[6], 290.0,
+                 "no-data update must retain the current forecast value");
+}
+
+void time_indexed_updates_reject_bad_times_and_off_step_offsets() {
+    auto config = make_mapping_config();
+    config.timestep_seconds = 60.0;
+    config.steps = 2;
+    const auto initial = make_temperature_background();
+    const auto must_reject = [&](const std::vector<TimeIndexedTemperatureField>& updates,
+                                 const std::string& case_name) {
+        bool rejected = false;
+        try {
+            (void)advance_dry_transport_with_temperature_observations(
+                initial, config, updates);
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
+        require(rejected, case_name + " must be rejected");
+    };
+
+    must_reject(
+        {{0.0, make_timed_temperature_field(
+                   config, "not-a-timeZ", ObservationStatus::decoded, 290.0)}},
+        "invalid UTC timestamp");
+    must_reject(
+        {{30.0, make_timed_temperature_field(
+                    config, "2026-11-01T00:00:30Z",
+                    ObservationStatus::decoded, 290.0)}},
+        "off-timestep update");
+    must_reject(
+        {{60.0, make_timed_temperature_field(
+                    config, "2026-11-01T00:02:00Z",
+                    ObservationStatus::decoded, 290.0)}},
+        "timestamp that disagrees with the scheduled time");
+}
+
 }  // namespace
 
 int main() {
@@ -345,6 +444,9 @@ int main() {
         temperature_overlay_applies_valid_values_and_keeps_background_for_gaps();
         temperature_overlay_rejects_duplicate_cell_collisions();
         temperature_overlay_rejects_variable_time_and_grid_mismatches();
+        time_indexed_updates_apply_at_start_middle_and_end();
+        time_indexed_no_data_retains_current_forecast_value();
+        time_indexed_updates_reject_bad_times_and_off_step_offsets();
     } catch (const std::exception& error) {
         std::cerr << "dry scalar transport test failed: " << error.what() << '\n';
         return 1;
