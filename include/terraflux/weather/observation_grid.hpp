@@ -74,9 +74,14 @@ TemperatureInitializationResult apply_air_temperature_observation_update(
 // Advance one timestep at a time and apply each chronological observation
 // field at its valid time. Observation times must fall on timestep boundaries
 // within the configured run, including its start or end time.
+struct TimeIndexedTemperatureField {
+    double elapsed_seconds{0.0};
+    GriddedObservationField field;
+};
+
 DryTransportState advance_dry_transport_with_temperature_observations(
     const DryTransportState& initial,
     const DryTransportConfig& config,
-    const std::vector<GriddedObservationField>& observation_updates);
+    const std::vector<TimeIndexedTemperatureField>& observation_updates);
 
 }  // namespace terraflux::weather
