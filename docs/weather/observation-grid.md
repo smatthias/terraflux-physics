@@ -1,6 +1,6 @@
 # Observation fields on the dry transport grid
 
-`map_weather_observations_to_grid` projects a homogeneous set of georeferenced weather observations onto the grid configured for dry transport. It creates an observation field; it does not turn one weather variable into another or fill the solver's state automatically.
+`map_weather_observations_to_grid` projects a homogeneous set of georeferenced weather observations onto the grid configured for dry transport. It creates an observation field while preserving quality and source-index provenance.
 
 ## Coordinate conversion
 
@@ -17,7 +17,16 @@ The projected domain is divided into the configured uniform cells. A point is as
 - If multiple observations land in one cell, that cell becomes `ambiguous`; the mapper does not average them. Source observation indices remain available through `source_offsets` and `source_observation_indices`.
 - dBZ remains radar reflectivity. It is never interpreted as air temperature in kelvin.
 
-To create a solver temperature field, supply observations whose variable is air temperature and whose units are K, then apply an explicit background or missing-data policy. No such assimilation policy is defined yet. The mapper itself preserves missing and ambiguous cells for that later decision.
+## Initializing temperature
+
+`overlay_air_temperature_observations` applies the explicit v1 initialization policy:
+
+1. Start with a complete `DryTransportState` at elapsed time zero. Its temperature and wind arrays must already cover every grid cell and pass the transport-state validation.
+2. Supply a gridded field with variable `air_temperature`, units `K`, the same grid and local coordinate system as the config, and a valid time exactly equal to `config.start_time_utc`.
+3. The function copies the background state and replaces temperatures only where a cell has exactly one decoded, finite value greater than 0 K.
+4. `no_data` and `ambiguous` cells keep the background temperature. The returned counts report applied observation cells, retained background cells, and the two retained-status counts separately.
+
+The background input is not mutated. The original gridded observation field remains available with its quality flags and source indices. The overlay rejects radar reflectivity, other variables or units, time mismatches, grid mismatches, and malformed provenance instead of guessing a conversion, interpolating in time, or averaging collisions.
 
 ## C++ API
 
@@ -25,7 +34,11 @@ To create a solver temperature field, supply observations whose variable is air 
 #include "terraflux/weather/observation_grid.hpp"
 
 auto field = terraflux::weather::map_weather_observations_to_grid(
-    observations, config, "radar_reflectivity", "dBZ");
+    observations, config, "air_temperature", "K");
+
+auto initialized =
+    terraflux::weather::overlay_air_temperature_observations(
+        complete_background_state, field, config);
 ~~~
 
 `field.cells` is row-major with index `y * nx + x`. The grid and its geographic anchor are copied into the result so callers retain the exact mapping context.
