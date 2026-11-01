@@ -32,16 +32,22 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 2. Define the observation schema, metadata requirements, confidence, and provenance.
 3. Select one structured weather dataset and one bounded rendered-map class for initial input support. The first rendered-map class is radar reflectivity with a known legend and georeferencing.
 4. Implement map decoding and georeferencing with explicit uncertainty and test fixtures.
-5. Define immutable simulation configuration and state contracts with validation.
-6. Implement the smallest dry-air transport case and compare it with analytic expectations.
+5. Define immutable simulation configuration and state contracts with validation. **Completed for the dry scalar transport v1 contract.**
+6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Next.**
 7. Add thermodynamic and moisture processes one at a time, with invariants and reference cases.
 8. Add terrain and surface exchange after the atmospheric baseline is stable.
 9. Add adapters for fire physics without making weather depend on the renderer or fire model.
 
-## Decisions still open
+## First solver contract selected
 
-The first radar reference candidate is BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012). Its documented PNG and coordinate-sidecar package gives us a concrete ingestion target, while source licensing remains a production gate. Use synthetic fixtures until terms for live data use are confirmed. Still choose the target spatial and temporal scales, vertical representation, time integration method, intended scenario class, and structured weather dataset. The numerical method should follow the model scale. Synoptic charts, satellite imagery, and other parameter maps can follow after this path is validated. Avoid implying cloud-resolving or operational forecast fidelity unless the equations, resolution, inputs, and validation support it.
+The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
+
+The configured grid spacing and timestep are scenario inputs; the numerical implementation must validate timestep stability for its selected discretization. This baseline is a controlled transport experiment, not a regional forecast model.
+
+## Map-source decisions
+
+The first radar reference candidate is BOM Melbourne (Broadmeadows) 256 km reflectivity (IDR012). Use synthetic fixtures until terms for live data use are confirmed. The public guide identifies the coordinate sidecar naming pattern but does not specify its internal format; native BOM map parsing remains blocked on a sample or specification. Synoptic charts, satellite imagery, and other parameter maps can follow after the radar path is validated.
 
 ## Validation expectations
 
-Every process should document its inputs, outputs, units, assumptions, and valid range. Tests should cover conservation where applicable, positivity and boundedness, deterministic repeatability, limiting cases, map georeferencing, known legend values, missing metadata, and regression fixtures. Reference data must record its source and conditions.
+Every process should document its inputs, outputs, units, assumptions, and valid range. Validation should cover conservation where applicable, positivity and boundedness, deterministic repeatability, limiting cases, map georeferencing, known legend values, missing metadata, and regression fixtures. Reference data must record its source and conditions. Do not claim operational forecast fidelity without suitable equations, resolution, inputs, and validation.
