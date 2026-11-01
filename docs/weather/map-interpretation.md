@@ -17,6 +17,18 @@ Start with a radar reflectivity map whose palette or legend and georeferencing a
 
 Radar reflectivity represents returned radar energy; it is not a direct surface rainfall-rate measurement. Do not convert dBZ to rain rate in this reader. A later precipitation-estimation module must choose and document an empirical reflectivity-to-rainfall relationship and its limits. See [NOAA's reflectivity overview](https://www.noaa.gov/jetstream/reflectivity) and the [NWS discussion of radar rainfall-estimation limits](https://www.weather.gov/mrx/radarrainfallestimates).
 
+## First reference source candidate: BOM Melbourne radar
+
+Use the [Bureau of Meteorology (BOM) Melbourne (Broadmeadows) 256 km radar product](https://www.bom.gov.au/products/IDR012.shtml) as the first concrete source candidate for the Victoria wildfire-weather use case. This is a reference product choice, not yet authorization to ingest or redistribute live BOM imagery.
+
+The BOM radar guide documents timestamped PNG products using the pattern `IDRnnnx.T.yyyymmddhhmm.png` and matching coordinate sidecars named `IDRnnnx.map`; `nnn` identifies the radar and the timestamp is UTC. For Melbourne 256 km, use the corresponding `IDR0122` product family and its matching map sidecar. Keep the radar product identifier, UTC valid time, source URL/feed, palette/legend identity, and sidecar version with every decoded observation. Do not infer a palette or map transform from a screenshot when required metadata is missing. See the [BOM Radar Images User Guide](https://www.bom.gov.au/weather/radar/about/radar_images_user_guide.shtml).
+
+Keep the provider-specific retrieval and file naming in a BOM adapter. The interpretation pipeline should accept a documented image, palette, coordinate transform, and timestamp package so other licensed sources can use the same canonical observation format.
+
+## Source-use and fixture policy
+
+BOM copyright and data terms vary by product and use. Resolve the applicable licence and permissions before production ingestion, persistent storage, redistribution, or commercial use. Until then, use a synthetic, clearly labelled palette fixture in the repository; do not commit live BOM radar imagery. The [BOM copyright guidance](https://www.bom.gov.au/other/copyright.shtml) describes restrictions and licensing routes.
+
 ## Observation record
 
 An interpreted observation should retain, where available:
