@@ -16,6 +16,7 @@ using terraflux::weather::DryTransportState;
 using terraflux::weather::ObservationStatus;
 using terraflux::weather::WeatherObservation;
 using terraflux::weather::map_weather_observations_to_grid;
+using terraflux::weather::map_air_temperature_observations_to_updates;
 using terraflux::weather::overlay_air_temperature_observations;
 using terraflux::weather::TransportGrid2D;
 using terraflux::weather::TimeIndexedTemperatureField;
@@ -429,6 +430,74 @@ void time_indexed_updates_reject_bad_times_and_off_step_offsets() {
         "timestamp that disagrees with the scheduled time");
 }
 
+
+void raw_temperature_observations_group_chronologically_and_keep_global_indices() {
+    const auto config = make_mapping_config();
+    auto later_first = make_temperature_observation(
+        0.0, ObservationStatus::decoded, 295.0);
+    later_first.valid_time_utc = "2026-11-01T00:01:00Z";
+    auto earlier = make_temperature_observation(
+        0.0, ObservationStatus::decoded, 290.0);
+    earlier.valid_time_utc = "2026-11-01T00:00:00Z";
+    auto later_second = make_temperature_observation(
+        0.0001, ObservationStatus::decoded, 300.0);
+    later_second.valid_time_utc = "2026-11-01T00:01:00Z";
+
+    const std::vector<WeatherObservation> observations{
+        later_first, earlier, later_second};
+    const auto updates =
+        map_air_temperature_observations_to_updates(observations, config);
+
+    require(updates.size() == 2,
+            "observations at the same valid time must share one update");
+    require_near(updates[0].elapsed_seconds, 0.0,
+                 "earlier valid time must be returned first");
+    require(updates[0].field.valid_time_utc == "2026-11-01T00:00:00Z",
+            "first field must retain its valid time");
+    require_near(updates[1].elapsed_seconds, 60.0,
+                 "later valid time must have the correct elapsed offset");
+    require(updates[1].field.cells[6].status == ObservationStatus::ambiguous,
+            "colliding readings in one time group must remain ambiguous");
+    require(updates[0].field.source_observation_indices[
+                updates[0].field.source_offsets[6]] == 1,
+            "first group source index must refer to the original input");
+    require(updates[1].field.source_offsets[7] -
+                updates[1].field.source_offsets[6] == 2,
+            "later group must preserve both colliding source indices");
+    require(updates[1].field.source_observation_indices[
+                updates[1].field.source_offsets[6]] == 0 &&
+                updates[1].field.source_observation_indices[
+                    updates[1].field.source_offsets[6] + 1] == 2,
+            "later group indexes must refer to original input positions");
+}
+
+void raw_temperature_adapter_rejects_mixed_variable_units_and_bad_timestamp() {
+    const auto config = make_mapping_config();
+    const auto valid = make_temperature_observation(
+        0.0, ObservationStatus::decoded, 290.0);
+    const auto must_reject = [&](const std::vector<WeatherObservation>& observations,
+                                 const std::string& case_name) {
+        bool rejected = false;
+        try {
+            (void)map_air_temperature_observations_to_updates(
+                observations, config);
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
+        require(rejected, case_name + " must be rejected");
+    };
+
+    must_reject(
+        {valid, make_observation(0.001, ObservationStatus::decoded, 30.0)},
+        "mixed variables");
+    auto wrong_units = valid;
+    wrong_units.units = "C";
+    must_reject({wrong_units}, "non-kelvin units");
+    auto invalid_time = valid;
+    invalid_time.valid_time_utc = "2026-02-30T00:00:00Z";
+    must_reject({invalid_time}, "invalid calendar timestamp");
+}
+
 }  // namespace
 
 int main() {
@@ -447,6 +516,8 @@ int main() {
         time_indexed_updates_apply_at_start_middle_and_end();
         time_indexed_no_data_retains_current_forecast_value();
         time_indexed_updates_reject_bad_times_and_off_step_offsets();
+        raw_temperature_observations_group_chronologically_and_keep_global_indices();
+        raw_temperature_adapter_rejects_mixed_variable_units_and_bad_timestamp();
     } catch (const std::exception& error) {
         std::cerr << "dry scalar transport test failed: " << error.what() << '\n';
         return 1;
