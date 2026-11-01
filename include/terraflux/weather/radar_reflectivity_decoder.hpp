@@ -75,6 +75,7 @@ struct WeatherObservation {
     std::optional<double> confidence;
     std::string reason;
     std::string interpretation{"palette_lookup"};
+    std::string derivation;
 };
 
 struct DecodeLimits {
