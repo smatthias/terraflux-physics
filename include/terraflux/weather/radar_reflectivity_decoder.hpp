@@ -55,6 +55,7 @@ struct RadarMapMetadata {
 
 struct GeoLocation {
     std::string crs;
+    // The observation-grid adapter treats EPSG:4326 x/y as longitude/latitude degrees.
     double x{0.0};
     double y{0.0};
 };
