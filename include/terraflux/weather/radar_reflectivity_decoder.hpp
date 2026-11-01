@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <istream>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -103,5 +104,11 @@ std::vector<WeatherObservation> decode_reflectivity_map(
     std::istream& raster,
     const RadarMapMetadata& metadata,
     DecodeLimits limits = {});
+
+// Writes an array of canonical v1 weather observation records as JSON.
+// Invalid or internally inconsistent records are rejected.
+void write_weather_observations_json(
+    std::ostream& output,
+    const std::vector<WeatherObservation>& observations);
 
 }  // namespace terraflux::weather
