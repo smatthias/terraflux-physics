@@ -187,8 +187,8 @@ DryTransportState advance_dry_transport(
             }
         }
         result.air_temperature_k.swap(next_temperature);
-        result.elapsed_seconds += timestep;
     }
+    result.elapsed_seconds = static_cast<double>(final_elapsed);
     return result;
 }
 
