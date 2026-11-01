@@ -2,20 +2,20 @@
 
 A C++ home for deterministic, testable physical models used by TerraFlux. The first planned area is weather physics, with a future interface for coupling weather to terrain and wildfire spread.
 
-The engine is intended to read both structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation reads a v1 map sidecar and decodes palette-based PPM P3 or PNG reflectivity rasters; the weather solver and live provider adapters remain future work.
+The engine is intended to read both structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation reads a v1 map sidecar, decodes palette-based PPM P3 or PNG reflectivity rasters, and writes canonical weather observation JSON; the weather solver and live provider adapters remain future work.
 
 ## Layout
 
 - `docs/weather/architecture.md` — model scope, boundaries, and implementation sequence
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
-- `docs/weather/map-decoder.md` — decoder API, formats, dependencies, and limitations
+- `docs/weather/map-decoder.md` — decoder API, CLI, formats, dependencies, and limitations
 - `docs/weather/observation-schema.json` — v1 raster-sidecar schema
 - `docs/weather/observation-record-v1.schema.json` — canonical observation schema
 - `include/terraflux/weather/` — public weather data types and interfaces
-- `src/weather/` — sidecar parsing and raster decoding
+- `src/weather/` — sidecar parsing, raster decoding, serialization, and CLI
 - `tests/weather/` — planned unit, invariant, reference, and regression checks
-- `examples/weather/maps/` — synthetic palette raster and its metadata
-- `CMakeLists.txt` — C++17 decoder library target and dependencies
+- `examples/weather/maps/` — synthetic palette rasters and metadata
+- `CMakeLists.txt` — C++17 decoder library and CLI targets
 
 ## Working principles
 
