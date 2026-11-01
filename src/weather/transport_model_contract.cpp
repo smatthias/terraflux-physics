@@ -28,7 +28,7 @@ void require_finite(double value, const char* field) {
 void validate_dry_transport_config(const DryTransportConfig& config) {
     (void)cell_count(config.grid);
     if (config.start_time_utc.empty() || config.start_time_utc.back() != 'Z') {
-        throw std::invalid_argument("start_time_utc must be an ISO-8601 UTC timestamp ending in Z");
+        throw std::invalid_argument("start_time_utc must be a UTC timestamp ending in Z");
     }
     if (config.boundary_condition != "periodic") {
         throw std::invalid_argument("v1 dry transport supports periodic boundaries only");
@@ -45,6 +45,12 @@ void validate_dry_transport_config(const DryTransportConfig& config) {
     require_finite(config.timestep_seconds, "timestep must be finite");
     if (config.timestep_seconds <= 0.0 || config.steps == 0) {
         throw std::invalid_argument("timestep and step count must be positive");
+    }
+    const long double duration =
+        static_cast<long double>(config.timestep_seconds) *
+        static_cast<long double>(config.steps);
+    if (duration > static_cast<long double>(std::numeric_limits<double>::max())) {
+        throw std::invalid_argument("configured simulation duration overflows");
     }
 
     require_finite(
