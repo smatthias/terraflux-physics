@@ -1,4 +1,5 @@
 #include "terraflux/weather/observation_grid.hpp"
+#include "terraflux/weather/temperature_observation_pipeline.hpp"
 #include "terraflux/weather/transport_model.hpp"
 
 #include <cmath>
@@ -6,6 +7,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <utility>
 
@@ -498,6 +500,41 @@ void raw_temperature_adapter_rejects_mixed_variable_units_and_bad_timestamp() {
     must_reject({invalid_time}, "invalid calendar timestamp");
 }
 
+
+void canonical_json_pipeline_advances_temperature_and_rejects_radar() {
+    auto config = make_mapping_config();
+    config.timestep_seconds = 60.0;
+    config.steps = 1;
+    const auto background = make_temperature_background();
+
+    const std::vector<WeatherObservation> temperature_observations{
+        make_temperature_observation(
+            0.0, ObservationStatus::decoded, 292.5)};
+    std::stringstream temperature_json;
+    terraflux::weather::write_weather_observations_json(
+        temperature_json, temperature_observations);
+    const auto forecast =
+        terraflux::weather::advance_dry_transport_from_observation_json(
+            temperature_json, background, config);
+    require_near(forecast.air_temperature_k[6], 292.5,
+                 "canonical temperature JSON must reach the forecast state");
+
+    const std::vector<WeatherObservation> radar_observations{
+        make_observation(0.0, ObservationStatus::decoded, 45.0)};
+    std::stringstream radar_json;
+    terraflux::weather::write_weather_observations_json(
+        radar_json, radar_observations);
+    bool rejected = false;
+    try {
+        (void)terraflux::weather::advance_dry_transport_from_observation_json(
+            radar_json, background, config);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected,
+            "canonical radar dBZ JSON must not enter temperature simulation");
+}
+
 }  // namespace
 
 int main() {
@@ -518,6 +555,7 @@ int main() {
         time_indexed_updates_reject_bad_times_and_off_step_offsets();
         raw_temperature_observations_group_chronologically_and_keep_global_indices();
         raw_temperature_adapter_rejects_mixed_variable_units_and_bad_timestamp();
+        canonical_json_pipeline_advances_temperature_and_rejects_radar();
     } catch (const std::exception& error) {
         std::cerr << "dry scalar transport test failed: " << error.what() << '\n';
         return 1;
