@@ -74,6 +74,7 @@ struct WeatherObservation {
     ObservationStatus status{ObservationStatus::ambiguous};
     std::optional<double> confidence;
     std::string reason;
+    std::string interpretation{"palette_lookup"};
 };
 
 struct DecodeLimits {
