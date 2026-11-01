@@ -115,6 +115,11 @@ void validate_metadata(const RadarMapMetadata& metadata, const DecodeLimits& lim
     std::unordered_map<std::uint32_t, bool> seen_colors;
     seen_colors.reserve(metadata.palette.size());
     for (const PaletteEntry& entry : metadata.palette) {
+        if (entry.status != ObservationStatus::decoded &&
+            entry.status != ObservationStatus::no_data &&
+            entry.status != ObservationStatus::ambiguous) {
+            throw std::invalid_argument("map metadata palette contains an unsupported status");
+        }
         if (!seen_colors.emplace(color_key(entry.rgb), true).second) {
             throw std::invalid_argument("map metadata palette contains a duplicate RGB color");
         }
@@ -207,6 +212,10 @@ std::vector<WeatherObservation> decode_reflectivity_ppm_p3(
                 metadata.pixel_to_world[3] +
                 pixel_x * metadata.pixel_to_world[4] +
                 pixel_y * metadata.pixel_to_world[5];
+            if (!std::isfinite(observation.location.x) ||
+                !std::isfinite(observation.location.y)) {
+                throw std::invalid_argument("georeferencing transform produced a non-finite coordinate");
+            }
 
             if (found == palette.end()) {
                 observation.status = ObservationStatus::ambiguous;
