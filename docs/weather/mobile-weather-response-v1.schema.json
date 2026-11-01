@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/mobile-response-v1.json",
+  "title": "TerraFlux mobile weather response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "forecast", "precipitation_accumulation"],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.mobile_response/v1"
+    },
+    "forecast": {
+      "$ref": "temperature-forecast-v1.schema.json",
+      "description": "The existing temperature and wind forecast. Its grid defines the row-major cell order for the precipitation arrays."
+    },
+    "precipitation_accumulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period_start_utc", "valid_time_utc", "units", "method", "values", "quality"],
+      "properties": {
+        "period_start_utc": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Start of the accumulated precipitation interval."
+        },
+        "valid_time_utc": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "End of the accumulated precipitation interval."
+        },
+        "units": {
+          "const": "mm"
+        },
+        "method": {
+          "const": "trapezoidal_rate_integration"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": ["number", "null"],
+            "minimum": 0
+          },
+          "description": "Row-major accumulated precipitation values aligned with forecast.grid; null cells must have a non-decoded quality status."
+        },
+        "quality": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "enum": ["decoded", "no_data", "ambiguous"]
+          },
+          "description": "Row-major per-cell status aligned with values and forecast.grid."
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "derivation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "description": "The precipitation arrays must each contain exactly forecast.grid.nx * forecast.grid.ny entries and use the same grid geometry, coordinate reference, and row-major y-then-x ordering as the forecast. A decoded cell has a numeric value; no_data and ambiguous cells have null values. The rainfall layer is an observation-derived accumulation and is not an input or output of the dry temperature transport solver."
+}
