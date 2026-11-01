@@ -13,7 +13,7 @@ Keep format decoding, image interpretation, georeferencing, and weather physics 
 
 Start with a radar reflectivity map whose palette or legend and georeferencing are known. Accept an image plus its source metadata, valid time, projection or map bounds, and legend/palette definition. The first output is a spatial field of reflectivity observations in dBZ, with no-data and confidence/provenance recorded per observation.
 
-Radar reflectivity represents returned radar energy; it is not a direct surface rainfall-rate measurement. Do not convert dBZ to rain rate in this reader. A later precipitation-estimation module must choose and document an empirical reflectivity-to-rainfall relationship and its limits. See [NOAA's reflectivity overview](https://www.noaa.gov/jetstream/reflectivity) and the [NWS discussion of radar rainfall-estimation limits](https://www.weather.gov/mrx/radarrainfallestimates).
+Radar reflectivity represents returned radar energy; it is not a direct surface rainfall-rate measurement. Keep map decoding independent of rainfall estimation. A separate estimator applies a documented empirical reflectivity-to-rainfall relationship and records the coefficients and limits with each result. See [NOAA's reflectivity overview](https://www.noaa.gov/jetstream/reflectivity), the [NWS default Z-R relation](https://www.weather.gov/tae/research-zrpaper), and the [NWS discussion of radar rainfall-estimation limits](https://www.weather.gov/mrx/radarrainfallestimates).
 
 ## Temporary structured-grid source: NOAA MRMS
 
