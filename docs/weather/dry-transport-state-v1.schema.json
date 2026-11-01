@@ -21,5 +21,5 @@
       "items": { "type": "number" }
     }
   },
-  "description": "All arrays are row-major, indexed by y * nx + x, and must each contain nx * ny values from the associated configuration. Wind is prescribed and remains fixed during a run."
+  "description": "All arrays are row-major, indexed by y * nx + x, and must each contain nx * ny values from the associated configuration. Wind is prescribed, remains fixed during a run, and must be discretely divergence-free on the periodic grid; the solver enforces this constraint."
 }
