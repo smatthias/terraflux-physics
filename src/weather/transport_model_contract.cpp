@@ -42,6 +42,31 @@ void validate_dry_transport_config(const DryTransportConfig& config) {
         throw std::invalid_argument("grid spacing must be positive");
     }
 
+    const long double east_extent =
+        static_cast<long double>(config.grid.origin_east_m) +
+        static_cast<long double>(config.grid.nx) * config.grid.spacing_east_m;
+    const long double north_extent =
+        static_cast<long double>(config.grid.origin_north_m) +
+        static_cast<long double>(config.grid.ny) * config.grid.spacing_north_m;
+    if (!std::isfinite(east_extent) || !std::isfinite(north_extent) ||
+        std::abs(east_extent) > std::numeric_limits<double>::max() ||
+        std::abs(north_extent) > std::numeric_limits<double>::max()) {
+        throw std::invalid_argument("transport grid extent overflows");
+    }
+
+    require_finite(
+        config.grid.geographic_anchor_longitude_deg,
+        "geographic anchor longitude must be finite");
+    require_finite(
+        config.grid.geographic_anchor_latitude_deg,
+        "geographic anchor latitude must be finite");
+    if (config.grid.geographic_anchor_longitude_deg < -180.0 ||
+        config.grid.geographic_anchor_longitude_deg > 180.0 ||
+        config.grid.geographic_anchor_latitude_deg < -90.0 ||
+        config.grid.geographic_anchor_latitude_deg > 90.0) {
+        throw std::invalid_argument("geographic projection anchor is outside longitude/latitude bounds");
+    }
+
     require_finite(config.timestep_seconds, "timestep must be finite");
     if (config.timestep_seconds <= 0.0 || config.steps == 0) {
         throw std::invalid_argument("timestep and step count must be positive");
