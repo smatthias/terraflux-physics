@@ -1,6 +1,6 @@
 # First radar map decoder
 
-The C++17 library target **terraflux_weather_map** reads the v1 JSON sidecar, decodes PPM P3 or PNG rasters, and writes georeferenced observations in canonical v1 JSON form.
+The C++17 library target **terraflux_weather_map** reads the v1 JSON sidecar, decodes PPM P3 or PNG rasters, and writes georeferenced observations in canonical v1 JSON form. The `terraflux-decode-radar-map` executable provides a command-line path through those stages.
 
 ## Current scope
 
@@ -13,7 +13,21 @@ The C++17 library target **terraflux_weather_map** reads the v1 JSON sidecar, de
 - PNG is decoded to 8-bit RGBA. Inputs with more than 8 bits per channel are rejected to avoid silently changing palette colors.
 - Observation output follows the canonical v1 record shape, retaining source, valid time, units, coordinates, vertical reference, quality state, and optional confidence.
 
-## Sidecar, raster, and output usage
+## Build and run
+
+~~~sh
+cmake -S . -B build
+cmake --build build
+
+./build/terraflux-decode-radar-map \
+  examples/weather/maps/victoria-radar-synthetic.json \
+  examples/weather/maps/victoria-radar-synthetic.ppm \
+  build/victoria-observations.json
+~~~
+
+The CLI takes three paths: sidecar JSON, raster image, and output JSON. It reports input or decoding errors to stderr and returns a nonzero exit code. The output is a JSON array; each element follows [weather observation v1](observation-record-v1.schema.json). The writer rejects invalid status/value combinations, unsupported source kinds, non-finite coordinates or values, and confidence outside 0..1.
+
+## C++ API
 
 The sidecar loader type-checks the required v1 fields and returns typed metadata. It is not a general JSON Schema validation engine; applications can validate the document against the checked-in schema before loading it.
 
@@ -35,14 +49,7 @@ std::ofstream output("observations.json");
 terraflux::weather::write_weather_observations_json(output, observations);
 ~~~
 
-The writer emits a JSON array; each element follows [weather observation v1](observation-record-v1.schema.json). It rejects invalid status/value combinations, unsupported source kinds, non-finite coordinates or values, and confidence outside 0..1.
-
 The committed fixtures are synthetic. The axis-aligned and rotated-grid sidecars both use the small PPM palette raster; the rotated-grid fixture has nonzero cross-axis coefficients. PNG support uses libpng; CMake requires libpng 1.6.59 or later and nlohmann/json 3.12.0 or later.
-
-~~~sh
-cmake -S . -B build
-cmake --build build
-~~~
 
 The reader does not fetch live BOM products, estimate rainfall rate, or run weather physics. PNG and PPM inputs are decoded locally; provider retrieval remains separate.
 
