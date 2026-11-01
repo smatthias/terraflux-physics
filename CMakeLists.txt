@@ -32,13 +32,19 @@ target_link_libraries(terraflux_weather_map
 )
 
 add_executable(terraflux-decode-radar-map src/weather/decode_radar_map.cpp)
-target_link_libraries(terraflux-decode-radar-map PRIVATE terraflux_weather_map)
+target_link_libraries(terraflux-decode-radar-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
 
 add_executable(terraflux-decode-temperature-map src/weather/decode_temperature_map.cpp)
-target_link_libraries(terraflux-decode-temperature-map PRIVATE terraflux_weather_map)
+target_link_libraries(terraflux-decode-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
 
 add_executable(terraflux-run-temperature-map src/weather/run_temperature_map.cpp)
-target_link_libraries(terraflux-run-temperature-map PRIVATE terraflux_weather_map)
+target_link_libraries(terraflux-run-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
 
 if(BUILD_TESTING)
     add_executable(terraflux-weather-transport-test
