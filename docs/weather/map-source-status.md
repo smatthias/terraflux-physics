@@ -11,7 +11,7 @@ Use NOAA's Multi-Radar/Multi-Sensor System (MRMS) merged reflectivity composite 
 
 NOAA NODD says its MRMS data are open for public use and requests attribution for unaltered data. Do not imply NOAA endorsement; identify transformed data as modified. This temporary feed is U.S.-coverage data and does not replace the planned Victoria/Australia source.
 
-The repository includes `tools/fetch_noaa_mrms.py` to retrieve the current compressed GRIB2 file, expand it, and write a provenance record. It does not yet decode GRIB2 into TerraFlux observations, PNG, or a v1 geospatial sidecar. Retrieval time is explicitly kept separate from the product valid time. Do not run the model on a downloaded file until its GRIB2 valid time, projection/grid, reflectivity units, and missing-value encoding have been read and mapped.
+The repository includes `tools/fetch_noaa_mrms.py` to retrieve the current compressed GRIB2 file and write a provenance record, plus `tools/decode_noaa_mrms.py` to use `wgrib2` to decode a bounded area into canonical radar-reflectivity observations. The decoder reads valid time and geographic coordinates from the GRIB2 field and preserves explicit missing/no-coverage codes. Retrieval time remains separate from product valid time. The decoder writes source observations; the dry air-temperature model does not interpret dBZ as temperature. Follow [the MRMS ingestion guide](noaa-mrms.md) for the workflow and limits.
 
 ## Planned licensed source: BOM Victoria radar
 
