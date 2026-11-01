@@ -8,7 +8,7 @@ The C++17 library target **terraflux_weather_map** reads the v1 JSON sidecar and
 - PNG alpha is retained; sidecar palette alpha defaults to 255 when omitted.
 - Explicit no-data and ambiguous palette states remain null-valued observations.
 - Unrecognized raster colors become ambiguous with a reason; the decoder never guesses a value.
-- Pixel-corner affine georeferencing is evaluated at each pixel center.
+- Pixel-corner affine georeferencing is evaluated at each pixel center, including rotated or sheared grids.
 - Sidecar fields, image dimensions, PPM sample ranges, palette entries, and configurable input limits are checked.
 - PNG is decoded to 8-bit RGBA. Inputs with more than 8 bits per channel are rejected to avoid silently changing palette colors.
 
@@ -31,7 +31,7 @@ auto observations =
     terraflux::weather::decode_reflectivity_map(raster, metadata);
 ~~~
 
-The committed fixture remains synthetic PPM. PNG support uses libpng; CMake requires libpng 1.6.59 or later and nlohmann/json 3.12.0 or later.
+The committed fixtures are synthetic. The axis-aligned and rotated-grid sidecars both use the small PPM palette raster; the rotated-grid fixture has nonzero cross-axis coefficients. PNG support uses libpng; CMake requires libpng 1.6.59 or later and nlohmann/json 3.12.0 or later.
 
 ~~~sh
 cmake -S . -B build
@@ -42,4 +42,4 @@ The reader does not fetch live BOM products, estimate rainfall rate, or run weat
 
 ## Native BOM coordinate files
 
-The BOM Radar Images User Guide identifies the coordinate files as `IDRnnnx.map` and explains that the final digit selects a radar-image radius. The public guide does not describe the file contents or coordinate convention. The decoder therefore accepts the documented, normalized JSON sidecar; it does not claim to parse BOM `.map` files. Add that adapter only after a real sample or a format specification is available, and keep the synthetic fixture separate from BOM source files.
+The BOM Radar Images User Guide identifies the coordinate files by the `IDRnnnx.map` naming pattern and explains that the final digit selects a radar-image radius. The public guide does not describe the file contents or coordinate convention. The decoder therefore accepts the documented, normalized JSON sidecar; it does not claim to parse BOM `.map` files. Add that adapter only after a real sample or a format specification is available, and keep the synthetic fixtures separate from BOM source files.
