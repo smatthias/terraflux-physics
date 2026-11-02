@@ -18,13 +18,15 @@ def main():
     with tempfile.TemporaryDirectory(prefix='terraflux-example-') as temporary:
         directory = Path(temporary)
         subprocess.run([str(args.build_dir.resolve() / 'terraflux-generate-viewer-example'), str(directory)], check=True)
-        subprocess.run([str(args.build_dir.resolve() / 'terraflux-grid-rainfall'),
-                        str(directory / 'forecast.json'), str(directory / 'accumulation.json'),
-                        str(directory / 'gridded.json')], check=True)
-        result = compose(json.loads((directory / 'forecast.json').read_text()),
-                         json.loads((directory / 'gridded.json').read_text()))
         frames=json.loads((directory / 'forecast-frames.json').read_text())
-        frames[-1]=result
+        for i in range(1,len(frames)):
+            forecast_path=directory / f'forecast-{i}.json'
+            forecast_path.write_text(json.dumps(frames[i]))
+            subprocess.run([str(args.build_dir.resolve() / 'terraflux-grid-rainfall'),
+                            str(forecast_path), str(directory / f'accumulation-{i}.json'),
+                            str(directory / 'gridded.json')], check=True)
+            frames[i]=compose(frames[i], json.loads((directory / 'gridded.json').read_text()))
+        result=frames[-1]
         timeline={'schema_version':'terraflux.weather.timeline/v1', 'frames':frames}
         outputs=[(args.output,result),(args.output.with_name('engine-timeline.json'),timeline)]
         if args.check:

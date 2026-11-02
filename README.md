@@ -65,7 +65,7 @@ python3 tools/build_viewer_example.py --build-dir build
 python3 tools/build_viewer_example.py --build-dir build --check
 ```
 
-CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 120 × 30-second dry-transport steps. The companion timeline contains seven snapshots at ten-minute intervals, with static prescribed wind. A separate one-hour radar-derived rainfall layer is included only at the final frame.
+CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 120 × 30-second dry-transport steps. The companion timeline contains seven snapshots at ten-minute intervals, with static prescribed wind. Each positive-time frame includes radar-derived rainfall accumulated from the start up to that frame.
 
 ### Timeline playback
 

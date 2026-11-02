@@ -22,6 +22,10 @@ int main(int argc, char** argv) {
         c.horizontal_mixing_diffusivity_m2_s=100;
         c.grid={12,10,-6000,-5000,1000,1000,0,0};
         DryTransportState initial;
+        const std::vector<std::string> valid_times={
+            "2026-11-01T12:00:00Z", "2026-11-01T12:10:00Z", "2026-11-01T12:20:00Z",
+            "2026-11-01T12:30:00Z", "2026-11-01T12:40:00Z", "2026-11-01T12:50:00Z",
+            "2026-11-01T13:00:00Z"};
         std::vector<WeatherObservation> reflectivity;
         for (std::size_t y=0;y<c.grid.ny;++y) {
             for (std::size_t x=0;x<c.grid.nx;++x) {
@@ -35,13 +39,13 @@ int main(int argc, char** argv) {
                 const double rho=std::hypot(east,north), angle=rho/6371008.8;
                 const double latitude=std::asin(north*std::sin(angle)/rho);
                 const double longitude=std::atan2(east*std::sin(angle),rho*std::cos(angle));
-                for (int frame=0;frame<2;++frame) {
+                for (int frame=0;frame<7;++frame) {
                     WeatherObservation o;
                     o.source_id="terraflux_synthetic_viewer_fixture";
                     o.source_kind="user_supplied";
                     o.product_id="synthetic_reflectivity_not_live_data";
                     o.interpretation="structured_grid_value";
-                    o.valid_time_utc=frame==0?c.start_time_utc:"2026-11-01T13:00:00Z";
+                    o.valid_time_utc=valid_times.at(frame);
                     o.variable="radar_reflectivity";o.units="dBZ";
                     o.vertical_reference="composite";
                     o.location.crs="EPSG:4326";
@@ -52,7 +56,7 @@ int main(int argc, char** argv) {
                     } else {
                         o.status=ObservationStatus::decoded;
                         const double rx=static_cast<double>(x)-7, ry=static_cast<double>(y)-4;
-                        o.value=15+25*std::exp(-(rx*rx+ry*ry)/10)+frame*2;
+                        o.value=15+25*std::exp(-(rx*rx+ry*ry)/10)+frame/3.0;
                     }
                     reflectivity.push_back(o);
                 }
@@ -66,7 +70,18 @@ int main(int argc, char** argv) {
             snapshots.push_back(state);
         }
         const auto& forecast=snapshots.back();
-        const auto accumulation=accumulate_rainfall(estimate_rain_rate(reflectivity));
+        const auto rates=estimate_rain_rate(reflectivity);
+        const auto accumulation=accumulate_rainfall(rates);
+        for (std::size_t i=1;i<valid_times.size();++i) {
+            std::vector<WeatherObservation> prefix;
+            for (const auto& rate : rates) {
+                if (rate.valid_time_utc<=valid_times[i]) prefix.push_back(rate);
+            }
+            std::ofstream output(directory/("accumulation-"+std::to_string(i)+".json"));
+            write_weather_observations_json(output,accumulate_rainfall(prefix));
+            output.close();
+            if (!output) throw std::runtime_error("failed to write prefix accumulation");
+        }
         const auto& g=c.grid;
         Json grid={{"nx",g.nx},{"ny",g.ny},{"origin_east_m",g.origin_east_m},
           {"origin_north_m",g.origin_north_m},{"spacing_east_m",g.spacing_east_m},

@@ -5,3 +5,5 @@
 .example-button{display:block;width:100%;border:1px solid #49664b;border-radius:4px;background:#1c302f;color:#c8e8bd;padding:11px;margin:14px 0;font-size:11px;text-align:left}
 
 .timeline{padding:18px 24px;border-top:1px solid #293e4b}.playback{display:flex;align-items:center;gap:8px}.playback button{background:#1c302f;color:#c8e8bd;border:1px solid #49664b;border-radius:4px;padding:6px 12px;font-size:11px}.playback span{font-size:11px;color:#9db0b8;margin-left:8px}.timeline input{width:100%;accent-color:#b1d9a4;margin:15px 0 3px}.timeline p{font-size:9px;color:#839da9;margin:4px 0}
+
+.rain-interval{font-size:10px;color:#a7c9b5;padding:0 24px 12px;line-height:1.7}
