@@ -1,0 +1,18 @@
+# Weather snapshot timeline v1
+
+The viewer accepts:
+
+```json
+{
+  "schema_version": "terraflux.weather.timeline/v1",
+  "frames": ["forecast or mobile-response object", "next frame object"]
+}
+```
+
+The strings above are placeholders; each entry must be a complete forecast/v1 or mobile_response/v1 object validated by the existing viewer contract. Frames share an exact grid and UTC start time, and their elapsed_seconds strictly increase. A timeline contains 2–240 frames, subject to the viewer limits of 65,536 cells per frame and two million cell snapshots in total. File loading is limited to 20 MB.
+
+A frame can carry precipitation only when it is a mobile response with an accumulation interval matching that frame. Missing precipitation does not mean zero rainfall. The bundled example includes rainfall only in the final frame; earlier frames disable the rainfall layer. The displayed interval endpoint and forecast valid time advance with the selected frame.
+
+Playback selects stored frames every 700 ms and stops at the final frame. A fixed field range across the timeline preserves color/height comparability; missing values remain excluded from that range. Scrubbing and stepping pause playback. No interpolation, live solver, evolving wind, or coupled precipitation physics is implied.
+
+Generate both bundled examples with `python3 tools/build_viewer_example.py --build-dir build`; append `--check` to verify regeneration without rewriting outputs. Production C++ kernels generate every temperature snapshot from the same initial state using successive 20-step segments. Synthetic reflectivity inputs are independently estimated, accumulated, gridded and composed into the final frame.

@@ -23,9 +23,12 @@ def main():
                         str(directory / 'gridded.json')], check=True)
         result = compose(json.loads((directory / 'forecast.json').read_text()),
                          json.loads((directory / 'gridded.json').read_text()))
+        frames=json.loads((directory / 'forecast-frames.json').read_text())
+        frames[-1]=result
+        timeline={'schema_version':'terraflux.weather.timeline/v1', 'frames':frames}
+        outputs=[(args.output,result),(args.output.with_name('engine-timeline.json'),timeline)]
         if args.check:
             # Floating-point kernel results can vary slightly between platforms.
-            committed = json.loads(args.output.read_text())
             def equivalent(a, b):
                 if type(a) in (float, int) and type(b) in (float, int):
                     return abs(a-b) <= 1e-9 * max(1, abs(a), abs(b))
@@ -34,13 +37,14 @@ def main():
                 if isinstance(a, list) and isinstance(b, list):
                     return len(a) == len(b) and all(equivalent(x,y) for x,y in zip(a,b))
                 return a == b
-            if not equivalent(committed, result):
+            if not all(equivalent(json.loads(path.read_text()), content) for path,content in outputs):
                 parser.exit(1, 'Engine example differs from committed fixture. Regenerate it.\n')
             print('Committed engine example matches regeneration')
         else:
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(result, indent=2, allow_nan=False) + '\n')
-            print(f'Wrote {args.output}')
+            for path,content in outputs:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(content, indent=2, allow_nan=False) + '\n')
+                print(f'Wrote {path}')
 
 if __name__ == '__main__':
     main()

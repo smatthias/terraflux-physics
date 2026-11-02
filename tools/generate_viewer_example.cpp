@@ -58,7 +58,14 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        const auto forecast=advance_dry_transport(initial,c);
+        std::vector<DryTransportState> snapshots{initial};
+        auto state=initial;
+        auto segment=c; segment.steps=20;
+        for (int i=0;i<6;++i) {
+            state=advance_dry_transport(state,segment);
+            snapshots.push_back(state);
+        }
+        const auto& forecast=snapshots.back();
         const auto accumulation=accumulate_rainfall(estimate_rain_rate(reflectivity));
         const auto& g=c.grid;
         Json grid={{"nx",g.nx},{"ny",g.ny},{"origin_east_m",g.origin_east_m},
@@ -72,6 +79,18 @@ int main(int argc, char** argv) {
           {"fields",{{"air_temperature",{{"units","K"},{"values",forecast.air_temperature_k}}},
                      {"wind_east",{{"units","m/s"},{"values",forecast.wind_east_m_s}}},
                      {"wind_north",{{"units","m/s"},{"values",forecast.wind_north_m_s}}}}}};
+        Json frames=Json::array();
+        for (const auto& snapshot : snapshots) {
+            auto frame=result;
+            frame["elapsed_seconds"]=snapshot.elapsed_seconds;
+            frame["fields"]["air_temperature"]["values"]=snapshot.air_temperature_k;
+            frame["fields"]["wind_east"]["values"]=snapshot.wind_east_m_s;
+            frame["fields"]["wind_north"]["values"]=snapshot.wind_north_m_s;
+            frames.push_back(frame);
+        }
+        std::ofstream timeline_file(directory/"forecast-frames.json");
+        timeline_file << frames.dump(2) << '\n'; timeline_file.close();
+        if (!timeline_file) throw std::runtime_error("failed to write timeline");
         std::ofstream forecast_file(directory/"forecast.json");
         forecast_file << result.dump(2) << '\n'; forecast_file.close();
         std::ofstream accumulation_file(directory/"accumulation.json");

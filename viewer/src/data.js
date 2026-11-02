@@ -36,3 +36,19 @@ export function demo() {
   }
   return {schema_version:'terraflux.weather.mobile_response/v1', forecast:{schema_version:'terraflux.weather.forecast/v1', start_time_utc:'2026-11-01T12:00:00Z', elapsed_seconds:3600, observation_updates:[], grid:{nx,ny,origin_east_m:0,origin_north_m:0,spacing_east_m:1000,spacing_north_m:1000,geographic_anchor_longitude_deg:-100,geographic_anchor_latitude_deg:38,coordinate_system:'local_azimuthal_equidistant_m',array_order:'row_major_y_then_x'},fields:{air_temperature:{units:'K',values:t},wind_east:{units:'m/s',values:u},wind_north:{units:'m/s',values:v}}}, precipitation_accumulation:{period_start_utc:'2026-11-01T12:00:00Z',valid_time_utc:'2026-11-01T13:00:00Z',units:'mm',method:'trapezoidal_rate_integration',values:rain,quality}}
 }
+
+// Snapshot playback only: no interpolation and no browser-side simulation.
+export function validateSequence(input) {
+  if(input?.schema_version !== 'terraflux.weather.timeline/v1') return [validate(input)]
+  check(Array.isArray(input.frames) && input.frames.length >= 2 && input.frames.length <= 240, 'Timeline requires 2–240 frames.')
+  const frames=input.frames.map(validate), first=frames[0].forecast
+  const keys=Object.keys(first.grid)
+  check(frames.length*first.grid.nx*first.grid.ny <= 2000000, 'Timeline exceeds two million cell snapshots.')
+  frames.forEach((frame,i)=>{
+    const f=frame.forecast
+    check(keys.every(key=>f.grid[key]===first.grid[key]) && Object.keys(f.grid).length===keys.length, 'Timeline grids must match exactly.')
+    check(f.start_time_utc===first.start_time_utc, 'Timeline start times must match.')
+    check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
+  })
+  return frames
+}

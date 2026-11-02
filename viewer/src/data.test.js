@@ -15,3 +15,20 @@ test('bundled engine output loads with valid coverage and prescribed wind',async
  assert.ok(forecast.fields.wind_east.values.every(v=>v===1.5))
  assert.ok(rain.values.filter(v=>v!==null).every(v=>v>0))
 })
+
+test('timeline has seven increasing solver snapshots and final-only rainfall',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const frames=validateSequence(input)
+ assert.equal(frames.length,7)
+ assert.deepEqual(frames.map(f=>f.forecast.elapsed_seconds),[0,600,1200,1800,2400,3000,3600])
+ assert.ok(frames.slice(0,-1).every(f=>f.rain===null))
+ assert.ok(frames.at(-1).rain)
+ assert.notDeepEqual(frames[0].forecast.fields.air_temperature.values,frames.at(-1).forecast.fields.air_temperature.values)
+ const total=f=>f.forecast.fields.air_temperature.values.reduce((a,b)=>a+b,0)
+ for(const frame of frames)assert.ok(Math.abs(total(frame)-total(frames[0]))<1e-7,'periodic transport conserves scalar sum')
+ for(const mutate of [d=>d.frames.reverse(),d=>d.frames[1].grid.spacing_east_m=2000,d=>d.frames[1].start_time_utc='2026-11-02T12:00:00Z',d=>d.frames[1].elapsed_seconds=0]){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+})

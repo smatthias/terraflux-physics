@@ -50,7 +50,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite. No login, database, or backend is required. Use **Open JSON** for a `terraflux.weather.forecast/v1` file or composed `terraflux.weather.mobile_response/v1` file. Files remain in browser memory. The initial synthetic demo is illustrative, not solver output. Temperature, wind speed, rainfall, wind vectors, orbit/zoom, and cell inspection are supported. Height represents the selected field, not terrain elevation. A single snapshot is displayed; no live solver or timeline is included. Rainfall is unavailable for bare forecast files. Limit: 65,536 cells / 20 MB input.
+Open the URL printed by Vite. No login, database, or backend is required. Use **Open JSON** for a `terraflux.weather.forecast/v1` file or composed `terraflux.weather.mobile_response/v1` file. Files remain in browser memory. The initial synthetic demo is illustrative, not solver output. Temperature, wind speed, rainfall, wind vectors, orbit/zoom, and cell inspection are supported. Height represents the selected field, not terrain elevation. Single snapshots and validated snapshot timelines are supported; there is no live browser solver. Rainfall is unavailable for bare forecast files. Limit: 65,536 cells / 20 MB input.
 
 Checks: `npm test` and `npm run build` inside `viewer/`.
 
@@ -65,4 +65,10 @@ python3 tools/build_viewer_example.py --build-dir build
 python3 tools/build_viewer_example.py --build-dir build --check
 ```
 
-CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The fixture remains a single snapshot after 120 × 30-second dry-transport steps, with static prescribed wind and a separate one-hour radar-derived rainfall layer.
+CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 120 × 30-second dry-transport steps. The companion timeline contains seven snapshots at ten-minute intervals, with static prescribed wind. A separate one-hour radar-derived rainfall layer is included only at the final frame.
+
+### Timeline playback
+
+**Load engine example** opens the generated seven-frame timeline. Play/pause, previous/next, and the frame slider select discrete solver snapshots. Playback stops at the end; Play from the end restarts. Scrubbing or loading another dataset stops playback. Color ranges are fixed across all frames for each field. No temporal interpolation or browser-side physics is performed.
+
+JSON input also accepts `terraflux.weather.timeline/v1`: an object with a `frames` array of 2–240 forecast or mobile-response objects. All frames must have the same grid and start time, strictly increasing elapsed times, and no more than two million cell snapshots in total. Rainfall is enabled only on frames containing an interval-aligned rainfall layer. See [timeline contract](docs/weather/timeline-v1.md).
