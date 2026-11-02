@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--build-dir', type=Path, default=ROOT / 'build')
     parser.add_argument('--output', type=Path, default=ROOT / 'viewer/public/examples/engine-weather.json')
     parser.add_argument('--scenario', type=Path, default=ROOT / 'examples/hydrology-scenario.json')
+    parser.add_argument('--timeline-only', action='store_true', help='write/check only the companion timeline')
     parser.add_argument('--check', action='store_true', help='check that committed output matches regeneration')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='terraflux-example-') as temporary:
@@ -34,7 +35,8 @@ def main():
                   'surface_water':json.loads((directory / 'surface-water.json').read_text()),
                   'terrain_derivatives':json.loads((directory / 'terrain-derivatives.json').read_text()),
                   'terrain_temperature':json.loads((directory / 'terrain-temperature.json').read_text())}
-        outputs=[(args.output,result),(args.output.with_name('engine-timeline.json'),timeline)]
+        outputs=[(args.output.with_name('engine-timeline.json'),timeline)]
+        if not args.timeline_only: outputs.insert(0,(args.output,result))
         if args.check:
             # Floating-point kernel results can vary slightly between platforms.
             def equivalent(a, b):

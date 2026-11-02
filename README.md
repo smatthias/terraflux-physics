@@ -124,3 +124,18 @@ python3 tools/build_viewer_example.py --build-dir build --scenario my-scenario.j
 ```
 
 Open `/tmp/custom-weather/engine-timeline.json` in the viewer. The timeline records the exact applied `water_scenario`, and its water output carries matching parameters. Water/soil budget readouts show timestep and rate settings. The [JSON Schema](docs/weather/hydrology-scenario-v1.schema.json) documents the file contract. Parameters remain illustrative and prescribed; no AI or predictive model is involved.
+
+### Deterministic scenario comparison
+
+Select **Compare hydrology scenarios** to load the baseline and a C++-generated variant with infiltration reduced from 3.60 to 0.36 mm/h. Playback is synchronized, the map can switch between runs, and water/soil layers share a common color range. A table shows selected-time surface storage, soil storage, evaporation, drainage and rainfall, with delta defined as variant minus baseline. The chart compares surface storage across the full timeline and marks the current frame.
+
+**Open comparison JSON** accepts another generated timeline only when grid, times, terrain, rainfall, atmospheric forcing and coverage match the current baseline. Both runs must provide water output at every snapshot. This is a deterministic parameter comparison, not AI prediction or an assessment of real soil behavior.
+
+Regenerate or verify the bundled variant:
+
+```sh
+python3 tools/build_viewer_example.py --build-dir build --scenario examples/hydrology-low-infiltration.json --output viewer/public/comparison/engine-weather.json --timeline-only
+python3 tools/build_viewer_example.py --build-dir build --scenario examples/hydrology-low-infiltration.json --output viewer/public/comparison/engine-weather.json --timeline-only --check
+```
+
+CTest checks both baseline and variant regeneration. The `--timeline-only` flag avoids saving an unused final-snapshot file for comparisons.
