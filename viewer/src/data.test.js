@@ -111,3 +111,18 @@ test('surface water preserves masked cells and balances all covered rainfall',as
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
 })
+
+test('soil water stays within capacity and participates in combined mass balance',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const frames=validateSequence(input)
+ const final=frames.at(-1).surfaceWater
+ assert.ok(final.soil_volume_m3>0)
+ assert.ok(final.soil_values.some(v=>v===.0015),'some cells reach capacity')
+ assert.equal(final.soil_values.filter(v=>v===null).length,4)
+ assert.ok(Math.abs(final.stored_volume_m3+final.soil_volume_m3-final.cumulative_rainfall_volume_m3)<1e-7)
+ for(const mutate of [d=>d.surface_water.soil_values_by_frame[1][0]=1,d=>d.surface_water.soil_volume_m3[1]+=1,d=>d.surface_water.soil_values_by_frame[1][0]=null,d=>delete d.surface_water.infiltration_rate_m_s]){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+})

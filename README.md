@@ -91,6 +91,10 @@ The C++ `calculate_terrain_derivatives` function computes metric terrain gradien
 
 ### Surface-water storage and runoff prototype
 
-The C++ `advance_surface_water` function adds interval rainfall and routes stored water between four neighboring cells down free-surface head gradients. Donor-limited transfers keep storage nonnegative. Boundaries are closed; there is no infiltration, evaporation, external outflow or momentum solver. It is a conservative storage/routing prototype, not shallow-water hydraulics.
+The C++ `advance_surface_water` function adds interval rainfall and routes stored water between four neighboring cells down free-surface head gradients. Donor-limited transfers keep storage nonnegative. Boundaries are closed. Optional capacity-limited infiltration transfers surface water into a separate soil store; there is no evaporation, external outflow or momentum solver. It is a conservative storage/routing prototype, not shallow-water hydraulics.
 
 The example applies each ten-minute rainfall increment uniformly over twenty 30-second steps, with routing speed parameter 0.002 m/s. Cells lacking rainfall coverage are impermeable masks and retain unknown/null water depth in the output. Water depth is stored in metres and displayed in millimetres. The **Surface water depth** layer includes stored volume, cumulative rainfall input and mass-balance residual for every frame. Terrain and weather remain independent of the routed water state. See [surface-water contract](docs/weather/surface-water-v1.md).
+
+### Soil-water storage
+
+The optional C++ infiltration step transfers available surface water into a capacity-limited soil store. The example runs rain → routing → infiltration each 30 seconds. **Soil water storage** is a separate playback layer; budget readouts show surface and soil volumes against cumulative rainfall. The example rate and capacity are illustrative scenario parameters. See [infiltration contract and limits](docs/weather/infiltration-v1.md).

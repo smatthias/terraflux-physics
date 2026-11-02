@@ -2,6 +2,7 @@
 #include "terraflux/weather/transport_model.hpp"
 #include "terraflux/weather/terrain_temperature.hpp"
 #include "terraflux/weather/surface_water.hpp"
+#include "terraflux/weather/infiltration.hpp"
 #include "terraflux/weather/precipitation_grid.hpp"
 #include "terraflux/weather/terrain_derivatives.hpp"
 #include "terraflux/weather/precipitation_estimator.hpp"
@@ -138,12 +139,12 @@ int main(int argc, char** argv) {
         std::ofstream derivatives_file(directory/"terrain-derivatives.json");
         derivatives_file << derived.dump(2) << '\n'; derivatives_file.close();
         if (!derivatives_file) throw std::runtime_error("failed to write terrain derivatives");
-        std::vector<double> water_depth(g.nx*g.ny,0),previous_rain(g.nx*g.ny,0);
+        std::vector<double> water_depth(g.nx*g.ny,0),previous_rain(g.nx*g.ny,0),soil_storage(g.nx*g.ny,0);
         std::vector<unsigned char> active(g.nx*g.ny,1);
         const auto elevation=elevations.get<std::vector<double>>();
         const auto covered=map_precipitation_accumulation_to_grid(accumulation,c,3600);
         for(std::size_t i=0;i<active.size();++i)active[i]=covered.cells[i].status==ObservationStatus::decoded;
-        Json water_frames=Json::array(),volumes=Json::array(),rain_volumes=Json::array(),balance=Json::array();
+        Json water_frames=Json::array(),volumes=Json::array(),rain_volumes=Json::array(),balance=Json::array(),soil_frames=Json::array(),soil_volumes=Json::array();
         double cumulative_rain_volume=0;
         for(std::size_t frame_index=0;frame_index<snapshots.size();++frame_index) {
             if(frame_index>0) {
@@ -162,23 +163,30 @@ int main(int argc, char** argv) {
                 // integrated with twenty 30-second routing steps.
                 for(int step=0;step<20;++step) {
                     const auto routed=advance_surface_water(elevation,water_depth,rain_increment,active,g,{30,0.002});
-                    water_depth=routed.depth_m;cumulative_rain_volume+=routed.rainfall_volume_m3;
+                    const auto infiltrated=infiltrate_surface_water(routed.depth_m,soil_storage,active,{30,0.000001,0.0015});
+                    water_depth=infiltrated.surface_depth_m;soil_storage=infiltrated.soil_storage_m;
+                    cumulative_rain_volume+=routed.rainfall_volume_m3;
                 }
             }
-            Json depths=Json::array();double stored=0;
+            Json depths=Json::array(),soil_depths=Json::array();double stored=0,soil_stored=0;
             for(std::size_t i=0;i<active.size();++i) {
                 depths.push_back(active[i]?Json(water_depth[i]):Json(nullptr));
+                soil_depths.push_back(active[i]?Json(soil_storage[i]):Json(nullptr));
+                soil_stored+=soil_storage[i]*g.spacing_east_m*g.spacing_north_m;
                 stored+=water_depth[i]*g.spacing_east_m*g.spacing_north_m;
             }
             water_frames.push_back(depths);volumes.push_back(stored);
-            rain_volumes.push_back(cumulative_rain_volume);balance.push_back(stored-cumulative_rain_volume);
+            soil_frames.push_back(soil_depths);soil_volumes.push_back(soil_stored);
+            rain_volumes.push_back(cumulative_rain_volume);balance.push_back(stored+soil_stored-cumulative_rain_volume);
         }
         Json water={{"schema_version","terraflux.water.timeline/v1"},{"units","m"},
             {"method","head_gradient_donor_limited"},{"boundary","closed"},
             {"missing_rainfall_policy","impermeable_mask"},{"routing_speed_m_s",0.002},
             {"timestep_seconds",30},{"values_by_frame",water_frames},
             {"stored_volume_m3",volumes},{"cumulative_rainfall_volume_m3",rain_volumes},
-            {"balance_error_m3",balance}};
+            {"balance_error_m3",balance},{"soil_values_by_frame",soil_frames},
+            {"soil_volume_m3",soil_volumes},{"soil_storage_capacity_m",0.0015},
+            {"infiltration_rate_m_s",0.000001},{"process_order","rain_route_infiltrate"}};
         std::ofstream water_file(directory/"surface-water.json");
         water_file<<water.dump(2)<<'\n';water_file.close();
         if(!water_file)throw std::runtime_error("failed to write water timeline");
