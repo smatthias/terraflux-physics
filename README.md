@@ -53,3 +53,16 @@ npm run dev
 Open the URL printed by Vite. No login, database, or backend is required. Use **Open JSON** for a `terraflux.weather.forecast/v1` file or composed `terraflux.weather.mobile_response/v1` file. Files remain in browser memory. The initial synthetic demo is illustrative, not solver output. Temperature, wind speed, rainfall, wind vectors, orbit/zoom, and cell inspection are supported. Height represents the selected field, not terrain elevation. A single snapshot is displayed; no live solver or timeline is included. Rainfall is unavailable for bare forecast files. Limit: 65,536 cells / 20 MB input.
 
 Checks: `npm test` and `npm run build` inside `viewer/`.
+
+### Reproducible engine example
+
+Select **Load engine example** in the viewer to open the committed 12 × 10 example. It uses synthetic radar and atmospheric inputs evaluated by the production C++ dry-transport, rain-rate estimator, accumulator, and gridding kernels, then the Python composer. This is engine output from synthetic inputs, not live weather or a coupled rainfall/temperature simulation. It includes missing rainfall coverage.
+
+After a normal CMake build, regenerate or verify the bundled file:
+
+```sh
+python3 tools/build_viewer_example.py --build-dir build
+python3 tools/build_viewer_example.py --build-dir build --check
+```
+
+CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The fixture remains a single snapshot after 120 × 30-second dry-transport steps, with static prescribed wind and a separate one-hour radar-derived rainfall layer.

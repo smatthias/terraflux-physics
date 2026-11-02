@@ -59,11 +59,16 @@ target_link_libraries(terraflux-accumulate-rainfall
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
+add_executable(terraflux-generate-viewer-example tools/generate_viewer_example.cpp)
+target_link_libraries(terraflux-generate-viewer-example PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json)
+
 add_executable(terraflux-grid-rainfall src/weather/grid_rainfall.cpp)
 target_link_libraries(terraflux-grid-rainfall PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json)
 
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME weather.viewer_example
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_viewer_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR} --check)
     add_test(NAME weather.rainfall_pipeline
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/rainfall_pipeline_check.py $<TARGET_FILE:terraflux-grid-rainfall>)
     add_executable(terraflux-precipitation-grid-test tests/weather/precipitation_grid_test.cpp)
