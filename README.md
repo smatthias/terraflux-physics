@@ -149,3 +149,7 @@ The CSV uses UTF-8 with BOM and CRLF rows, preserves numeric precision, escapes 
 ### Water timestep sensitivity
 
 `python3 tools/check_water_timestep.py --build-dir build --check` reruns the synthetic hydrology case at 15, 30 and 60 second water timesteps. It checks storage positivity, capacity, coverage, input consistency and full mass accounting, then verifies the committed report. CTest includes this regression. The report measures spatial surface-water differences from the 15-second run; it is not proof of physical accuracy or convergence. See [method and results](docs/weather/water-timestep-sensitivity.md).
+
+### Basin ponding and overflow regression
+
+`ctest --test-dir build -R surface_water_basin --output-on-failure` checks stable ponding below a spill point, equal-head retention, internal overflow above it, a raised spill barrier and rainfall-driven filling. Each step verifies nonnegative depths and the closed-domain water budget. This is a controlled routing regression, not a hydraulic spillway model. See [geometry and limits](docs/weather/surface-water-basin-test.md).
