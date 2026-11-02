@@ -24,14 +24,16 @@ int main(int argc, char** argv) {
         std::filesystem::create_directories(directory);
         DryTransportConfig c;
         c.start_time_utc="2026-11-01T12:00:00Z";
-        c.timestep_seconds=30; c.steps=120;
+        c.timestep_seconds=30; c.steps=260;
         c.horizontal_mixing_diffusivity_m2_s=100;
         c.grid={12,10,-6000,-5000,1000,1000,0,0};
         DryTransportState initial;
         const std::vector<std::string> valid_times={
             "2026-11-01T12:00:00Z", "2026-11-01T12:10:00Z", "2026-11-01T12:20:00Z",
             "2026-11-01T12:30:00Z", "2026-11-01T12:40:00Z", "2026-11-01T12:50:00Z",
-            "2026-11-01T13:00:00Z"};
+            "2026-11-01T13:00:00Z", "2026-11-01T13:10:00Z", "2026-11-01T13:20:00Z",
+            "2026-11-01T13:30:00Z", "2026-11-01T13:40:00Z", "2026-11-01T13:50:00Z",
+            "2026-11-01T14:00:00Z", "2026-11-01T14:10:00Z"};
         std::vector<WeatherObservation> reflectivity;
         for (std::size_t y=0;y<c.grid.ny;++y) {
             for (std::size_t x=0;x<c.grid.nx;++x) {
@@ -71,12 +73,25 @@ int main(int argc, char** argv) {
         std::vector<DryTransportState> snapshots{initial};
         auto state=initial;
         auto segment=c; segment.steps=20;
-        for (int i=0;i<6;++i) {
+        for (std::size_t i=1;i<valid_times.size();++i) {
             state=advance_dry_transport(state,segment);
             snapshots.push_back(state);
         }
         const auto& forecast=snapshots.back();
-        const auto rates=estimate_rain_rate(reflectivity);
+        auto rates=estimate_rain_rate(reflectivity);
+        std::vector<WeatherObservation> dry_rates;
+        for(const auto& rate:rates)if(rate.valid_time_utc==valid_times[6]) {
+            for(std::size_t i=7;i<valid_times.size();++i) {
+                auto dry=rate;dry.valid_time_utc=valid_times[i];
+                if(dry.value)dry.value=0;
+                dry_rates.push_back(dry);
+            }
+        }
+        rates.insert(rates.end(),dry_rates.begin(),dry_rates.end());
+        for(auto& rate:rates) {
+            rate.interpretation="manual_annotation";
+            rate.derivation="Synthetic forcing: wet Z=300 R^1.4 estimates; linear rate taper to explicit zero at 13:10 UTC; dry thereafter";
+        }
         const auto accumulation=accumulate_rainfall(rates);
         for (std::size_t i=1;i<valid_times.size();++i) {
             std::vector<WeatherObservation> prefix;
@@ -143,7 +158,7 @@ int main(int argc, char** argv) {
         std::vector<double> water_depth(g.nx*g.ny,0),previous_rain(g.nx*g.ny,0),soil_storage(g.nx*g.ny,0);
         std::vector<unsigned char> active(g.nx*g.ny,1);
         const auto elevation=elevations.get<std::vector<double>>();
-        const auto covered=map_precipitation_accumulation_to_grid(accumulation,c,3600);
+        const auto covered=map_precipitation_accumulation_to_grid(accumulation,c,snapshots.back().elapsed_seconds);
         for(std::size_t i=0;i<active.size();++i)active[i]=covered.cells[i].status==ObservationStatus::decoded;
         Json water_frames=Json::array(),volumes=Json::array(),rain_volumes=Json::array(),balance=Json::array(),soil_frames=Json::array(),soil_volumes=Json::array(),evap_volumes=Json::array(),drain_volumes=Json::array();
         double cumulative_rain_volume=0,cumulative_evap_volume=0,cumulative_drain_volume=0;

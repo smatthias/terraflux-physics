@@ -9,20 +9,20 @@ test('bundled engine output loads with valid coverage and prescribed wind',async
  const input=JSON.parse(await readFile(new URL('../public/examples/engine-weather.json',import.meta.url),'utf8'))
  const {forecast,rain}=validate(input)
  assert.equal(forecast.grid.nx*forecast.grid.ny,120)
- assert.equal(forecast.elapsed_seconds,3600)
+ assert.equal(forecast.elapsed_seconds,7800)
  assert.equal(rain.quality.filter(q=>q==='no_data').length,4)
  assert.equal(rain.quality.filter(q=>q==='decoded').length,116)
  assert.ok(forecast.fields.wind_east.values.every(v=>v===1.5))
  assert.ok(rain.values.filter(v=>v!==null).every(v=>v>0))
 })
 
-test('timeline has seven solver snapshots with cumulative rainfall after time zero',async()=>{
+test('timeline has wet-transition-dry solver snapshots with cumulative rainfall after time zero',async()=>{
  const {readFile}=await import('node:fs/promises')
  const {validateSequence}=await import('./data.js')
  const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
  const frames=validateSequence(input)
- assert.equal(frames.length,7)
- assert.deepEqual(frames.map(f=>f.forecast.elapsed_seconds),[0,600,1200,1800,2400,3000,3600])
+ assert.equal(frames.length,14)
+ assert.deepEqual(frames.map(f=>f.forecast.elapsed_seconds),Array.from({length:14},(_,i)=>i*600))
  assert.equal(frames[0].rain,null)
  assert.ok(frames.slice(1).every(f=>f.rain))
  for(let i=1;i<frames.length;i++){
@@ -31,12 +31,12 @@ test('timeline has seven solver snapshots with cumulative rainfall after time ze
   assert.equal(Date.parse(rain.valid_time_utc)-Date.parse(rain.period_start_utc),i*600000)
   // Independent Z-R + trapezoidal reference at cell 0 for all prefix intervals.
   const baseDbz=15+25*Math.exp(-(7*7+4*4)/10)
-  const rate=k=>(10**((baseDbz+k/3)/10)/300)**(1/1.4)
+  const rate=k=>k>=7?0:(10**((baseDbz+k/3)/10)/300)**(1/1.4)
   let expected=0
   for(let k=1;k<=i;k++)expected+=(rate(k-1)+rate(k))/2/6
   assert.ok(Math.abs(rain.values[0]-expected)<1e-10)
   if(i>1)for(let cell=0;cell<120;cell++){
-   if(rain.values[cell]!==null)assert.ok(rain.values[cell]>frames[i-1].rain.values[cell])
+   if(rain.values[cell]!==null)assert.ok(rain.values[cell]>=frames[i-1].rain.values[cell])
    else assert.equal(frames[i-1].rain.values[cell],null)
   }
  }
@@ -119,7 +119,7 @@ test('soil water stays within capacity and participates in combined mass balance
  const frames=validateSequence(input)
  const final=frames.at(-1).surfaceWater
  assert.ok(final.soil_volume_m3>0)
- assert.ok(final.soil_values.some(v=>v!==null&&v>.00149),'some cells reach capacity')
+ assert.ok(frames[6].surfaceWater.soil_values.some(v=>v!==null&&v>.00149),'some cells approach capacity during rain')
  assert.equal(final.soil_values.filter(v=>v===null).length,4)
  assert.ok(Math.abs(final.stored_volume_m3+final.soil_volume_m3+final.evaporated_volume_m3+final.drained_volume_m3-final.cumulative_rainfall_volume_m3)<1e-7)
  for(const mutate of [d=>d.surface_water.soil_values_by_frame[1][0]=1,d=>d.surface_water.soil_volume_m3[1]+=1,d=>d.surface_water.soil_values_by_frame[1][0]=null,d=>delete d.surface_water.infiltration_rate_m_s]){
@@ -137,4 +137,21 @@ test('evaporation and drainage are separately accounted and rate bounded',async(
  for(const mutate of [d=>d.surface_water.cumulative_evaporation_volume_m3[1]=-1,d=>d.surface_water.cumulative_drainage_volume_m3[1]+=10,d=>delete d.surface_water.drainage_rate_m_s,d=>d.surface_water.evaporation_rate_m_s=0]){
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
+})
+
+test('dry phase keeps rain constant while storage depletes and losses grow',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const frames=validateSequence(input),dryStart=frames[7].surfaceWater,final=frames.at(-1).surfaceWater
+ for(let i=8;i<frames.length;i++){
+  const a=frames[i-1].surfaceWater,b=frames[i].surfaceWater
+  assert.equal(b.cumulative_rainfall_volume_m3,dryStart.cumulative_rainfall_volume_m3)
+  assert.ok(b.stored_volume_m3+b.soil_volume_m3<a.stored_volume_m3+a.soil_volume_m3)
+  assert.ok(b.evaporated_volume_m3>=a.evaporated_volume_m3&&b.drained_volume_m3>=a.drained_volume_m3)
+  assert.ok(b.values.every(v=>v===null||v>=0))
+  assert.ok(Math.abs(b.balance_error_m3)<1e-7)
+ }
+ assert.ok(final.soil_volume_m3<dryStart.soil_volume_m3)
+ assert.ok(final.stored_volume_m3<dryStart.stored_volume_m3)
 })

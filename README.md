@@ -65,11 +65,11 @@ python3 tools/build_viewer_example.py --build-dir build
 python3 tools/build_viewer_example.py --build-dir build --check
 ```
 
-CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 120 × 30-second dry-transport steps. The companion timeline contains seven snapshots at ten-minute intervals, with static prescribed wind. Each positive-time frame includes radar-derived rainfall accumulated from the start up to that frame.
+CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 260 × 30-second dry-transport steps. The companion timeline contains 14 snapshots at ten-minute intervals, with static prescribed wind. Each positive-time frame includes radar-derived rainfall accumulated from the start up to that frame.
 
 ### Timeline playback
 
-**Load engine example** opens the generated seven-frame timeline. Play/pause, previous/next, and the frame slider select discrete solver snapshots. Playback stops at the end; Play from the end restarts. Scrubbing or loading another dataset stops playback. Color ranges are fixed across all frames for each field. No temporal interpolation or browser-side physics is performed.
+**Load engine example** opens the generated 14-frame timeline. Play/pause, previous/next, and the frame slider select discrete solver snapshots. Playback stops at the end; Play from the end restarts. Scrubbing or loading another dataset stops playback. Color ranges are fixed across all frames for each field. No temporal interpolation or browser-side physics is performed.
 
 JSON input also accepts `terraflux.weather.timeline/v1`: an object with a `frames` array of 2–240 forecast or mobile-response objects. All frames must have the same grid and start time, strictly increasing elapsed times, and no more than two million cell snapshots in total. Rainfall is enabled only on frames containing an interval-aligned rainfall layer. See [timeline contract](docs/weather/timeline-v1.md).
 
@@ -102,3 +102,7 @@ The optional C++ infiltration step transfers available surface water into a capa
 ### Evaporation and soil drainage
 
 `apply_water_losses` optionally removes a shared evaporation demand from surface then soil storage, followed by availability-limited soil drainage. Playback budgets show cumulative evaporation and drainage alongside remaining storage. The synthetic example uses prescribed rates, not a weather-driven evaporation calculation. All removed water remains explicitly represented in the mass budget. See [loss contract](docs/weather/water-losses-v1.md).
+
+### Wet-to-dry regression scenario
+
+The generated example covers 12:00–14:10 UTC: one hour of synthetic rain-rate estimates, a ten-minute linear taper to zero, then one rain-free hour. Explicit zero rates are scenario forcing; missing coverage remains unknown. This controlled edit is identified in observation derivation metadata. Cumulative rainfall stops growing at 13:10, while routing, infiltration, evaporation and drainage continue. The timeline labels intervals from rainfall increments. Regression checks verify constant dry-phase rain input, declining combined storage, nonnegative depths, growing accounted losses and mass closure. Soil and surface stores decrease over the dry period; they need not be completely empty.
