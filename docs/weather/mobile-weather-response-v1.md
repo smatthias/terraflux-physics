@@ -30,4 +30,11 @@ python3 -m unittest discover -s tests/tools -v
 
 The composer checks exact grid equality, array sizes, finite physical values, units, and quality/value consistency. The accumulation interval must start at forecast.start_time_utc and end at that time plus forecast.elapsed_seconds. Invalid input does not replace the destination; successful writes replace it atomically.
 
-The accumulator CLI emits geographic observation records, **not** this gridded wrapper. Mapping those records onto the forecast grid remains a separate next step; do not attach a grid label to untransformed source arrays. This composer provides no network API. Full JSON Schema validation remains a separate consumer check.
+The accumulator CLI emits geographic observation records, **not** this gridded wrapper. Map those observations using the existing C++ spherical azimuthal-equidistant projection:
+
+```sh
+./build/terraflux-grid-rainfall forecast.json accumulation.json gridded-rainfall.json
+python3 tools/compose_mobile_weather.py forecast.json gridded-rainfall.json mobile-response.json
+```
+
+The mapper checks a common source/derivation and the forecast interval, assigns each geographic observation to its containing cell, leaves uncovered cells as `no_data`, and marks multiple observations in a cell `ambiguous` without averaging. Out-of-domain observations are counted on stderr. This is conservative point assignment, not area-weighted radar resampling; dense input on a coarse grid can therefore produce many ambiguous cells. The gridding CLI supports up to one million cells; the current viewer limit is 65,536. Open `mobile-response.json` in the viewer to inspect the combined result. This composer provides no network API. Full JSON Schema validation remains a separate consumer check.

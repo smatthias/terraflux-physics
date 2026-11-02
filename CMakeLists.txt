@@ -20,6 +20,7 @@ add_library(terraflux_weather_map
     src/weather/time_indexed_observation_mapper.cpp
     src/weather/temperature_observation_pipeline.cpp
     src/weather/precipitation_estimator.cpp
+    src/weather/precipitation_grid.cpp
     src/weather/precipitation_accumulator.cpp
 )
 target_include_directories(terraflux_weather_map
@@ -58,7 +59,16 @@ target_link_libraries(terraflux-accumulate-rainfall
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
+add_executable(terraflux-grid-rainfall src/weather/grid_rainfall.cpp)
+target_link_libraries(terraflux-grid-rainfall PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json)
+
 if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME weather.rainfall_pipeline
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/rainfall_pipeline_check.py $<TARGET_FILE:terraflux-grid-rainfall>)
+    add_executable(terraflux-precipitation-grid-test tests/weather/precipitation_grid_test.cpp)
+    target_link_libraries(terraflux-precipitation-grid-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.precipitation_grid COMMAND terraflux-precipitation-grid-test)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )

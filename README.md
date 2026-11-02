@@ -40,7 +40,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 
 ### Combined weather response
 
-`tools/compose_mobile_weather.py` composes forecast and explicitly gridded rainfall files with spatial, interval, and missing-data checks. See [the input contract and commands](docs/weather/mobile-weather-response-v1.md#file-composer). Raw rainfall observation gridding remains pending.
+`tools/compose_mobile_weather.py` composes forecast and explicitly gridded rainfall files with spatial, interval, and missing-data checks. See [the input contract and commands](docs/weather/mobile-weather-response-v1.md#file-composer). The `terraflux-grid-rainfall` CLI maps geographic accumulation observations onto the forecast grid before composition.
 
 ## Vue + Three.js physics viewer
 
