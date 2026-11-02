@@ -48,3 +48,18 @@ test('timeline has seven solver snapshots with cumulative rainfall after time ze
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
 })
+
+test('terrain has explicit datum and exact grid alignment',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const frames=validateSequence(input)
+ assert.equal(frames[0].terrain,frames[6].terrain)
+ assert.equal(frames[0].terrain.values.length,120)
+ assert.ok(frames[0].terrain.values.every(v=>v>=80&&v<=780))
+ for(const mutate of [d=>d.terrain.grid.nx++,d=>d.terrain.values.pop(),d=>d.terrain.values[0]=null,d=>d.terrain.units='ft',d=>d.terrain.vertical_reference='',d=>d.terrain.source_id='']){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+ const noTerrain=structuredClone(input);delete noTerrain.terrain
+ assert.equal(validateSequence(noTerrain)[0].terrain,undefined)
+})

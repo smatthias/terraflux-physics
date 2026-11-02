@@ -27,7 +27,8 @@ def main():
                             str(directory / 'gridded.json')], check=True)
             frames[i]=compose(frames[i], json.loads((directory / 'gridded.json').read_text()))
         result=frames[-1]
-        timeline={'schema_version':'terraflux.weather.timeline/v1', 'frames':frames}
+        timeline={'schema_version':'terraflux.weather.timeline/v1', 'frames':frames,
+                  'terrain':json.loads((directory / 'terrain.json').read_text())}
         outputs=[(args.output,result),(args.output.with_name('engine-timeline.json'),timeline)]
         if args.check:
             # Floating-point kernel results can vary slightly between platforms.

@@ -103,6 +103,17 @@ int main(int argc, char** argv) {
             frame["fields"]["wind_north"]["values"]=snapshot.wind_north_m_s;
             frames.push_back(frame);
         }
+        Json elevations=Json::array();
+        for (std::size_t y=0;y<g.ny;++y) for (std::size_t x=0;x<g.nx;++x) {
+            const double dx=static_cast<double>(x)-7, dy=static_cast<double>(y)-5;
+            elevations.push_back(80+700*std::exp(-(dx*dx/12+dy*dy/6)));
+        }
+        Json terrain={{"schema_version","terraflux.terrain.grid/v1"}, {"grid",grid},
+            {"units","m"},{"vertical_reference","synthetic_local_datum"},
+            {"source_id","synthetic_gaussian_hill"},{"values",elevations}};
+        std::ofstream terrain_file(directory/"terrain.json");
+        terrain_file << terrain.dump(2) << '\n'; terrain_file.close();
+        if (!terrain_file) throw std::runtime_error("failed to write terrain");
         std::ofstream timeline_file(directory/"forecast-frames.json");
         timeline_file << frames.dump(2) << '\n'; timeline_file.close();
         if (!timeline_file) throw std::runtime_error("failed to write timeline");

@@ -42,6 +42,10 @@ export function validateSequence(input) {
   if(input?.schema_version !== 'terraflux.weather.timeline/v1') return [validate(input)]
   check(Array.isArray(input.frames) && input.frames.length >= 2 && input.frames.length <= 240, 'Timeline requires 2–240 frames.')
   const frames=input.frames.map(validate), first=frames[0].forecast
+  if(input.terrain !== undefined){
+    const terrain=validateTerrain(input.terrain,first.grid)
+    frames.forEach(frame=>{frame.terrain=terrain})
+  }
   const keys=Object.keys(first.grid)
   check(frames.length*first.grid.nx*first.grid.ny <= 2000000, 'Timeline exceeds two million cell snapshots.')
   frames.forEach((frame,i)=>{
@@ -51,4 +55,14 @@ export function validateSequence(input) {
     check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
   })
   return frames
+}
+
+export function validateTerrain(terrain, grid) {
+  check(terrain?.schema_version==='terraflux.terrain.grid/v1', 'Unsupported terrain schema.')
+  check(terrain.grid && Object.keys(grid).length===Object.keys(terrain.grid).length && Object.keys(grid).every(k=>terrain.grid[k]===grid[k]), 'Terrain must match the forecast grid exactly.')
+  check(terrain.units==='m', 'Terrain elevation units must be metres.')
+  check(typeof terrain.vertical_reference==='string' && terrain.vertical_reference.trim().length>0, 'Terrain vertical reference is required.')
+  check(typeof terrain.source_id==='string' && terrain.source_id.trim().length>0, 'Terrain source identity is required.')
+  check(Array.isArray(terrain.values) && terrain.values.length===grid.nx*grid.ny && terrain.values.every(finite), 'Terrain requires a finite elevation for every cell.')
+  return terrain
 }
