@@ -145,3 +145,7 @@ CTest checks both baseline and variant regeneration. The `--timeline-only` flag 
 After loading a comparison, select **Export all frames (CSV)**. The download contains one row per snapshot, regardless of the current playback frame or visible scenario. Columns include UTC valid time, elapsed seconds, scenario labels, known/masked cell counts, baseline/variant/delta volumes (surface, soil, evaporation, drainage, rain and balance residual), applied timestep/rate parameters and soil capacities. Volume units are m³, storage capacities metres and rates m/s, identified in column names. Delta means variant minus baseline.
 
 The CSV uses UTF-8 with BOM and CRLF rows, preserves numeric precision, escapes quoted/multiline labels, and neutralizes labels that could be interpreted as spreadsheet formulas. The export contains aggregates for the modeled coverage; masked cells are counted explicitly. Data are downloaded locally without a server or database.
+
+### Water timestep sensitivity
+
+`python3 tools/check_water_timestep.py --build-dir build --check` reruns the synthetic hydrology case at 15, 30 and 60 second water timesteps. It checks storage positivity, capacity, coverage, input consistency and full mass accounting, then verifies the committed report. CTest includes this regression. The report measures spatial surface-water differences from the 15-second run; it is not proof of physical accuracy or convergence. See [method and results](docs/weather/water-timestep-sensitivity.md).

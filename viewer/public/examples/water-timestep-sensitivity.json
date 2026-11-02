@@ -1,0 +1,59 @@
+{
+  "schema_version": "terraflux.water.timestep_sensitivity/v1",
+  "case_id": "synthetic_wet_taper_dry",
+  "reference_timestep_seconds": 15,
+  "scenario": {
+    "schema_version": "terraflux.water.scenario/v1",
+    "timestep_seconds": 30,
+    "routing_speed_m_s": 0.002,
+    "infiltration_rate_m_s": 1e-06,
+    "soil_storage_capacity_m": 0.0015,
+    "evaporation_rate_m_s": 5e-08,
+    "drainage_rate_m_s": 1e-07,
+    "boundary": "closed",
+    "missing_rainfall_policy": "impermeable_mask",
+    "process_order": "rain_route_infiltrate_evaporate_drain"
+  },
+  "results": [
+    {
+      "timestep_seconds": 15,
+      "frames_checked": 14,
+      "surface_volume_m3": 20833.76588874785,
+      "soil_volume_m3": 62332.66849212607,
+      "evaporated_volume_m3": 36956.8925328106,
+      "drained_volume_m3": 65786.4154824152,
+      "rainfall_volume_m3": 185909.74239609967,
+      "max_abs_balance_error_m3": 1.1350493878126144e-09,
+      "peak_final_depth_mm": 13.68207184447135,
+      "final_surface_l1_difference_m3": 0.0,
+      "final_surface_l1_percent_of_rain": 0.0
+    },
+    {
+      "timestep_seconds": 30,
+      "frames_checked": 14,
+      "surface_volume_m3": 20693.816865569857,
+      "soil_volume_m3": 62499.32177543455,
+      "evaporated_volume_m3": 36962.96432097894,
+      "drained_volume_m3": 65753.63943411862,
+      "rainfall_volume_m3": 185909.74239610095,
+      "max_abs_balance_error_m3": 1.0477378964424133e-09,
+      "peak_final_depth_mm": 13.597190515454757,
+      "final_surface_l1_difference_m3": 386.42680777355514,
+      "final_surface_l1_percent_of_rain": 0.20785721221119802
+    },
+    {
+      "timestep_seconds": 60,
+      "frames_checked": 14,
+      "surface_volume_m3": 20444.394086224842,
+      "soil_volume_m3": 62804.577286081374,
+      "evaporated_volume_m3": 36965.80718277118,
+      "drained_volume_m3": 65694.96384102377,
+      "rainfall_volume_m3": 185909.7423961006,
+      "max_abs_balance_error_m3": 5.820766091346741e-10,
+      "peak_final_depth_mm": 13.451832830387911,
+      "final_surface_l1_difference_m3": 1135.9759462192928,
+      "final_surface_l1_percent_of_rain": 0.6110362650059374
+    }
+  ],
+  "interpretation": "Timestep dependence of this synthetic routing case; not a convergence proof or physical calibration."
+}

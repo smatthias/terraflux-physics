@@ -87,6 +87,9 @@ if(BUILD_TESTING)
     target_link_libraries(terraflux-terrain-temperature-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.terrain_temperature COMMAND terraflux-terrain-temperature-test)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME weather.water_timestep_sensitivity
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_water_timestep.py
+        --build-dir ${CMAKE_CURRENT_BINARY_DIR} --check)
     add_test(NAME weather.viewer_comparison
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_viewer_example.py
         --build-dir ${CMAKE_CURRENT_BINARY_DIR} --scenario ${CMAKE_CURRENT_SOURCE_DIR}/examples/hydrology-low-infiltration.json
