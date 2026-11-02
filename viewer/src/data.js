@@ -73,6 +73,11 @@ export function validateSequence(input) {
     check(input.terrain && w?.schema_version==='terraflux.water.timeline/v1' && w.units==='m' && w.method==='head_gradient_donor_limited' && w.boundary==='closed' && w.missing_rainfall_policy==='impermeable_mask', 'Unsupported surface water contract.')
     check(finite(w.routing_speed_m_s)&&w.routing_speed_m_s>=0&&finite(w.timestep_seconds)&&w.timestep_seconds>0, 'Invalid routing parameters.')
     for(const key of ['values_by_frame','stored_volume_m3','cumulative_rainfall_volume_m3','balance_error_m3'])check(Array.isArray(w[key])&&w[key].length===frames.length,'Water frame count mismatch.')
+    if(input.water_scenario!==undefined){
+      const s=input.water_scenario
+      check(s?.schema_version==='terraflux.water.scenario/v1','Invalid water scenario provenance.')
+      for(const key of ['timestep_seconds','routing_speed_m_s','infiltration_rate_m_s','soil_storage_capacity_m','evaporation_rate_m_s','drainage_rate_m_s','boundary','missing_rainfall_policy','process_order'])check(s[key]===w[key],'Scenario parameters disagree with water output.')
+    }
     const soilKeys=['soil_values_by_frame','soil_volume_m3','soil_storage_capacity_m','infiltration_rate_m_s','process_order']
     const hasSoil=soilKeys.some(k=>w[k]!==undefined)
     const lossKeys=['evaporation_rate_m_s','drainage_rate_m_s','cumulative_evaporation_volume_m3','cumulative_drainage_volume_m3']
@@ -116,7 +121,7 @@ export function validateSequence(input) {
         const rainVolume=frame.rain.values.reduce((a,v)=>a+(v??0)/1000*area,0)
         check(Math.abs(rainVolume-rain)<=tol,'Applied water input disagrees with accumulated rain.')
       }
-      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained}
+      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained,parameters:{timestep_seconds:w.timestep_seconds,routing_speed_m_s:w.routing_speed_m_s,infiltration_rate_m_s:w.infiltration_rate_m_s??0,evaporation_rate_m_s:w.evaporation_rate_m_s??0,drainage_rate_m_s:w.drainage_rate_m_s??0}}
     })
   }
   if(input.terrain_derivatives !== undefined){

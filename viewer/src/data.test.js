@@ -155,3 +155,12 @@ test('dry phase keeps rain constant while storage depletes and losses grow',asyn
  assert.ok(final.soil_volume_m3<dryStart.soil_volume_m3)
  assert.ok(final.stored_volume_m3<dryStart.stored_volume_m3)
 })
+
+test('applied scenario provenance must match hydrology output',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ assert.equal(validateSequence(input)[0].surfaceWater.parameters.timestep_seconds,30)
+ input.water_scenario.infiltration_rate_m_s=1
+ assert.throws(()=>validateSequence(input))
+})

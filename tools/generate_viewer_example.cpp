@@ -9,6 +9,7 @@
 #include "terraflux/weather/precipitation_estimator.hpp"
 #include "terraflux/weather/precipitation_accumulator.hpp"
 #include <nlohmann/json.hpp>
+#include "hydrology_scenario.hpp"
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -18,8 +19,21 @@
 int main(int argc, char** argv) {
     using namespace terraflux::weather;
     using Json = nlohmann::json;
-    if (argc != 2) { std::cerr << "Usage: terraflux-generate-viewer-example <output-directory>\n"; return 2; }
+    if (argc != 2 && argc != 3) { std::cerr << "Usage: terraflux-generate-viewer-example <output-directory> [hydrology-scenario.json]\n"; return 2; }
     try {
+        auto scenario=terraflux::example::default_hydrology_scenario();
+        if(argc==3){
+            std::ifstream input(argv[2]);if(!input)throw std::runtime_error("cannot open hydrology scenario");
+            scenario=Json::parse(input);
+        }
+        terraflux::example::validate_hydrology_scenario(scenario);
+        const double water_dt=scenario.at("timestep_seconds").get<double>();
+        const int routing_steps=600/scenario.at("timestep_seconds").get<int>();
+        const double routing=scenario.at("routing_speed_m_s").get<double>();
+        const double infiltration=scenario.at("infiltration_rate_m_s").get<double>();
+        const double capacity=scenario.at("soil_storage_capacity_m").get<double>();
+        const double evaporation=scenario.at("evaporation_rate_m_s").get<double>();
+        const double drainage=scenario.at("drainage_rate_m_s").get<double>();
         const std::filesystem::path directory(argv[1]);
         std::filesystem::create_directories(directory);
         DryTransportConfig c;
@@ -172,15 +186,15 @@ int main(int argc, char** argv) {
                 for(std::size_t i=0;i<active.size();++i)if(active[i]) {
                     if(!field.cells[i].value)throw std::runtime_error("synthetic rainfall mask changed");
                     const double cumulative=*field.cells[i].value/1000;
-                    rain_increment[i]=(cumulative-previous_rain[i])/20;
+                    rain_increment[i]=(cumulative-previous_rain[i])/routing_steps;
                     previous_rain[i]=cumulative;
                 }
                 // Uniform rainfall delivery inside each ten-minute interval,
-                // integrated with twenty 30-second routing steps.
-                for(int step=0;step<20;++step) {
-                    const auto routed=advance_surface_water(elevation,water_depth,rain_increment,active,g,{30,0.002});
-                    const auto infiltrated=infiltrate_surface_water(routed.depth_m,soil_storage,active,{30,0.000001,0.0015});
-                    const auto losses=apply_water_losses(infiltrated.surface_depth_m,infiltrated.soil_storage_m,active,{30,0.00000005,0.0000001});
+                // integrated with the configured water timestep.
+                for(int step=0;step<routing_steps;++step) {
+                    const auto routed=advance_surface_water(elevation,water_depth,rain_increment,active,g,{water_dt,routing});
+                    const auto infiltrated=infiltrate_surface_water(routed.depth_m,soil_storage,active,{water_dt,infiltration,capacity});
+                    const auto losses=apply_water_losses(infiltrated.surface_depth_m,infiltrated.soil_storage_m,active,{water_dt,evaporation,drainage});
                     water_depth=losses.surface_depth_m;soil_storage=losses.soil_storage_m;
                     for(std::size_t cell=0;cell<active.size();++cell){
                         cumulative_evap_volume+=losses.evaporated_depth_m[cell]*g.spacing_east_m*g.spacing_north_m;
@@ -203,14 +217,17 @@ int main(int argc, char** argv) {
         }
         Json water={{"schema_version","terraflux.water.timeline/v1"},{"units","m"},
             {"method","head_gradient_donor_limited"},{"boundary","closed"},
-            {"missing_rainfall_policy","impermeable_mask"},{"routing_speed_m_s",0.002},
-            {"timestep_seconds",30},{"values_by_frame",water_frames},
+            {"missing_rainfall_policy","impermeable_mask"},{"routing_speed_m_s",routing},
+            {"timestep_seconds",water_dt},{"values_by_frame",water_frames},
             {"stored_volume_m3",volumes},{"cumulative_rainfall_volume_m3",rain_volumes},
             {"balance_error_m3",balance},{"soil_values_by_frame",soil_frames},
-            {"soil_volume_m3",soil_volumes},{"soil_storage_capacity_m",0.0015},
-            {"infiltration_rate_m_s",0.000001},{"process_order","rain_route_infiltrate_evaporate_drain"},
-            {"evaporation_rate_m_s",0.00000005},{"drainage_rate_m_s",0.0000001},
+            {"soil_volume_m3",soil_volumes},{"soil_storage_capacity_m",capacity},
+            {"infiltration_rate_m_s",infiltration},{"process_order","rain_route_infiltrate_evaporate_drain"},
+            {"evaporation_rate_m_s",evaporation},{"drainage_rate_m_s",drainage},
             {"cumulative_evaporation_volume_m3",evap_volumes},{"cumulative_drainage_volume_m3",drain_volumes}};
+        std::ofstream scenario_file(directory/"water-scenario.json");
+        scenario_file<<scenario.dump(2)<<'\n';scenario_file.close();
+        if(!scenario_file)throw std::runtime_error("failed to record scenario");
         std::ofstream water_file(directory/"surface-water.json");
         water_file<<water.dump(2)<<'\n';water_file.close();
         if(!water_file)throw std::runtime_error("failed to write water timeline");

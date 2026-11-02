@@ -13,11 +13,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path, default=ROOT / 'build')
     parser.add_argument('--output', type=Path, default=ROOT / 'viewer/public/examples/engine-weather.json')
+    parser.add_argument('--scenario', type=Path, default=ROOT / 'examples/hydrology-scenario.json')
     parser.add_argument('--check', action='store_true', help='check that committed output matches regeneration')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='terraflux-example-') as temporary:
         directory = Path(temporary)
-        subprocess.run([str(args.build_dir.resolve() / 'terraflux-generate-viewer-example'), str(directory)], check=True)
+        subprocess.run([str(args.build_dir.resolve() / 'terraflux-generate-viewer-example'), str(directory), str(args.scenario.resolve())], check=True)
         frames=json.loads((directory / 'forecast-frames.json').read_text())
         for i in range(1,len(frames)):
             forecast_path=directory / f'forecast-{i}.json'
@@ -29,6 +30,7 @@ def main():
         result=frames[-1]
         timeline={'schema_version':'terraflux.weather.timeline/v1', 'frames':frames,
                   'terrain':json.loads((directory / 'terrain.json').read_text()),
+                  'water_scenario':json.loads((directory / 'water-scenario.json').read_text()),
                   'surface_water':json.loads((directory / 'surface-water.json').read_text()),
                   'terrain_derivatives':json.loads((directory / 'terrain-derivatives.json').read_text()),
                   'terrain_temperature':json.loads((directory / 'terrain-temperature.json').read_text())}

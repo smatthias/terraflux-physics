@@ -112,3 +112,15 @@ The generated example covers 12:00–14:10 UTC: one hour of synthetic rain-rate 
 Select **Regional weather demo** for a separate 1,200 × 900 km analytic scene with moving low/high-pressure centers, a front, cloud cover, pressure and humidity layers. Cloud and system overlays work in Three.js and the 2D fallback. These are explicitly synthetic illustrations, not output from an atmospheric circulation or cloud model, and they do not drive local hydrology.
 
 Metrics now show domain area, temperature range/mean, wind mean/maximum, cloud percentage, pressure range and humidity. Engine examples additionally show rainfall coverage/mean, wet area, peak surface-water depth, soil capacity usage and water budgets. See [display contract and metric definitions](docs/weather/regional-display-v1.md).
+
+### Configurable hydrology scenario
+
+Edit `examples/hydrology-scenario.json` to set routing speed, infiltration, soil capacity, evaporation, drainage and the water timestep. The C++ example generator validates the complete configuration before creating output. Supported boundary, missing-data and process-order settings are explicit; unsupported modes and unknown keys are rejected. Water timesteps must be integer divisors of the 600-second output interval. Atmospheric transport keeps its independent 30-second timestep.
+
+```sh
+python3 tools/build_viewer_example.py --build-dir build --scenario examples/hydrology-scenario.json
+# Preserve the bundled fixture when experimenting with another config:
+python3 tools/build_viewer_example.py --build-dir build --scenario my-scenario.json --output /tmp/custom-weather/engine-weather.json
+```
+
+Open `/tmp/custom-weather/engine-timeline.json` in the viewer. The timeline records the exact applied `water_scenario`, and its water output carries matching parameters. Water/soil budget readouts show timestep and rate settings. The [JSON Schema](docs/weather/hydrology-scenario-v1.schema.json) documents the file contract. Parameters remain illustrative and prescribed; no AI or predictive model is involved.

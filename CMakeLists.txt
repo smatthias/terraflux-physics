@@ -87,6 +87,8 @@ if(BUILD_TESTING)
     target_link_libraries(terraflux-terrain-temperature-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.terrain_temperature COMMAND terraflux-terrain-temperature-test)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME weather.hydrology_scenario
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/hydrology_scenario_check.py $<TARGET_FILE:terraflux-generate-viewer-example>)
     add_test(NAME weather.viewer_example
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_viewer_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR} --check)
     add_test(NAME weather.rainfall_pipeline
