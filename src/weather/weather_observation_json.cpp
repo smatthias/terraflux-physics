@@ -29,6 +29,16 @@ bool supported_source_kind(const std::string& kind) {
            kind == "public_dataset" || kind == "user_supplied";
 }
 
+bool supported_interpretation(const std::string& interpretation) {
+    return interpretation == "palette_lookup" ||
+           interpretation == "structured_grid_value" ||
+           interpretation == "direct_measurement" ||
+           interpretation == "contour_interpolation" ||
+           interpretation == "derived_empirical_conversion" ||
+           interpretation == "derived_temporal_integration" ||
+           interpretation == "manual_annotation";
+}
+
 Json serialize_observation(const WeatherObservation& observation) {
     if (observation.source_id.empty() || !supported_source_kind(observation.source_kind)) {
         throw std::invalid_argument("observation requires a supported source_id and source_kind");
@@ -69,13 +79,20 @@ Json serialize_observation(const WeatherObservation& observation) {
             break;
     }
 
+    if (!supported_interpretation(observation.interpretation)) {
+        throw std::invalid_argument("observation interpretation is unsupported");
+    }
+
     Json source = {
         {"source_id", observation.source_id},
         {"source_kind", observation.source_kind},
-        {"interpretation", "palette_lookup"},
+        {"interpretation", observation.interpretation},
     };
     if (!observation.product_id.empty()) {
         source["product_id"] = observation.product_id;
+    }
+    if (!observation.derivation.empty()) {
+        source["derivation"] = observation.derivation;
     }
     if (!observation.sidecar.empty()) {
         source["sidecar"] = observation.sidecar;
@@ -89,7 +106,7 @@ Json serialize_observation(const WeatherObservation& observation) {
         quality["reason"] = observation.reason;
     }
 
-    return {
+    Json record = {
         {"schema_version", "terraflux.weather.observation/v1"},
         {"source", std::move(source)},
         {"valid_time_utc", observation.valid_time_utc},
@@ -103,6 +120,13 @@ Json serialize_observation(const WeatherObservation& observation) {
         {"vertical_reference", observation.vertical_reference},
         {"quality", std::move(quality)},
     };
+    if (!observation.period_start_utc.empty()) {
+        if (observation.period_start_utc.back() != 'Z') {
+            throw std::invalid_argument("period_start_utc must end in Z");
+        }
+        record["period_start_utc"] = observation.period_start_utc;
+    }
+    return record;
 }
 
 
@@ -198,15 +222,23 @@ std::vector<WeatherObservation> read_weather_observations_json(
         WeatherObservation observation;
         observation.source_id = required_string(source, "source_id");
         observation.source_kind = required_string(source, "source_kind");
+        observation.interpretation = required_string(source, "interpretation");
         observation.product_id = optional_string(source, "product_id");
+        observation.derivation = optional_string(source, "derivation");
         observation.sidecar = optional_string(source, "sidecar");
         if (observation.source_id.empty() ||
-            !supported_source_kind(observation.source_kind)) {
+            !supported_source_kind(observation.source_kind) ||
+            !supported_interpretation(observation.interpretation)) {
             throw std::invalid_argument(
                 "canonical observation source identity or kind is invalid");
         }
 
         observation.valid_time_utc = required_string(record, "valid_time_utc");
+        observation.period_start_utc = optional_string(record, "period_start_utc");
+        if (!observation.period_start_utc.empty() &&
+            observation.period_start_utc.back() != 'Z') {
+            throw std::invalid_argument("canonical observation period_start_utc must end in Z");
+        }
         if (observation.valid_time_utc.empty() ||
             observation.valid_time_utc.back() != 'Z') {
             throw std::invalid_argument(

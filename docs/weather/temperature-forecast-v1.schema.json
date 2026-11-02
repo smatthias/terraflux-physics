@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/forecast-v1.json",
+  "title": "TerraFlux weather forecast v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "start_time_utc",
+    "elapsed_seconds",
+    "grid",
+    "observation_updates",
+    "fields"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.forecast/v1"
+    },
+    "start_time_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nx",
+        "ny",
+        "origin_east_m",
+        "origin_north_m",
+        "spacing_east_m",
+        "spacing_north_m",
+        "geographic_anchor_longitude_deg",
+        "geographic_anchor_latitude_deg",
+        "coordinate_system",
+        "array_order"
+      ],
+      "properties": {
+        "nx": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "ny": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "origin_east_m": {
+          "type": "number"
+        },
+        "origin_north_m": {
+          "type": "number"
+        },
+        "spacing_east_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "spacing_north_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "geographic_anchor_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geographic_anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "coordinate_system": {
+          "const": "local_azimuthal_equidistant_m"
+        },
+        "array_order": {
+          "const": "row_major_y_then_x"
+        }
+      }
+    },
+    "observation_updates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "valid_time_utc",
+          "elapsed_seconds",
+          "decoded_cells",
+          "no_data_cells",
+          "ambiguous_cells",
+          "outside_domain_count"
+        ],
+        "properties": {
+          "valid_time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "decoded_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "no_data_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ambiguous_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outside_domain_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "air_temperature",
+        "wind_east",
+        "wind_north"
+      ],
+      "properties": {
+        "air_temperature": {
+          "$ref": "#/$defs/kelvin_field"
+        },
+        "wind_east": {
+          "$ref": "#/$defs/east_wind_field"
+        },
+        "wind_north": {
+          "$ref": "#/$defs/north_wind_field"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "kelvin_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "values"
+      ],
+      "properties": {
+        "units": {
+          "const": "K"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "east_wind_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "values"
+      ],
+      "properties": {
+        "units": {
+          "const": "m/s"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "north_wind_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "values"
+      ],
+      "properties": {
+        "units": {
+          "const": "m/s"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "description": "Field arrays are row-major and each must contain exactly grid.nx * grid.ny values. Observation updates summarize source-map quality; they do not replace the final forecast fields."
+}

@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TerraFlux example hydrology scenario v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "timestep_seconds",
+    "routing_speed_m_s",
+    "infiltration_rate_m_s",
+    "soil_storage_capacity_m",
+    "evaporation_rate_m_s",
+    "drainage_rate_m_s",
+    "boundary",
+    "missing_rainfall_policy",
+    "process_order"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.water.scenario/v1"
+    },
+    "timestep_seconds": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        10,
+        12,
+        15,
+        20,
+        24,
+        25,
+        30,
+        40,
+        50,
+        60,
+        75,
+        100,
+        120,
+        150,
+        200,
+        300,
+        600
+      ]
+    },
+    "routing_speed_m_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "infiltration_rate_m_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "soil_storage_capacity_m": {
+      "type": "number",
+      "minimum": 0
+    },
+    "evaporation_rate_m_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "drainage_rate_m_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "boundary": {
+      "enum": [
+        "closed",
+        "configured_outlets"
+      ]
+    },
+    "missing_rainfall_policy": {
+      "const": "impermeable_mask"
+    },
+    "process_order": {
+      "enum": [
+        "rain_route_infiltrate_evaporate_drain",
+        "rain_route_infiltrate_evaporate_drain_outlet"
+      ]
+    },
+    "outlets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y",
+          "crest_elevation_m",
+          "max_rate_m_s"
+        ],
+        "properties": {
+          "x": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "crest_elevation_m": {
+            "type": "number"
+          },
+          "max_rate_m_s": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "boundary": {
+            "const": "configured_outlets"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "outlets"
+        ],
+        "properties": {
+          "outlets": {
+            "minItems": 1
+          },
+          "process_order": {
+            "const": "rain_route_infiltrate_evaporate_drain_outlet"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "outlets": {
+            "maxItems": 0
+          },
+          "process_order": {
+            "const": "rain_route_infiltrate_evaporate_drain"
+          }
+        }
+      }
+    }
+  ]
+}

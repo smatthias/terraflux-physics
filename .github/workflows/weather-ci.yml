@@ -44,5 +44,18 @@ jobs:
       - name: Build
         run: cmake --build build --parallel 2
 
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure
+      - name: Verify C++ and Python pipeline
+        run: python3 tools/verify_pipeline.py --cpp-only --skip-configure --skip-build
+
+  viewer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - run: npm ci
+        working-directory: viewer
+      - run: python3 tools/verify_pipeline.py --viewer-only --skip-install

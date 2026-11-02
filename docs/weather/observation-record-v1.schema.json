@@ -15,11 +15,18 @@
         "source_id": { "type": "string", "minLength": 1 },
         "source_kind": { "enum": ["synthetic_fixture", "licensed_feed", "public_dataset", "user_supplied"] },
         "product_id": { "type": "string" },
-        "interpretation": { "enum": ["palette_lookup", "direct_measurement", "contour_interpolation", "manual_annotation"] },
+        "interpretation": { "enum": ["palette_lookup", "structured_grid_value", "direct_measurement", "contour_interpolation", "manual_annotation", "derived_empirical_conversion", "derived_temporal_integration"] },
+        "derivation": { "type": "string" },
         "sidecar": { "type": "string" }
       }
     },
     "valid_time_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "period_start_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "Start of the accumulation interval; valid_time_utc is the interval end."
+    },
     "variable": { "type": "string", "minLength": 1 },
     "value": { "type": ["number", "null"] },
     "units": { "type": "string", "minLength": 1 },

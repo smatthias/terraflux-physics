@@ -1,0 +1,20 @@
+{
+  "schema_version": "terraflux.water.scenario/v1",
+  "timestep_seconds": 30,
+  "routing_speed_m_s": 0.002,
+  "infiltration_rate_m_s": 0,
+  "soil_storage_capacity_m": 0.0015,
+  "evaporation_rate_m_s": 0,
+  "drainage_rate_m_s": 0,
+  "boundary": "configured_outlets",
+  "missing_rainfall_policy": "impermeable_mask",
+  "process_order": "rain_route_infiltrate_evaporate_drain_outlet",
+  "outlets": [
+    {
+      "x": 11,
+      "y": 0,
+      "crest_elevation_m": 0,
+      "max_rate_m_s": 1e-05
+    }
+  ]
+}

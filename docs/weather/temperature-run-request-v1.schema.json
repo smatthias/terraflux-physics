@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/temperature-run-v1.json",
+  "title": "TerraFlux temperature run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "start_time_utc",
+    "timestep_seconds",
+    "steps",
+    "horizontal_mixing_diffusivity_m2_s",
+    "boundary_condition",
+    "grid",
+    "initial_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.temperature-run/v1"
+    },
+    "start_time_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "timestep_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "horizontal_mixing_diffusivity_m2_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "boundary_condition": {
+      "const": "periodic"
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nx",
+        "ny",
+        "origin_east_m",
+        "origin_north_m",
+        "spacing_east_m",
+        "spacing_north_m",
+        "geographic_anchor_longitude_deg",
+        "geographic_anchor_latitude_deg"
+      ],
+      "properties": {
+        "nx": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "ny": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "origin_east_m": {
+          "type": "number"
+        },
+        "origin_north_m": {
+          "type": "number"
+        },
+        "spacing_east_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "spacing_north_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "geographic_anchor_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geographic_anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        }
+      }
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "elapsed_seconds",
+        "air_temperature_k",
+        "wind_east_m_s",
+        "wind_north_m_s"
+      ],
+      "properties": {
+        "elapsed_seconds": {
+          "const": 0
+        },
+        "air_temperature_k": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "wind_east_m_s": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "number"
+          }
+        },
+        "wind_north_m_s": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "description": "All state arrays are row-major and each must contain exactly grid.nx * grid.ny values. Wind is prescribed and must be discretely divergence-free on the periodic grid."
+}
