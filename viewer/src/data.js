@@ -54,6 +54,20 @@ export function validateSequence(input) {
     check(f.start_time_utc===first.start_time_utc, 'Timeline start times must match.')
     check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
   })
+  if(input.atmosphere !== undefined){
+    const a=input.atmosphere,count=first.grid.nx*first.grid.ny
+    check(a?.schema_version==='terraflux.weather.atmosphere_display/v1'&&a.source_kind==='synthetic','Only explicitly synthetic atmosphere displays are currently supported.')
+    for(const key of ['cloud_fraction_by_frame','sea_level_pressure_hpa_by_frame','relative_humidity_pct_by_frame','systems_by_frame'])check(Array.isArray(a[key])&&a[key].length===frames.length,'Atmosphere frame count mismatch.')
+    frames.forEach((frame,i)=>{
+      const cloud=a.cloud_fraction_by_frame[i],pressure=a.sea_level_pressure_hpa_by_frame[i],humidity=a.relative_humidity_pct_by_frame[i],systems=a.systems_by_frame[i]
+      check(Array.isArray(cloud)&&cloud.length===count&&cloud.every(v=>finite(v)&&v>=0&&v<=1),'Invalid cloud fraction.')
+      check(Array.isArray(pressure)&&pressure.length===count&&pressure.every(v=>finite(v)&&v>0),'Invalid pressure field.')
+      check(Array.isArray(humidity)&&humidity.length===count&&humidity.every(v=>finite(v)&&v>=0&&v<=100),'Invalid relative humidity.')
+      const point=p=>Array.isArray(p)&&p.length===2&&p.every(v=>finite(v)&&v>=0&&v<=1)
+      check(Array.isArray(systems)&&systems.length<=20&&systems.every(s=>s&&(['low','high'].includes(s.kind)?finite(s.u)&&finite(s.v)&&s.u>=0&&s.u<=1&&s.v>=0&&s.v<=1:s.kind==='cold_front'&&Array.isArray(s.points)&&s.points.length>=2&&s.points.length<=100&&s.points.every(point))),'Invalid weather-system positions.')
+      frame.atmosphere={cloud,pressure,humidity,systems,synthetic:true}
+    })
+  }
   if(input.surface_water !== undefined){
     const w=input.surface_water,count=first.grid.nx*first.grid.ny,area=first.grid.spacing_east_m*first.grid.spacing_north_m
     check(input.terrain && w?.schema_version==='terraflux.water.timeline/v1' && w.units==='m' && w.method==='head_gradient_donor_limited' && w.boundary==='closed' && w.missing_rainfall_policy==='impermeable_mask', 'Unsupported surface water contract.')

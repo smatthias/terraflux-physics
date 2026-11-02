@@ -9,3 +9,5 @@
 .rain-interval{font-size:10px;color:#a7c9b5;padding:0 24px 12px;line-height:1.7}
 
 .aspect-key{position:absolute;bottom:80px;right:24px;font-size:9px;color:#9db0b8;pointer-events:none}@media(max-width:700px){.layer{width:49%}}
+
+.systems-map{position:absolute;inset:85px 35px 100px;width:calc(100% - 70px);height:calc(100% - 185px);transform:perspective(800px) rotateX(25deg);pointer-events:none}.extra-metrics{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:25px}.extra-metrics>div:last-child{grid-column:auto}@media(max-width:700px){.extra-metrics{grid-template-columns:1fr 1fr}.extra-metrics strong{font-size:15px}}

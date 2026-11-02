@@ -106,3 +106,9 @@ The optional C++ infiltration step transfers available surface water into a capa
 ### Wet-to-dry regression scenario
 
 The generated example covers 12:00–14:10 UTC: one hour of synthetic rain-rate estimates, a ten-minute linear taper to zero, then one rain-free hour. Explicit zero rates are scenario forcing; missing coverage remains unknown. This controlled edit is identified in observation derivation metadata. Cumulative rainfall stops growing at 13:10, while routing, infiltration, evaporation and drainage continue. The timeline labels intervals from rainfall increments. Regression checks verify constant dry-phase rain input, declining combined storage, nonnegative depths, growing accounted losses and mass closure. Soil and surface stores decrease over the dry period; they need not be completely empty.
+
+### Clouds, regional weather and metrics
+
+Select **Regional weather demo** for a separate 1,200 × 900 km analytic scene with moving low/high-pressure centers, a front, cloud cover, pressure and humidity layers. Cloud and system overlays work in Three.js and the 2D fallback. These are explicitly synthetic illustrations, not output from an atmospheric circulation or cloud model, and they do not drive local hydrology.
+
+Metrics now show domain area, temperature range/mean, wind mean/maximum, cloud percentage, pressure range and humidity. Engine examples additionally show rainfall coverage/mean, wet area, peak surface-water depth, soil capacity usage and water budgets. See [display contract and metric definitions](docs/weather/regional-display-v1.md).
