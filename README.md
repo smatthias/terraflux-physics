@@ -41,3 +41,15 @@ The engine is intended to read structured weather datasets and rendered weather 
 ### Combined weather response
 
 `tools/compose_mobile_weather.py` composes forecast and explicitly gridded rainfall files with spatial, interval, and missing-data checks. See [the input contract and commands](docs/weather/mobile-weather-response-v1.md#file-composer). Raw rainfall observation gridding remains pending.
+
+## Vue + Three.js physics viewer
+
+```sh
+cd viewer
+npm ci
+npm run dev
+```
+
+Open the URL printed by Vite. No login, database, or backend is required. Use **Open JSON** for a `terraflux.weather.forecast/v1` file or composed `terraflux.weather.mobile_response/v1` file. Files remain in browser memory. The initial synthetic demo is illustrative, not solver output. Temperature, wind speed, rainfall, wind vectors, orbit/zoom, and cell inspection are supported. Height represents the selected field, not terrain elevation. A single snapshot is displayed; no live solver or timeline is included. Rainfall is unavailable for bare forecast files. Limit: 65,536 cells / 20 MB input.
+
+Checks: `npm test` and `npm run build` inside `viewer/`.
