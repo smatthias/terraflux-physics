@@ -4,6 +4,11 @@ A C++ home for deterministic, testable physical models used by TerraFlux. The fi
 
 The engine is intended to read structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation decodes sidecar-backed radar and temperature PNG/PPM maps, tracks timestamped temperature frames through a 2D dry transport model, and writes versioned forecast JSON. NOAA MRMS is the temporary live radar data source; its GRIB2 acquisition helper is in place, while GRIB2 decoding into the model's canonical observation contract remains the next step. The planned Victoria source remains BOM radar, pending a suitable commercial licence and sample.
 
+## Reviewer and handover guide
+
+See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewer commands, implemented boundaries and remaining checks. Examples remain synthetic; AI and prediction work are excluded.
+
+
 ## Layout
 
 - `docs/weather/architecture.md` — model scope, boundaries, and implementation sequence
