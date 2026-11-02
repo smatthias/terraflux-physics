@@ -54,6 +54,13 @@ export function validateSequence(input) {
     check(f.start_time_utc===first.start_time_utc, 'Timeline start times must match.')
     check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
   })
+  if(input.terrain_derivatives !== undefined){
+    const d=input.terrain_derivatives, count=first.grid.nx*first.grid.ny
+    check(input.terrain && d?.schema_version==='terraflux.terrain.derivatives/v1' && d.method==='central_interior_one_sided_edges', 'Terrain derivatives require terrain and a supported method.')
+    check(Array.isArray(d.slope_deg) && d.slope_deg.length===count && d.slope_deg.every(v=>finite(v)&&v>=0&&v<=90), 'Invalid slope array.')
+    check(Array.isArray(d.aspect_deg) && d.aspect_deg.length===count && d.aspect_deg.every((v,i)=>d.slope_deg[i]===0?v===null:finite(v)&&v>=0&&v<360), 'Invalid downhill aspect; flat cells require null.')
+    frames.forEach(frame=>{frame.terrainDerivatives=d})
+  }
   if(input.terrain_temperature !== undefined){
     const d=input.terrain_temperature
     check(input.terrain && d?.schema_version==='terraflux.weather.terrain_temperature/v1' && d.units==='K', 'Terrain temperature diagnostic requires terrain and supported units/schema.')

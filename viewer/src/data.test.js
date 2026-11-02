@@ -60,7 +60,7 @@ test('terrain has explicit datum and exact grid alignment',async()=>{
  for(const mutate of [d=>d.terrain.grid.nx++,d=>d.terrain.values.pop(),d=>d.terrain.values[0]=null,d=>d.terrain.units='ft',d=>d.terrain.vertical_reference='',d=>d.terrain.source_id='']){
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
- const noTerrain=structuredClone(input);delete noTerrain.terrain;delete noTerrain.terrain_temperature
+ const noTerrain=structuredClone(input);delete noTerrain.terrain;delete noTerrain.terrain_temperature;delete noTerrain.terrain_derivatives
  assert.equal(validateSequence(noTerrain)[0].terrain,undefined)
 })
 
@@ -78,4 +78,19 @@ test('terrain temperature diagnostic matches the explicit lapse-rate relation',a
  }
  const disabled=structuredClone(input);delete disabled.terrain_temperature
  assert.equal(validateSequence(disabled)[0].terrainTemperature,undefined)
+})
+
+
+test('terrain derivatives preserve undefined flat aspect and reject malformed arrays',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const d=validateSequence(input)[0].terrainDerivatives
+ assert.equal(d.slope_deg.length,120)
+ assert.equal(d.slope_deg[5*12+7],0)
+ assert.equal(d.aspect_deg[5*12+7],null)
+ assert.ok(d.slope_deg.some(v=>v>0))
+ for(const mutate of [x=>x.terrain_derivatives.slope_deg.pop(),x=>x.terrain_derivatives.slope_deg[0]=-1,x=>x.terrain_derivatives.aspect_deg[0]=360,x=>x.terrain_derivatives.aspect_deg[5*12+7]=0,x=>x.terrain_derivatives.method='unknown']){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
 })

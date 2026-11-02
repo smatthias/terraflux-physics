@@ -84,3 +84,7 @@ The C++ `adjust_temperature_for_terrain` function optionally computes `Tadjusted
 The example uses an explicitly chosen 0.0065 K/m lapse rate and 80 m reference elevation in its synthetic datum. These are scenario assumptions, not measured weather. In the viewer, **Terrain-adjusted temperature** switches between stored C++ diagnostic output and the original field, with the correction shown in the inspector. The adjustment is applied once to each snapshot and never feeds back into transport. Wind, pressure, moisture, and surface fluxes are unaffected.
 
 The timeline may carry `terrain_temperature` with schema version `terraflux.weather.terrain_temperature/v1`, units `K`, finite `lapse_rate_k_per_m` and `reference_elevation_m`, a matching `vertical_reference`, and `values_by_frame` arrays matching every forecast. The viewer verifies the declared relation and rejects inconsistent output.
+
+### Terrain slope and aspect
+
+The C++ `calculate_terrain_derivatives` function computes metric terrain gradients, slope angle, and downhill aspect. The example bundles these fields for **Terrain slope** and **Downhill aspect** viewer layers. Aspect is clockwise from north, with undefined flat cells preserved as null. One-sided boundary differences do not wrap across the domain. See [method and contract](docs/weather/terrain-derivatives-v1.md).

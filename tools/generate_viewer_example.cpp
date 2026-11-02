@@ -1,6 +1,7 @@
 // Deterministic synthetic scenario, evaluated by the production physics kernels.
 #include "terraflux/weather/transport_model.hpp"
 #include "terraflux/weather/terrain_temperature.hpp"
+#include "terraflux/weather/terrain_derivatives.hpp"
 #include "terraflux/weather/precipitation_estimator.hpp"
 #include "terraflux/weather/precipitation_accumulator.hpp"
 #include <nlohmann/json.hpp>
@@ -126,6 +127,15 @@ int main(int argc, char** argv) {
         std::ofstream diagnostic_file(directory/"terrain-temperature.json");
         diagnostic_file << diagnostic.dump(2) << '\n'; diagnostic_file.close();
         if (!diagnostic_file) throw std::runtime_error("failed to write terrain diagnostic");
+        const auto derivatives=calculate_terrain_derivatives(elevations.get<std::vector<double>>(),g);
+        Json aspect=Json::array();
+        for(const auto& bearing:derivatives.aspect_deg)aspect.push_back(bearing?Json(*bearing):Json(nullptr));
+        Json derived={{"schema_version","terraflux.terrain.derivatives/v1"},
+            {"method","central_interior_one_sided_edges"},
+            {"slope_deg",derivatives.slope_deg},{"aspect_deg",aspect}};
+        std::ofstream derivatives_file(directory/"terrain-derivatives.json");
+        derivatives_file << derived.dump(2) << '\n'; derivatives_file.close();
+        if (!derivatives_file) throw std::runtime_error("failed to write terrain derivatives");
         std::ofstream terrain_file(directory/"terrain.json");
         terrain_file << terrain.dump(2) << '\n'; terrain_file.close();
         if (!terrain_file) throw std::runtime_error("failed to write terrain");
