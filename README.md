@@ -139,3 +139,9 @@ python3 tools/build_viewer_example.py --build-dir build --scenario examples/hydr
 ```
 
 CTest checks both baseline and variant regeneration. The `--timeline-only` flag avoids saving an unused final-snapshot file for comparisons.
+
+### Comparison CSV export
+
+After loading a comparison, select **Export all frames (CSV)**. The download contains one row per snapshot, regardless of the current playback frame or visible scenario. Columns include UTC valid time, elapsed seconds, scenario labels, known/masked cell counts, baseline/variant/delta volumes (surface, soil, evaporation, drainage, rain and balance residual), applied timestep/rate parameters and soil capacities. Volume units are m³, storage capacities metres and rates m/s, identified in column names. Delta means variant minus baseline.
+
+The CSV uses UTF-8 with BOM and CRLF rows, preserves numeric precision, escapes quoted/multiline labels, and neutralizes labels that could be interpreted as spreadsheet formulas. The export contains aggregates for the modeled coverage; masked cells are counted explicitly. Data are downloaded locally without a server or database.

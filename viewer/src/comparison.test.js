@@ -18,3 +18,22 @@ test('matched deterministic scenarios isolate infiltration and expose storage de
   const invalid=structuredClone(b);mutate(invalid);assert.throws(()=>validateComparison(baseline,invalid))
  }
 })
+
+test('CSV exports precise budgets, timestamps and applied parameters for every frame',async()=>{
+ const {comparisonCsv}=await import('./comparison.js')
+ const baseline=validateSequence(await read('../public/examples/engine-timeline.json'))
+ const variant=validateComparison(baseline,await read('../public/comparison/engine-timeline.json'))
+ const csv=comparisonCsv(baseline,variant,'Baseline','Lower infiltration')
+ assert.ok(csv.startsWith('\uFEFFvalid_time_utc,'))
+ const rows=csv.slice(1).trimEnd().split('\r\n').map(row=>row.split(',')),header=rows.shift()
+ assert.equal(rows.length,14)
+ assert.ok(rows.every(row=>row.length===header.length))
+ const last=rows.at(-1),column=k=>last[header.indexOf(k)]
+ assert.equal(column('valid_time_utc'),'2026-11-01T14:10:00.000Z')
+ assert.equal(Number(column('known_cells')),116);assert.equal(Number(column('masked_cells')),4)
+ assert.equal(Number(column('delta_stored_volume_m3')),variant.at(-1).surfaceWater.stored_volume_m3-baseline.at(-1).surfaceWater.stored_volume_m3)
+ assert.equal(Number(column('variant_infiltration_rate_m_s')),1e-7)
+ assert.ok(comparisonCsv(baseline,variant,'A, "quoted"',' =HYPERLINK("x")').includes('"A, ""quoted"""'))
+ assert.ok(comparisonCsv(baseline,variant,'Baseline','=1+1').includes(",'=1+1,"))
+ assert.throws(()=>comparisonCsv([],[]))
+})
