@@ -75,4 +75,12 @@ JSON input also accepts `terraflux.weather.timeline/v1`: an object with a `frame
 
 ### Optional terrain
 
-The bundled timeline includes a deterministic synthetic Gaussian hill. Select **Terrain elevation** to inspect it, or use **Place fields on terrain** and the height-scale slider to display weather colors on its geometry. The 2D fallback shows elevation as color. Original metre values and their explicit datum appear in the cell inspector. This does not alter weather physics. See [terrain grid contract](docs/weather/terrain-grid-v1.md).
+The bundled timeline includes a deterministic synthetic Gaussian hill. Select **Terrain elevation** to inspect it, or use **Place fields on terrain** and the height-scale slider to display weather colors on its geometry. The 2D fallback shows elevation as color. Original metre values and their explicit datum appear in the cell inspector. An optional lapse-rate diagnostic can adjust displayed temperatures without modifying transport. See [terrain grid contract](docs/weather/terrain-grid-v1.md).
+
+### Terrain temperature diagnostic
+
+The C++ `adjust_temperature_for_terrain` function optionally computes `Tadjusted = Treference - lapse_rate × (elevation - reference_elevation)`. It preserves inputs and validates matching vertical datums, finite values, array lengths, and positive kelvin output. The function is disabled by default; the caller supplies grid-aligned arrays.
+
+The example uses an explicitly chosen 0.0065 K/m lapse rate and 80 m reference elevation in its synthetic datum. These are scenario assumptions, not measured weather. In the viewer, **Terrain-adjusted temperature** switches between stored C++ diagnostic output and the original field, with the correction shown in the inspector. The adjustment is applied once to each snapshot and never feeds back into transport. Wind, pressure, moisture, and surface fluxes are unaffected.
+
+The timeline may carry `terrain_temperature` with schema version `terraflux.weather.terrain_temperature/v1`, units `K`, finite `lapse_rate_k_per_m` and `reference_elevation_m`, a matching `vertical_reference`, and `values_by_frame` arrays matching every forecast. The viewer verifies the declared relation and rejects inconsistent output.

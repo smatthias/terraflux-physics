@@ -60,6 +60,22 @@ test('terrain has explicit datum and exact grid alignment',async()=>{
  for(const mutate of [d=>d.terrain.grid.nx++,d=>d.terrain.values.pop(),d=>d.terrain.values[0]=null,d=>d.terrain.units='ft',d=>d.terrain.vertical_reference='',d=>d.terrain.source_id='']){
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
- const noTerrain=structuredClone(input);delete noTerrain.terrain
+ const noTerrain=structuredClone(input);delete noTerrain.terrain;delete noTerrain.terrain_temperature
  assert.equal(validateSequence(noTerrain)[0].terrain,undefined)
+})
+
+test('terrain temperature diagnostic matches the explicit lapse-rate relation',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const frames=validateSequence(input)
+ for(const f of frames)for(let i=0;i<120;i++){
+  const expected=f.forecast.fields.air_temperature.values[i]-.0065*(f.terrain.values[i]-80)
+  assert.ok(Math.abs(f.terrainTemperature.values[i]-expected)<1e-10)
+ }
+ for(const mutate of [d=>d.terrain_temperature.vertical_reference='other',d=>d.terrain_temperature.values_by_frame.pop(),d=>d.terrain_temperature.values_by_frame[0][0]+=1,d=>d.terrain_temperature.lapse_rate_k_per_m=null,d=>delete d.terrain]){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+ const disabled=structuredClone(input);delete disabled.terrain_temperature
+ assert.equal(validateSequence(disabled)[0].terrainTemperature,undefined)
 })

@@ -54,6 +54,18 @@ export function validateSequence(input) {
     check(f.start_time_utc===first.start_time_utc, 'Timeline start times must match.')
     check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
   })
+  if(input.terrain_temperature !== undefined){
+    const d=input.terrain_temperature
+    check(input.terrain && d?.schema_version==='terraflux.weather.terrain_temperature/v1' && d.units==='K', 'Terrain temperature diagnostic requires terrain and supported units/schema.')
+    check(finite(d.reference_elevation_m) && finite(d.lapse_rate_k_per_m) && d.vertical_reference===input.terrain.vertical_reference, 'Invalid lapse-rate configuration or vertical datum.')
+    check(Array.isArray(d.values_by_frame) && d.values_by_frame.length===frames.length, 'Terrain temperature frame count mismatch.')
+    frames.forEach((frame,i)=>{
+      const values=d.values_by_frame[i], baseline=frame.forecast.fields.air_temperature.values
+      check(Array.isArray(values) && values.length===baseline.length && values.every(v=>finite(v)&&v>0), 'Invalid adjusted temperature array.')
+      check(values.every((v,j)=>Math.abs(v-(baseline[j]-d.lapse_rate_k_per_m*(input.terrain.values[j]-d.reference_elevation_m)))<=1e-8), 'Adjusted temperatures disagree with lapse-rate metadata.')
+      frame.terrainTemperature={...d,values,values_by_frame:undefined}
+    })
+  }
   return frames
 }
 

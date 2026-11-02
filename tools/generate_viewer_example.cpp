@@ -1,5 +1,6 @@
 // Deterministic synthetic scenario, evaluated by the production physics kernels.
 #include "terraflux/weather/transport_model.hpp"
+#include "terraflux/weather/terrain_temperature.hpp"
 #include "terraflux/weather/precipitation_estimator.hpp"
 #include "terraflux/weather/precipitation_accumulator.hpp"
 #include <nlohmann/json.hpp>
@@ -111,6 +112,20 @@ int main(int argc, char** argv) {
         Json terrain={{"schema_version","terraflux.terrain.grid/v1"}, {"grid",grid},
             {"units","m"},{"vertical_reference","synthetic_local_datum"},
             {"source_id","synthetic_gaussian_hill"},{"values",elevations}};
+        TerrainTemperatureConfig adjustment{true,0.0065,80,"synthetic_local_datum"};
+        Json adjusted_frames=Json::array();
+        for (const auto& snapshot : snapshots) {
+            adjusted_frames.push_back(adjust_temperature_for_terrain(
+                snapshot.air_temperature_k,elevations.get<std::vector<double>>(),
+                "synthetic_local_datum",adjustment));
+        }
+        Json diagnostic={{"schema_version","terraflux.weather.terrain_temperature/v1"},
+            {"units","K"},{"lapse_rate_k_per_m",adjustment.lapse_rate_k_per_m},
+            {"reference_elevation_m",adjustment.reference_elevation_m},
+            {"vertical_reference",adjustment.vertical_reference},{"values_by_frame",adjusted_frames}};
+        std::ofstream diagnostic_file(directory/"terrain-temperature.json");
+        diagnostic_file << diagnostic.dump(2) << '\n'; diagnostic_file.close();
+        if (!diagnostic_file) throw std::runtime_error("failed to write terrain diagnostic");
         std::ofstream terrain_file(directory/"terrain.json");
         terrain_file << terrain.dump(2) << '\n'; terrain_file.close();
         if (!terrain_file) throw std::runtime_error("failed to write terrain");

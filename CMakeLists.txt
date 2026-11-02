@@ -20,6 +20,7 @@ add_library(terraflux_weather_map
     src/weather/time_indexed_observation_mapper.cpp
     src/weather/temperature_observation_pipeline.cpp
     src/weather/precipitation_estimator.cpp
+    src/weather/terrain_temperature.cpp
     src/weather/precipitation_grid.cpp
     src/weather/precipitation_accumulator.cpp
 )
@@ -66,6 +67,9 @@ add_executable(terraflux-grid-rainfall src/weather/grid_rainfall.cpp)
 target_link_libraries(terraflux-grid-rainfall PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json)
 
 if(BUILD_TESTING)
+    add_executable(terraflux-terrain-temperature-test tests/weather/terrain_temperature_test.cpp)
+    target_link_libraries(terraflux-terrain-temperature-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.terrain_temperature COMMAND terraflux-terrain-temperature-test)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME weather.viewer_example
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_viewer_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR} --check)

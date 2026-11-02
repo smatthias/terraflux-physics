@@ -1,6 +1,6 @@
 # Optional terrain grid v1
 
-A weather timeline may contain a top-level `terrain` object, shared by every snapshot. Existing forecasts and mobile responses are unchanged. This is a visualization/input contract; the dry transport kernel does not consume elevation yet.
+A weather timeline may contain a top-level `terrain` object, shared by every snapshot. Existing forecasts and mobile responses are unchanged. This is a visualization/input contract. An optional lapse-rate diagnostic uses it; the dry transport kernel does not consume elevation.
 
 Required fields:
 
@@ -19,4 +19,4 @@ The bundled Gaussian hill uses `synthetic_local_datum`, not a real-world elevati
 
 In Three.js, **Place fields on terrain** uses relative terrain height above the minimum elevation as geometry; field values control color. Vertical exaggeration (1–5×) is a display control only. The terrain layer always uses terrain geometry regardless of the overlay toggle. Cell inspection reports original elevations and datum. The 2D fallback shows elevation colors without 3D geometry.
 
-Terrain elevation currently changes neither temperature transport nor prescribed wind. Terrain-driven flow, lapse-rate physics, surface fluxes and water routing remain future work.
+Terrain elevation can change the optional diagnostic temperature, but changes neither temperature transport nor prescribed wind. Terrain-driven flow, lapse-rate physics, surface fluxes and water routing remain future work.
