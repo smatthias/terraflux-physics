@@ -20,6 +20,7 @@ add_library(terraflux_weather_map
     src/weather/time_indexed_observation_mapper.cpp
     src/weather/temperature_observation_pipeline.cpp
     src/weather/precipitation_estimator.cpp
+    src/weather/surface_outlets.cpp
     src/weather/water_losses.cpp
     src/weather/infiltration.cpp
     src/weather/surface_water.cpp
@@ -71,6 +72,9 @@ add_executable(terraflux-grid-rainfall src/weather/grid_rainfall.cpp)
 target_link_libraries(terraflux-grid-rainfall PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json)
 
 if(BUILD_TESTING)
+    add_executable(terraflux-surface-outlets-test tests/weather/surface_outlets_test.cpp)
+    target_link_libraries(terraflux-surface-outlets-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.surface_outlets COMMAND terraflux-surface-outlets-test)
     add_executable(terraflux-surface-water-basin-test tests/weather/surface_water_basin_test.cpp)
     target_link_libraries(terraflux-surface-water-basin-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.surface_water_basin COMMAND terraflux-surface-water-basin-test)

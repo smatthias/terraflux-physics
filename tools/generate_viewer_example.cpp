@@ -10,6 +10,7 @@
 #include "terraflux/weather/precipitation_accumulator.hpp"
 #include <nlohmann/json.hpp>
 #include "hydrology_scenario.hpp"
+#include "terraflux/weather/surface_outlets.hpp"
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -34,13 +35,21 @@ int main(int argc, char** argv) {
         const double capacity=scenario.at("soil_storage_capacity_m").get<double>();
         const double evaporation=scenario.at("evaporation_rate_m_s").get<double>();
         const double drainage=scenario.at("drainage_rate_m_s").get<double>();
+        std::vector<SurfaceOutlet> outlets;
+        if(scenario.contains("outlets"))for(const auto& o:scenario.at("outlets"))
+            outlets.push_back({o.at("x").get<std::size_t>(),o.at("y").get<std::size_t>(),o.at("crest_elevation_m").get<double>(),o.at("max_rate_m_s").get<double>()});
         const std::filesystem::path directory(argv[1]);
-        std::filesystem::create_directories(directory);
+
         DryTransportConfig c;
         c.start_time_utc="2026-11-01T12:00:00Z";
         c.timestep_seconds=30; c.steps=260;
         c.horizontal_mixing_diffusivity_m2_s=100;
         c.grid={12,10,-6000,-5000,1000,1000,0,0};
+        std::vector<unsigned char> outlet_mask(c.grid.nx*c.grid.ny,1);
+        for(std::size_t y=8;y<c.grid.ny;++y)for(std::size_t x=0;x<2;++x)outlet_mask[y*c.grid.nx+x]=0;
+        const std::vector<double> dry_grid(c.grid.nx*c.grid.ny,0);
+        (void)apply_surface_outlets(dry_grid,dry_grid,outlet_mask,c.grid,water_dt,outlets);
+        std::filesystem::create_directories(directory);
         DryTransportState initial;
         const std::vector<std::string> valid_times={
             "2026-11-01T12:00:00Z", "2026-11-01T12:10:00Z", "2026-11-01T12:20:00Z",
@@ -174,8 +183,8 @@ int main(int argc, char** argv) {
         const auto elevation=elevations.get<std::vector<double>>();
         const auto covered=map_precipitation_accumulation_to_grid(accumulation,c,snapshots.back().elapsed_seconds);
         for(std::size_t i=0;i<active.size();++i)active[i]=covered.cells[i].status==ObservationStatus::decoded;
-        Json water_frames=Json::array(),volumes=Json::array(),rain_volumes=Json::array(),balance=Json::array(),soil_frames=Json::array(),soil_volumes=Json::array(),evap_volumes=Json::array(),drain_volumes=Json::array();
-        double cumulative_rain_volume=0,cumulative_evap_volume=0,cumulative_drain_volume=0;
+        Json water_frames=Json::array(),volumes=Json::array(),rain_volumes=Json::array(),balance=Json::array(),soil_frames=Json::array(),soil_volumes=Json::array(),evap_volumes=Json::array(),drain_volumes=Json::array(),discharge_volumes=Json::array();
+        double cumulative_rain_volume=0,cumulative_evap_volume=0,cumulative_drain_volume=0,cumulative_discharge=0;
         for(std::size_t frame_index=0;frame_index<snapshots.size();++frame_index) {
             if(frame_index>0) {
                 std::vector<WeatherObservation> prefix;
@@ -195,7 +204,9 @@ int main(int argc, char** argv) {
                     const auto routed=advance_surface_water(elevation,water_depth,rain_increment,active,g,{water_dt,routing});
                     const auto infiltrated=infiltrate_surface_water(routed.depth_m,soil_storage,active,{water_dt,infiltration,capacity});
                     const auto losses=apply_water_losses(infiltrated.surface_depth_m,infiltrated.soil_storage_m,active,{water_dt,evaporation,drainage});
-                    water_depth=losses.surface_depth_m;soil_storage=losses.soil_storage_m;
+                    const auto discharged=apply_surface_outlets(elevation,losses.surface_depth_m,active,g,water_dt,outlets);
+                    water_depth=discharged.depth_m;soil_storage=losses.soil_storage_m;
+                    cumulative_discharge+=discharged.discharged_volume_m3;
                     for(std::size_t cell=0;cell<active.size();++cell){
                         cumulative_evap_volume+=losses.evaporated_depth_m[cell]*g.spacing_east_m*g.spacing_north_m;
                         cumulative_drain_volume+=losses.drained_depth_m[cell]*g.spacing_east_m*g.spacing_north_m;
@@ -212,8 +223,8 @@ int main(int argc, char** argv) {
             }
             water_frames.push_back(depths);volumes.push_back(stored);
             soil_frames.push_back(soil_depths);soil_volumes.push_back(soil_stored);
-            rain_volumes.push_back(cumulative_rain_volume);balance.push_back(stored+soil_stored+cumulative_evap_volume+cumulative_drain_volume-cumulative_rain_volume);
-            evap_volumes.push_back(cumulative_evap_volume);drain_volumes.push_back(cumulative_drain_volume);
+            rain_volumes.push_back(cumulative_rain_volume);balance.push_back(stored+soil_stored+cumulative_evap_volume+cumulative_drain_volume+cumulative_discharge-cumulative_rain_volume);
+            discharge_volumes.push_back(cumulative_discharge);evap_volumes.push_back(cumulative_evap_volume);drain_volumes.push_back(cumulative_drain_volume);
         }
         Json water={{"schema_version","terraflux.water.timeline/v1"},{"units","m"},
             {"method","head_gradient_donor_limited"},{"boundary","closed"},
@@ -225,6 +236,11 @@ int main(int argc, char** argv) {
             {"infiltration_rate_m_s",infiltration},{"process_order","rain_route_infiltrate_evaporate_drain"},
             {"evaporation_rate_m_s",evaporation},{"drainage_rate_m_s",drainage},
             {"cumulative_evaporation_volume_m3",evap_volumes},{"cumulative_drainage_volume_m3",drain_volumes}};
+        if(!outlets.empty()){
+            water["boundary"]="configured_outlets";
+            water["process_order"]="rain_route_infiltrate_evaporate_drain_outlet";
+            water["outlets"]=scenario.at("outlets");water["cumulative_discharge_volume_m3"]=discharge_volumes;
+        }
         std::ofstream scenario_file(directory/"water-scenario.json");
         scenario_file<<scenario.dump(2)<<'\n';scenario_file.close();
         if(!scenario_file)throw std::runtime_error("failed to record scenario");

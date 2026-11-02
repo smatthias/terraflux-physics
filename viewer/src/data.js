@@ -70,7 +70,7 @@ export function validateSequence(input) {
   }
   if(input.surface_water !== undefined){
     const w=input.surface_water,count=first.grid.nx*first.grid.ny,area=first.grid.spacing_east_m*first.grid.spacing_north_m
-    check(input.terrain && w?.schema_version==='terraflux.water.timeline/v1' && w.units==='m' && w.method==='head_gradient_donor_limited' && w.boundary==='closed' && w.missing_rainfall_policy==='impermeable_mask', 'Unsupported surface water contract.')
+    check(input.terrain && w?.schema_version==='terraflux.water.timeline/v1' && w.units==='m' && w.method==='head_gradient_donor_limited' && ['closed','configured_outlets'].includes(w.boundary) && w.missing_rainfall_policy==='impermeable_mask', 'Unsupported surface water contract.')
     check(finite(w.routing_speed_m_s)&&w.routing_speed_m_s>=0&&finite(w.timestep_seconds)&&w.timestep_seconds>0, 'Invalid routing parameters.')
     for(const key of ['values_by_frame','stored_volume_m3','cumulative_rainfall_volume_m3','balance_error_m3'])check(Array.isArray(w[key])&&w[key].length===frames.length,'Water frame count mismatch.')
     if(input.water_scenario!==undefined){
@@ -78,17 +78,29 @@ export function validateSequence(input) {
       check(s?.schema_version==='terraflux.water.scenario/v1','Invalid water scenario provenance.')
       for(const key of ['timestep_seconds','routing_speed_m_s','infiltration_rate_m_s','soil_storage_capacity_m','evaporation_rate_m_s','drainage_rate_m_s','boundary','missing_rainfall_policy','process_order'])check(s[key]===w[key],'Scenario parameters disagree with water output.')
     }
+    const hasOutlets=w.boundary==='configured_outlets'
+    if(hasOutlets){
+      check(Array.isArray(w.outlets)&&w.outlets.length>0&&w.process_order==='rain_route_infiltrate_evaporate_drain_outlet','Invalid configured outlets.')
+      const cells=new Set()
+      for(const o of w.outlets){
+        check(Number.isInteger(o.x)&&Number.isInteger(o.y)&&o.x>=0&&o.x<first.grid.nx&&o.y>=0&&o.y<first.grid.ny&&(o.x===0||o.x===first.grid.nx-1||o.y===0||o.y===first.grid.ny-1)&&finite(o.crest_elevation_m)&&finite(o.max_rate_m_s)&&o.max_rate_m_s>=0,'Invalid boundary outlet.')
+        const index=o.y*first.grid.nx+o.x
+        check(!cells.has(index)&&w.values_by_frame.every(row=>Array.isArray(row)&&row[index]!==null),'Outlets must be unique and covered.');cells.add(index)
+      }
+      check(Array.isArray(w.cumulative_discharge_volume_m3)&&w.cumulative_discharge_volume_m3.length===frames.length,'Discharge frame count mismatch.')
+      if(input.water_scenario)check(Array.isArray(input.water_scenario.outlets)&&input.water_scenario.outlets.length===w.outlets.length&&w.outlets.every((o,i)=>['x','y','crest_elevation_m','max_rate_m_s'].every(k=>input.water_scenario.outlets[i][k]===o[k])),'Outlet provenance mismatch.')
+    }else check(w.outlets===undefined&&w.cumulative_discharge_volume_m3===undefined,'Closed domain cannot declare outlets or discharge.')
     const soilKeys=['soil_values_by_frame','soil_volume_m3','soil_storage_capacity_m','infiltration_rate_m_s','process_order']
     const hasSoil=soilKeys.some(k=>w[k]!==undefined)
     const lossKeys=['evaporation_rate_m_s','drainage_rate_m_s','cumulative_evaporation_volume_m3','cumulative_drainage_volume_m3']
     const hasLosses=lossKeys.some(k=>w[k]!==undefined)
     if(hasLosses){
-      check(hasSoil&&lossKeys.every(k=>w[k]!==undefined)&&w.process_order==='rain_route_infiltrate_evaporate_drain','Invalid water loss configuration.')
+      check(hasSoil&&lossKeys.every(k=>w[k]!==undefined)&&w.process_order===(hasOutlets?'rain_route_infiltrate_evaporate_drain_outlet':'rain_route_infiltrate_evaporate_drain'),'Invalid water loss configuration.')
       check(finite(w.evaporation_rate_m_s)&&w.evaporation_rate_m_s>=0&&finite(w.drainage_rate_m_s)&&w.drainage_rate_m_s>=0,'Invalid water loss rates.')
       for(const key of lossKeys.slice(2))check(Array.isArray(w[key])&&w[key].length===frames.length,'Water loss frame count mismatch.')
     }
     if(hasSoil){
-      check(soilKeys.every(k=>w[k]!==undefined)&&(hasLosses?w.process_order==='rain_route_infiltrate_evaporate_drain':w.process_order==='rain_route_infiltrate')&&finite(w.soil_storage_capacity_m)&&w.soil_storage_capacity_m>=0&&finite(w.infiltration_rate_m_s)&&w.infiltration_rate_m_s>=0,'Invalid infiltration configuration.')
+      check(soilKeys.every(k=>w[k]!==undefined)&&(hasLosses?w.process_order===(hasOutlets?'rain_route_infiltrate_evaporate_drain_outlet':'rain_route_infiltrate_evaporate_drain'):w.process_order==='rain_route_infiltrate')&&finite(w.soil_storage_capacity_m)&&w.soil_storage_capacity_m>=0&&finite(w.infiltration_rate_m_s)&&w.infiltration_rate_m_s>=0,'Invalid infiltration configuration.')
       check(Array.isArray(w.soil_values_by_frame)&&w.soil_values_by_frame.length===frames.length&&Array.isArray(w.soil_volume_m3)&&w.soil_volume_m3.length===frames.length,'Soil frame count mismatch.')
     }
     frames.forEach((frame,i)=>{
@@ -105,6 +117,13 @@ export function validateSequence(input) {
         const previousEvap=i===0?0:w.cumulative_evaporation_volume_m3[i-1],previousDrain=i===0?0:w.cumulative_drainage_volume_m3[i-1]
         check(evaporated-previousEvap<=w.evaporation_rate_m_s*seconds*area*activeCount+1e-7&&drained-previousDrain<=w.drainage_rate_m_s*seconds*area*activeCount+1e-7,'Water losses exceed prescribed rate limits.')
       }
+      const discharged=hasOutlets?w.cumulative_discharge_volume_m3[i]:0
+      check(finite(discharged)&&discharged>=0,'Invalid discharge budget.')
+      if(hasOutlets){
+        const previous=i===0?0:w.cumulative_discharge_volume_m3[i-1],seconds=i===0?0:frame.forecast.elapsed_seconds-frames[i-1].forecast.elapsed_seconds
+        check(i===0?discharged===0:discharged>=previous,'Discharge must be nondecreasing.')
+        check(discharged-previous<=w.outlets.reduce((a,o)=>a+o.max_rate_m_s,0)*seconds*area+1e-7,'Discharge exceeds outlet capacities.')
+      }
       const soil=hasSoil?w.soil_values_by_frame[i]:null,soilVolume=hasSoil?w.soil_volume_m3[i]:0
       if(hasSoil){
         check(Array.isArray(soil)&&soil.length===count&&soil.every((v,j)=>(v===null)===(depths[j]===null)&&(v===null||(finite(v)&&v>=0&&v<=w.soil_storage_capacity_m+1e-12))), 'Invalid soil storage or coverage.')
@@ -113,7 +132,7 @@ export function validateSequence(input) {
       check(finite(soilVolume)&&soilVolume>=0,'Invalid soil volume.')
       check([stored,rain,error].every(finite)&&stored>=0&&rain>=0, 'Invalid water volume budget.')
       const tol=1e-8*Math.max(1,rain)
-      check(Math.abs(volume-stored)<=tol&&Math.abs(stored+soilVolume+evaporated+drained-rain-error)<=tol&&Math.abs(error)<=tol, 'Water mass balance mismatch.')
+      check(Math.abs(volume-stored)<=tol&&Math.abs(stored+soilVolume+evaporated+drained+discharged-rain-error)<=tol&&Math.abs(error)<=tol, 'Water mass balance mismatch.')
       if(hasSoil)check(Math.abs(soil.reduce((a,v)=>a+(v??0)*area,0)-soilVolume)<=tol,'Soil volume mismatch.')
       check(i===0?stored===0&&soilVolume===0&&rain===0:rain>=w.cumulative_rainfall_volume_m3[i-1], 'Water requires zero initial storage and nondecreasing rain.')
       if(frame.rain){
@@ -121,7 +140,7 @@ export function validateSequence(input) {
         const rainVolume=frame.rain.values.reduce((a,v)=>a+(v??0)/1000*area,0)
         check(Math.abs(rainVolume-rain)<=tol,'Applied water input disagrees with accumulated rain.')
       }
-      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained,parameters:{timestep_seconds:w.timestep_seconds,routing_speed_m_s:w.routing_speed_m_s,infiltration_rate_m_s:w.infiltration_rate_m_s??0,evaporation_rate_m_s:w.evaporation_rate_m_s??0,drainage_rate_m_s:w.drainage_rate_m_s??0}}
+      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained,discharged_volume_m3:discharged,boundary:w.boundary,parameters:{timestep_seconds:w.timestep_seconds,routing_speed_m_s:w.routing_speed_m_s,infiltration_rate_m_s:w.infiltration_rate_m_s??0,evaporation_rate_m_s:w.evaporation_rate_m_s??0,drainage_rate_m_s:w.drainage_rate_m_s??0}}
     })
   }
   if(input.terrain_derivatives !== undefined){

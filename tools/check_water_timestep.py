@@ -36,9 +36,10 @@ def measure(executable,scenario):
                 stored=sum(v or 0 for v in depth)*area;soil_volume=sum(v or 0 for v in soil)*area
                 rain=water['cumulative_rainfall_volume_m3'][i]
                 evaporation=water['cumulative_evaporation_volume_m3'][i];drainage=water['cumulative_drainage_volume_m3'][i]
+                discharge=water.get('cumulative_discharge_volume_m3',[0]*count)[i]
                 tol=1e-8*max(1,rain)
-                require(all(math.isfinite(v) and v>=0 for v in (rain,evaporation,drainage)),'invalid input/loss volume')
-                require(abs(stored+soil_volume+evaporation+drainage-rain)<=tol,'mass balance failed')
+                require(all(math.isfinite(v) and v>=0 for v in (rain,evaporation,drainage,discharge)),'invalid input/loss volume')
+                require(abs(stored+soil_volume+evaporation+drainage+discharge-rain)<=tol,'mass balance failed')
                 require(abs(stored-water['stored_volume_m3'][i])<=tol and abs(soil_volume-water['soil_volume_m3'][i])<=tol,'serialized budget disagrees with cells')
             runs.append((water,forecast))
     reference,reference_forecast=runs[0]

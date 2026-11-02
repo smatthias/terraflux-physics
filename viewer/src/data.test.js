@@ -164,3 +164,18 @@ test('applied scenario provenance must match hydrology output',async()=>{
  input.water_scenario.infiltration_rate_m_s=1
  assert.throws(()=>validateSequence(input))
 })
+
+test('outlet metadata and discharge budgets are validated',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const w=input.surface_water
+ w.boundary='configured_outlets';w.process_order='rain_route_infiltrate_evaporate_drain_outlet'
+ w.outlets=[{x:11,y:0,crest_elevation_m:0,max_rate_m_s:.00001}]
+ w.cumulative_discharge_volume_m3=input.frames.map(()=>0)
+ input.water_scenario={...input.water_scenario,boundary:w.boundary,process_order:w.process_order,outlets:structuredClone(w.outlets)}
+ assert.equal(validateSequence(input)[0].surfaceWater.discharged_volume_m3,0)
+ for(const mutate of [d=>d.surface_water.outlets[0].x=5,d=>d.surface_water.outlets.push({...d.surface_water.outlets[0]}),d=>d.surface_water.cumulative_discharge_volume_m3[0]=1,d=>d.surface_water.cumulative_discharge_volume_m3[1]=-1]){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+})

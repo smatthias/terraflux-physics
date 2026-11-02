@@ -153,3 +153,7 @@ The CSV uses UTF-8 with BOM and CRLF rows, preserves numeric precision, escapes 
 ### Basin ponding and overflow regression
 
 `ctest --test-dir build -R surface_water_basin --output-on-failure` checks stable ponding below a spill point, equal-head retention, internal overflow above it, a raised spill barrier and rainfall-driven filling. Each step verifies nonnegative depths and the closed-domain water budget. This is a controlled routing regression, not a hydraulic spillway model. See [geometry and limits](docs/weather/surface-water-basin-test.md).
+
+### Configured surface outlets
+
+Optional boundary outlets remove surface water above a specified terrain-datum crest, bounded by available storage and a prescribed capacity. Discharge is tracked separately in water budgets, comparisons and CSV. Existing closed scenarios are unchanged. The example configuration, validation rules and command are documented in [surface outlets](docs/weather/surface-outlets-v1.md).

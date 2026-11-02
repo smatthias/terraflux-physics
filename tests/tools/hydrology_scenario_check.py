@@ -31,4 +31,16 @@ with tempfile.TemporaryDirectory() as temporary:
     assert all(v==0 for v in water['cumulative_drainage_volume_m3'])
     assert all(abs(v-r)<1e-6 for v,r in zip(water['stored_volume_m3'],water['cumulative_rainfall_volume_m3']))
     assert json.loads((output/'water-scenario.json').read_text())==custom
-print('hydrology scenario validation and custom-run checks passed')
+    outlets=json.loads((root/'examples/hydrology-outlet-scenario.json').read_text())
+    config.write_text(json.dumps(outlets));output=directory/'outlets'
+    subprocess.run([sys.argv[1],str(output),str(config)],check=True)
+    w=json.loads((output/'surface-water.json').read_text())
+    assert w['cumulative_discharge_volume_m3'][-1]>0
+    for i,rain in enumerate(w['cumulative_rainfall_volume_m3']):
+        total=w['stored_volume_m3'][i]+w['soil_volume_m3'][i]+w['cumulative_evaporation_volume_m3'][i]+w['cumulative_drainage_volume_m3'][i]+w['cumulative_discharge_volume_m3'][i]
+        assert abs(total-rain)<1e-7
+    for i,mutate in enumerate([lambda d:d['outlets'][0].update(x=5,y=5),lambda d:d['outlets'].append(dict(d['outlets'][0])),lambda d:d['outlets'][0].update(x=0,y=9)]):
+        invalid=copy.deepcopy(outlets);mutate(invalid);config.write_text(json.dumps(invalid));output=directory/f'bad-outlet-{i}'
+        assert subprocess.run([sys.argv[1],str(output),str(config)],capture_output=True).returncode!=0
+        assert not output.exists()
+print('hydrology scenario validation, custom run and outlet budget checks passed')

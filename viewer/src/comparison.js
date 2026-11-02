@@ -18,7 +18,7 @@ export function validateComparison(baseline, input){
  return variant
 }
 export function waterComparison(a,b){
- const rows=[['Surface storage','stored_volume_m3'],['Soil storage','soil_volume_m3'],['Evaporated','evaporated_volume_m3'],['Drained','drained_volume_m3'],['Rain input','cumulative_rainfall_volume_m3']]
+ const rows=[['Surface storage','stored_volume_m3'],['Soil storage','soil_volume_m3'],['Evaporated','evaporated_volume_m3'],['Drained','drained_volume_m3'],['Outlet discharge','discharged_volume_m3'],['Rain input','cumulative_rainfall_volume_m3']]
  return rows.map(([label,key])=>({label,baseline:a.surfaceWater[key],variant:b.surfaceWater[key],delta:b.surfaceWater[key]-a.surfaceWater[key]}))
 }
 
@@ -26,7 +26,7 @@ export function waterComparison(a,b){
 // retain JS precision; scenario labels are escaped and spreadsheet-formula-safe.
 export function comparisonCsv(baseline,variant,baselineName='Baseline',variantName='Variant'){
  if(!baseline.length||baseline.length!==variant.length)throw Error('CSV requires aligned nonempty scenario frames.')
- const metrics=['stored_volume_m3','soil_volume_m3','evaporated_volume_m3','drained_volume_m3','cumulative_rainfall_volume_m3','balance_error_m3']
+ const metrics=['stored_volume_m3','soil_volume_m3','evaporated_volume_m3','drained_volume_m3','cumulative_rainfall_volume_m3','discharged_volume_m3','balance_error_m3']
  const parameters=['timestep_seconds','routing_speed_m_s','infiltration_rate_m_s','evaporation_rate_m_s','drainage_rate_m_s']
  const header=['valid_time_utc','elapsed_seconds','baseline_name','variant_name','known_cells','masked_cells',...metrics.flatMap(k=>[`baseline_${k}`,`variant_${k}`,`delta_${k}`]),...parameters.flatMap(k=>[`baseline_${k}`,`variant_${k}`]),'baseline_soil_capacity_m','variant_soil_capacity_m']
  const escape=value=>{
