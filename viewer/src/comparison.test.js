@@ -37,3 +37,19 @@ test('CSV exports precise budgets, timestamps and applied parameters for every f
  assert.ok(comparisonCsv(baseline,variant,'Baseline','=1+1').includes(",'=1+1,"))
  assert.throws(()=>comparisonCsv([],[]))
 })
+
+test('outlet example balances discharge and chart rates integrate over snapshot intervals',async()=>{
+ const {dischargeSeries}=await import('./comparison.js')
+ const frames=validateSequence(await read('../public/outlet/engine-timeline.json'))
+ const series=dischargeSeries(frames)
+ assert.equal(series[0].mean_rate_m3_s,null)
+ assert.ok(series.at(-1).cumulative_m3>0)
+ let total=0
+ for(let i=1;i<series.length;i++)total+=series[i].mean_rate_m3_s*(series[i].elapsed_seconds-series[i-1].elapsed_seconds)
+ assert.ok(Math.abs(total-series.at(-1).cumulative_m3)<1e-8)
+ const final=frames.at(-1).surfaceWater
+ assert.ok(Math.abs(final.stored_volume_m3+final.soil_volume_m3+final.evaporated_volume_m3+final.drained_volume_m3+final.discharged_volume_m3-final.cumulative_rainfall_volume_m3)<1e-7)
+ const sample=[0,10,30].map((t,i)=>({forecast:{elapsed_seconds:t},surfaceWater:{discharged_volume_m3:[0,20,30][i]}}))
+ assert.deepEqual(dischargeSeries(sample).map(p=>p.mean_rate_m3_s),[null,2,.5])
+ sample[2].surfaceWater.discharged_volume_m3=1;assert.throws(()=>dischargeSeries(sample))
+})

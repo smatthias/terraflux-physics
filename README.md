@@ -157,3 +157,15 @@ The CSV uses UTF-8 with BOM and CRLF rows, preserves numeric precision, escapes 
 ### Configured surface outlets
 
 Optional boundary outlets remove surface water above a specified terrain-datum crest, bounded by available storage and a prescribed capacity. Discharge is tracked separately in water budgets, comparisons and CSV. Existing closed scenarios are unchanged. The example configuration, validation rules and command are documented in [surface outlets](docs/weather/surface-outlets-v1.md).
+
+### Outlet playback and discharge charts
+
+Select **Load outlet scenario** to open the bundled C++-generated outlet run. Orange markers locate configured outlet cells. The discharge panel follows playback and shows cumulative discharge in m³ and interval-average flow in m³/s. Rate values use actual elapsed times between snapshots; the initial frame has no preceding interval. These are snapshot averages, not instantaneous hydraulic discharge. Both charts mark the selected time.
+
+Regenerate the fixture with:
+
+```sh
+python3 tools/build_viewer_example.py --build-dir build --scenario examples/hydrology-outlet-scenario.json --output viewer/public/outlet/engine-weather.json --timeline-only
+```
+
+CTest verifies outlet fixture regeneration. The bundled case isolates external discharge by disabling infiltration, evaporation and soil drainage; local rain and terrain remain synthetic.

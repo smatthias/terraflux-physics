@@ -46,3 +46,16 @@ export function comparisonCsv(baseline,variant,baselineName='Baseline',variantNa
  })
  return '\uFEFF'+[header,...rows].map(row=>row.map(escape).join(',')).join('\r\n')+'\r\n'
 }
+
+
+// Rates are interval averages between stored snapshots, not instantaneous flow.
+export function dischargeSeries(frames){
+ return frames.map((frame,i)=>{
+  const elapsed=frame.forecast.elapsed_seconds,volume=frame.surfaceWater?.discharged_volume_m3??0
+  const dt=i?elapsed-frames[i-1].forecast.elapsed_seconds:0
+  if(!Number.isFinite(volume)||volume<0||(i&&dt<=0))throw Error('Invalid discharge series.')
+  const delta=i?volume-(frames[i-1].surfaceWater?.discharged_volume_m3??0):0
+  if(delta < -1e-8)throw Error('Cumulative discharge cannot decrease.')
+  return {elapsed_seconds:elapsed,cumulative_m3:volume,mean_rate_m3_s:i?Math.max(0,delta)/dt:null}
+ })
+}

@@ -140,7 +140,7 @@ export function validateSequence(input) {
         const rainVolume=frame.rain.values.reduce((a,v)=>a+(v??0)/1000*area,0)
         check(Math.abs(rainVolume-rain)<=tol,'Applied water input disagrees with accumulated rain.')
       }
-      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained,discharged_volume_m3:discharged,boundary:w.boundary,parameters:{timestep_seconds:w.timestep_seconds,routing_speed_m_s:w.routing_speed_m_s,infiltration_rate_m_s:w.infiltration_rate_m_s??0,evaporation_rate_m_s:w.evaporation_rate_m_s??0,drainage_rate_m_s:w.drainage_rate_m_s??0}}
+      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained,discharged_volume_m3:discharged,boundary:w.boundary,outlets:w.outlets??[],parameters:{timestep_seconds:w.timestep_seconds,routing_speed_m_s:w.routing_speed_m_s,infiltration_rate_m_s:w.infiltration_rate_m_s??0,evaporation_rate_m_s:w.evaporation_rate_m_s??0,drainage_rate_m_s:w.drainage_rate_m_s??0}}
     })
   }
   if(input.terrain_derivatives !== undefined){
