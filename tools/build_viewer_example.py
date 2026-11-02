@@ -29,6 +29,7 @@ def main():
         result=frames[-1]
         timeline={'schema_version':'terraflux.weather.timeline/v1', 'frames':frames,
                   'terrain':json.loads((directory / 'terrain.json').read_text()),
+                  'surface_water':json.loads((directory / 'surface-water.json').read_text()),
                   'terrain_derivatives':json.loads((directory / 'terrain-derivatives.json').read_text()),
                   'terrain_temperature':json.loads((directory / 'terrain-temperature.json').read_text())}
         outputs=[(args.output,result),(args.output.with_name('engine-timeline.json'),timeline)]

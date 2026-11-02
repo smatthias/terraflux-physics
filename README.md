@@ -88,3 +88,9 @@ The timeline may carry `terrain_temperature` with schema version `terraflux.weat
 ### Terrain slope and aspect
 
 The C++ `calculate_terrain_derivatives` function computes metric terrain gradients, slope angle, and downhill aspect. The example bundles these fields for **Terrain slope** and **Downhill aspect** viewer layers. Aspect is clockwise from north, with undefined flat cells preserved as null. One-sided boundary differences do not wrap across the domain. See [method and contract](docs/weather/terrain-derivatives-v1.md).
+
+### Surface-water storage and runoff prototype
+
+The C++ `advance_surface_water` function adds interval rainfall and routes stored water between four neighboring cells down free-surface head gradients. Donor-limited transfers keep storage nonnegative. Boundaries are closed; there is no infiltration, evaporation, external outflow or momentum solver. It is a conservative storage/routing prototype, not shallow-water hydraulics.
+
+The example applies each ten-minute rainfall increment uniformly over twenty 30-second steps, with routing speed parameter 0.002 m/s. Cells lacking rainfall coverage are impermeable masks and retain unknown/null water depth in the output. Water depth is stored in metres and displayed in millimetres. The **Surface water depth** layer includes stored volume, cumulative rainfall input and mass-balance residual for every frame. Terrain and weather remain independent of the routed water state. See [surface-water contract](docs/weather/surface-water-v1.md).

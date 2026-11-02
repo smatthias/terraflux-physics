@@ -1,0 +1,13 @@
+# Closed-domain surface water v1
+
+Inputs to `advance_surface_water` are aligned cell-centered terrain elevations (m), initial water depths (m), interval rainfall depths (m), a binary active mask, metric grid geometry, timestep (s) and routing-speed parameter (m/s). All arrays must match a grid of at least 2 × 2 cells. Elevations are finite; depths and rainfall are finite and nonnegative.
+
+Rainfall is added once. Neighbor transfer demand is `routing_speed × timestep × head_difference / neighbor_spacing`, expressed as depth. Free-surface head is terrain elevation plus stored water. Every east/north edge is visited once and transfer goes toward lower head. All outgoing demands from a donor are scaled proportionally if they exceed available water; transfers are applied simultaneously. This preserves mass and nonnegative storage, but is a timestep-dependent routing approximation, not a momentum or shallow-water solver. Large timesteps may over-redistribute water; donor limiting is a positivity safeguard, not an accuracy guarantee.
+
+Boundaries are closed with no periodic wrapping. Masked cells must receive zero numeric input storage/rain; they are excluded from routing. The caller must retain their unknown status rather than interpret the internal zero placeholder as measured dry ground. The example displays these cells as null and makes them impermeable; results near these artificial boundaries depend on the coverage mask.
+
+The returned budget records initial volume, added rainfall volume, final volume and residual, in m³. Cell area is east spacing × north spacing. There is no infiltration, evaporation, drainage outlet or external discharge in v1.
+
+A timeline may contain `surface_water` with schema `terraflux.water.timeline/v1`, units `m`, method `head_gradient_donor_limited`, boundary `closed`, missing_rainfall_policy `impermeable_mask`, routing_speed_m_s, timestep_seconds and arrays `values_by_frame`, `stored_volume_m3`, `cumulative_rainfall_volume_m3`, `balance_error_m3`. Depth arrays use the terrain grid and contain null at a fixed unknown-coverage mask. This viewer contract assumes zero initial storage; stored volume equals covered cumulative rainfall input up to numerical residual. The viewer validates the budgets and corresponding rainfall coverage before display.
+
+The synthetic example routes each ten-minute rainfall increment over twenty equal 30-second increments. Temporal uniformity within each interval is an explicit forcing assumption. Water is visualized in millimetres using a fixed color range across playback; its millimetre-scale depth is not exaggerated into a geometric flood surface.

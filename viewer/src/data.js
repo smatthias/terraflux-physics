@@ -54,6 +54,28 @@ export function validateSequence(input) {
     check(f.start_time_utc===first.start_time_utc, 'Timeline start times must match.')
     check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
   })
+  if(input.surface_water !== undefined){
+    const w=input.surface_water,count=first.grid.nx*first.grid.ny,area=first.grid.spacing_east_m*first.grid.spacing_north_m
+    check(input.terrain && w?.schema_version==='terraflux.water.timeline/v1' && w.units==='m' && w.method==='head_gradient_donor_limited' && w.boundary==='closed' && w.missing_rainfall_policy==='impermeable_mask', 'Unsupported surface water contract.')
+    check(finite(w.routing_speed_m_s)&&w.routing_speed_m_s>=0&&finite(w.timestep_seconds)&&w.timestep_seconds>0, 'Invalid routing parameters.')
+    for(const key of ['values_by_frame','stored_volume_m3','cumulative_rainfall_volume_m3','balance_error_m3'])check(Array.isArray(w[key])&&w[key].length===frames.length,'Water frame count mismatch.')
+    frames.forEach((frame,i)=>{
+      const depths=w.values_by_frame[i]
+      check(Array.isArray(depths)&&depths.length===count&&depths.every(v=>v===null||(finite(v)&&v>=0)), 'Invalid water depths.')
+      check(i===0||depths.every((v,j)=>(v===null)===(w.values_by_frame[0][j]===null)), 'Water mask must remain fixed.')
+      const volume=depths.reduce((a,v)=>a+(v??0)*area,0),stored=w.stored_volume_m3[i],rain=w.cumulative_rainfall_volume_m3[i],error=w.balance_error_m3[i]
+      check([stored,rain,error].every(finite)&&stored>=0&&rain>=0, 'Invalid water volume budget.')
+      const tol=1e-8*Math.max(1,rain)
+      check(Math.abs(volume-stored)<=tol&&Math.abs(stored-rain-error)<=tol&&Math.abs(error)<=tol, 'Water mass balance mismatch.')
+      check(i===0?stored===0&&rain===0:rain>=w.cumulative_rainfall_volume_m3[i-1], 'Water requires zero initial storage and nondecreasing rain.')
+      if(frame.rain){
+        check(depths.every((v,j)=>(v===null)===(frame.rain.values[j]===null)), 'Water and rainfall coverage mismatch.')
+        const rainVolume=frame.rain.values.reduce((a,v)=>a+(v??0)/1000*area,0)
+        check(Math.abs(rainVolume-rain)<=tol,'Applied water input disagrees with accumulated rain.')
+      }
+      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error}
+    })
+  }
   if(input.terrain_derivatives !== undefined){
     const d=input.terrain_derivatives, count=first.grid.nx*first.grid.ny
     check(input.terrain && d?.schema_version==='terraflux.terrain.derivatives/v1' && d.method==='central_interior_one_sided_edges', 'Terrain derivatives require terrain and a supported method.')

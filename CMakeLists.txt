@@ -20,6 +20,7 @@ add_library(terraflux_weather_map
     src/weather/time_indexed_observation_mapper.cpp
     src/weather/temperature_observation_pipeline.cpp
     src/weather/precipitation_estimator.cpp
+    src/weather/surface_water.cpp
     src/weather/terrain_derivatives.cpp
     src/weather/terrain_temperature.cpp
     src/weather/precipitation_grid.cpp
@@ -68,6 +69,9 @@ add_executable(terraflux-grid-rainfall src/weather/grid_rainfall.cpp)
 target_link_libraries(terraflux-grid-rainfall PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json)
 
 if(BUILD_TESTING)
+    add_executable(terraflux-surface-water-test tests/weather/surface_water_test.cpp)
+    target_link_libraries(terraflux-surface-water-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.surface_water COMMAND terraflux-surface-water-test)
     add_executable(terraflux-terrain-derivatives-test tests/weather/terrain_derivatives_test.cpp)
     target_link_libraries(terraflux-terrain-derivatives-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.terrain_derivatives COMMAND terraflux-terrain-derivatives-test)

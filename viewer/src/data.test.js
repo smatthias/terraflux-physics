@@ -60,7 +60,7 @@ test('terrain has explicit datum and exact grid alignment',async()=>{
  for(const mutate of [d=>d.terrain.grid.nx++,d=>d.terrain.values.pop(),d=>d.terrain.values[0]=null,d=>d.terrain.units='ft',d=>d.terrain.vertical_reference='',d=>d.terrain.source_id='']){
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
- const noTerrain=structuredClone(input);delete noTerrain.terrain;delete noTerrain.terrain_temperature;delete noTerrain.terrain_derivatives
+ const noTerrain=structuredClone(input);delete noTerrain.terrain;delete noTerrain.terrain_temperature;delete noTerrain.terrain_derivatives;delete noTerrain.surface_water
  assert.equal(validateSequence(noTerrain)[0].terrain,undefined)
 })
 
@@ -91,6 +91,23 @@ test('terrain derivatives preserve undefined flat aspect and reject malformed ar
  assert.equal(d.aspect_deg[5*12+7],null)
  assert.ok(d.slope_deg.some(v=>v>0))
  for(const mutate of [x=>x.terrain_derivatives.slope_deg.pop(),x=>x.terrain_derivatives.slope_deg[0]=-1,x=>x.terrain_derivatives.aspect_deg[0]=360,x=>x.terrain_derivatives.aspect_deg[5*12+7]=0,x=>x.terrain_derivatives.method='unknown']){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+})
+
+
+test('surface water preserves masked cells and balances all covered rainfall',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const frames=validateSequence(input)
+ for(const f of frames){
+  assert.equal(f.surfaceWater.values.filter(v=>v===null).length,4)
+  assert.ok(Math.abs(f.surfaceWater.balance_error_m3)<1e-7)
+ }
+ assert.ok(frames.at(-1).surfaceWater.stored_volume_m3>0)
+ assert.ok(frames.at(-1).surfaceWater.values.some((v,i)=>v!==null&&Math.abs(v-frames.at(-1).rain.values[i]/1000)>1e-6),'routing redistributes rainfall')
+ for(const mutate of [d=>d.surface_water.values_by_frame[1][0]=-1,d=>d.surface_water.stored_volume_m3[1]+=10,d=>d.surface_water.cumulative_rainfall_volume_m3[1]+=10,d=>d.surface_water.boundary='open',d=>d.surface_water.values_by_frame[1][0]=null]){
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
 })
