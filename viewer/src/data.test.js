@@ -119,10 +119,22 @@ test('soil water stays within capacity and participates in combined mass balance
  const frames=validateSequence(input)
  const final=frames.at(-1).surfaceWater
  assert.ok(final.soil_volume_m3>0)
- assert.ok(final.soil_values.some(v=>v===.0015),'some cells reach capacity')
+ assert.ok(final.soil_values.some(v=>v!==null&&v>.00149),'some cells reach capacity')
  assert.equal(final.soil_values.filter(v=>v===null).length,4)
- assert.ok(Math.abs(final.stored_volume_m3+final.soil_volume_m3-final.cumulative_rainfall_volume_m3)<1e-7)
+ assert.ok(Math.abs(final.stored_volume_m3+final.soil_volume_m3+final.evaporated_volume_m3+final.drained_volume_m3-final.cumulative_rainfall_volume_m3)<1e-7)
  for(const mutate of [d=>d.surface_water.soil_values_by_frame[1][0]=1,d=>d.surface_water.soil_volume_m3[1]+=1,d=>d.surface_water.soil_values_by_frame[1][0]=null,d=>delete d.surface_water.infiltration_rate_m_s]){
+  const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
+ }
+})
+
+test('evaporation and drainage are separately accounted and rate bounded',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const {validateSequence}=await import('./data.js')
+ const input=JSON.parse(await readFile(new URL('../public/examples/engine-timeline.json',import.meta.url),'utf8'))
+ const final=validateSequence(input).at(-1).surfaceWater
+ assert.ok(final.evaporated_volume_m3>0&&final.drained_volume_m3>0)
+ assert.ok(Math.abs(final.stored_volume_m3+final.soil_volume_m3+final.evaporated_volume_m3+final.drained_volume_m3-final.cumulative_rainfall_volume_m3)<1e-7)
+ for(const mutate of [d=>d.surface_water.cumulative_evaporation_volume_m3[1]=-1,d=>d.surface_water.cumulative_drainage_volume_m3[1]+=10,d=>delete d.surface_water.drainage_rate_m_s,d=>d.surface_water.evaporation_rate_m_s=0]){
   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>validateSequence(invalid))
  }
 })

@@ -61,8 +61,15 @@ export function validateSequence(input) {
     for(const key of ['values_by_frame','stored_volume_m3','cumulative_rainfall_volume_m3','balance_error_m3'])check(Array.isArray(w[key])&&w[key].length===frames.length,'Water frame count mismatch.')
     const soilKeys=['soil_values_by_frame','soil_volume_m3','soil_storage_capacity_m','infiltration_rate_m_s','process_order']
     const hasSoil=soilKeys.some(k=>w[k]!==undefined)
+    const lossKeys=['evaporation_rate_m_s','drainage_rate_m_s','cumulative_evaporation_volume_m3','cumulative_drainage_volume_m3']
+    const hasLosses=lossKeys.some(k=>w[k]!==undefined)
+    if(hasLosses){
+      check(hasSoil&&lossKeys.every(k=>w[k]!==undefined)&&w.process_order==='rain_route_infiltrate_evaporate_drain','Invalid water loss configuration.')
+      check(finite(w.evaporation_rate_m_s)&&w.evaporation_rate_m_s>=0&&finite(w.drainage_rate_m_s)&&w.drainage_rate_m_s>=0,'Invalid water loss rates.')
+      for(const key of lossKeys.slice(2))check(Array.isArray(w[key])&&w[key].length===frames.length,'Water loss frame count mismatch.')
+    }
     if(hasSoil){
-      check(soilKeys.every(k=>w[k]!==undefined)&&w.process_order==='rain_route_infiltrate'&&finite(w.soil_storage_capacity_m)&&w.soil_storage_capacity_m>=0&&finite(w.infiltration_rate_m_s)&&w.infiltration_rate_m_s>=0,'Invalid infiltration configuration.')
+      check(soilKeys.every(k=>w[k]!==undefined)&&(hasLosses?w.process_order==='rain_route_infiltrate_evaporate_drain':w.process_order==='rain_route_infiltrate')&&finite(w.soil_storage_capacity_m)&&w.soil_storage_capacity_m>=0&&finite(w.infiltration_rate_m_s)&&w.infiltration_rate_m_s>=0,'Invalid infiltration configuration.')
       check(Array.isArray(w.soil_values_by_frame)&&w.soil_values_by_frame.length===frames.length&&Array.isArray(w.soil_volume_m3)&&w.soil_volume_m3.length===frames.length,'Soil frame count mismatch.')
     }
     frames.forEach((frame,i)=>{
@@ -70,15 +77,24 @@ export function validateSequence(input) {
       check(Array.isArray(depths)&&depths.length===count&&depths.every(v=>v===null||(finite(v)&&v>=0)), 'Invalid water depths.')
       check(i===0||depths.every((v,j)=>(v===null)===(w.values_by_frame[0][j]===null)), 'Water mask must remain fixed.')
       const volume=depths.reduce((a,v)=>a+(v??0)*area,0),stored=w.stored_volume_m3[i],rain=w.cumulative_rainfall_volume_m3[i],error=w.balance_error_m3[i]
+      const evaporated=hasLosses?w.cumulative_evaporation_volume_m3[i]:0,drained=hasLosses?w.cumulative_drainage_volume_m3[i]:0
+      check([evaporated,drained].every(v=>finite(v)&&v>=0),'Invalid water loss budget.')
+      if(hasLosses){
+        check(i===0?evaporated===0&&drained===0:evaporated>=w.cumulative_evaporation_volume_m3[i-1]&&drained>=w.cumulative_drainage_volume_m3[i-1],'Cumulative water losses must be nondecreasing.')
+        const seconds=i===0?0:frame.forecast.elapsed_seconds-frames[i-1].forecast.elapsed_seconds
+        const activeCount=depths.filter(v=>v!==null).length
+        const previousEvap=i===0?0:w.cumulative_evaporation_volume_m3[i-1],previousDrain=i===0?0:w.cumulative_drainage_volume_m3[i-1]
+        check(evaporated-previousEvap<=w.evaporation_rate_m_s*seconds*area*activeCount+1e-7&&drained-previousDrain<=w.drainage_rate_m_s*seconds*area*activeCount+1e-7,'Water losses exceed prescribed rate limits.')
+      }
       const soil=hasSoil?w.soil_values_by_frame[i]:null,soilVolume=hasSoil?w.soil_volume_m3[i]:0
       if(hasSoil){
         check(Array.isArray(soil)&&soil.length===count&&soil.every((v,j)=>(v===null)===(depths[j]===null)&&(v===null||(finite(v)&&v>=0&&v<=w.soil_storage_capacity_m+1e-12))), 'Invalid soil storage or coverage.')
-        check(i===0||soil.every((v,j)=>v===null||v+1e-12>=w.soil_values_by_frame[i-1][j]), 'Soil storage cannot decrease without a sink process.')
+        check(hasLosses||i===0||soil.every((v,j)=>v===null||v+1e-12>=w.soil_values_by_frame[i-1][j]), 'Soil storage cannot decrease without a sink process.')
       }
       check(finite(soilVolume)&&soilVolume>=0,'Invalid soil volume.')
       check([stored,rain,error].every(finite)&&stored>=0&&rain>=0, 'Invalid water volume budget.')
       const tol=1e-8*Math.max(1,rain)
-      check(Math.abs(volume-stored)<=tol&&Math.abs(stored+soilVolume-rain-error)<=tol&&Math.abs(error)<=tol, 'Water mass balance mismatch.')
+      check(Math.abs(volume-stored)<=tol&&Math.abs(stored+soilVolume+evaporated+drained-rain-error)<=tol&&Math.abs(error)<=tol, 'Water mass balance mismatch.')
       if(hasSoil)check(Math.abs(soil.reduce((a,v)=>a+(v??0)*area,0)-soilVolume)<=tol,'Soil volume mismatch.')
       check(i===0?stored===0&&soilVolume===0&&rain===0:rain>=w.cumulative_rainfall_volume_m3[i-1], 'Water requires zero initial storage and nondecreasing rain.')
       if(frame.rain){
@@ -86,7 +102,7 @@ export function validateSequence(input) {
         const rainVolume=frame.rain.values.reduce((a,v)=>a+(v??0)/1000*area,0)
         check(Math.abs(rainVolume-rain)<=tol,'Applied water input disagrees with accumulated rain.')
       }
-      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null}
+      frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained}
     })
   }
   if(input.terrain_derivatives !== undefined){
