@@ -169,3 +169,11 @@ python3 tools/build_viewer_example.py --build-dir build --scenario examples/hydr
 ```
 
 CTest verifies outlet fixture regeneration. The bundled case isolates external discharge by disabling infiltration, evaporation and soil drainage; local rain and terrain remain synthetic.
+
+## One-command verification
+
+```sh
+python3 tools/verify_pipeline.py
+```
+
+This configures/builds C++, runs CTest and fixture checks, runs Python tests, installs locked viewer dependencies, and runs viewer tests plus its production build. Native dependencies must already be installed. The runner stops at the first failure; `--dry-run` only prints commands. CI uses the same runner for its C++/Python and viewer jobs. See [prerequisites, dependency prefixes and partial modes](docs/VERIFY_PIPELINE.md). All examples remain synthetic; AI and live-provider work are excluded.

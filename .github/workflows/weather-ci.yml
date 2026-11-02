@@ -44,11 +44,8 @@ jobs:
       - name: Build
         run: cmake --build build --parallel 2
 
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Test mobile response composer
-        run: python3 -m unittest discover -s tests/tools -v
+      - name: Verify C++ and Python pipeline
+        run: python3 tools/verify_pipeline.py --cpp-only --skip-configure --skip-build
 
   viewer:
     runs-on: ubuntu-latest
@@ -61,5 +58,4 @@ jobs:
           cache-dependency-path: viewer/package-lock.json
       - run: npm ci
         working-directory: viewer
-      - run: npm test && npm run build
-        working-directory: viewer
+      - run: python3 tools/verify_pipeline.py --viewer-only --skip-install
