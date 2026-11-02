@@ -14,4 +14,20 @@ The mobile response envelope combines the current temperature and wind forecast 
 
 The accumulation comes from the separate `terraflux-accumulate-rainfall` pipeline described in [precipitation accumulation](precipitation-accumulation.md). It remains an observation-derived layer and is not mixed into the dry temperature transport solver.
 
-The current command-line programs still emit their own local JSON files. A mobile adapter or service must compose those outputs into this envelope and verify that the grids, coordinate systems, and interval timestamps align. This contract does not imply that a mobile API or automatic composer is implemented.
+## File composer
+
+Run with Python 3.10+ (standard library only):
+
+```sh
+python3 tools/compose_mobile_weather.py forecast.json gridded-rainfall.json mobile-response.json
+python3 -m unittest discover -s tests/tools -v
+```
+
+`gridded-rainfall.json` is an object with exactly three keys:
+- `schema_version`: `terraflux.weather.gridded_accumulation/v1`
+- `grid`: the complete forecast grid geometry, coordinate system, and array order
+- `precipitation_accumulation`: the layer defined above
+
+The composer checks exact grid equality, array sizes, finite physical values, units, and quality/value consistency. The accumulation interval must start at forecast.start_time_utc and end at that time plus forecast.elapsed_seconds. Invalid input does not replace the destination; successful writes replace it atomically.
+
+The accumulator CLI emits geographic observation records, **not** this gridded wrapper. Mapping those records onto the forecast grid remains a separate next step; do not attach a grid label to untransformed source arrays. This composer provides no network API. Full JSON Schema validation remains a separate consumer check.

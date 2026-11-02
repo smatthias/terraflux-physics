@@ -37,3 +37,7 @@ The engine is intended to read structured weather datasets and rendered weather 
 - Keep map parsing and physical calculations independent of rendering, networking, and user interface code.
 - State model assumptions, spatial and temporal scales, and boundary conditions.
 - Validate simple cases before combining processes.
+
+### Combined weather response
+
+`tools/compose_mobile_weather.py` composes forecast and explicitly gridded rainfall files with spatial, interval, and missing-data checks. See [the input contract and commands](docs/weather/mobile-weather-response-v1.md#file-composer). Raw rainfall observation gridding remains pending.

@@ -46,3 +46,6 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
+
+      - name: Test mobile response composer
+        run: python3 -m unittest discover -s tests/tools -v
