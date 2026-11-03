@@ -14,6 +14,8 @@ add_library(terraflux_weather_map
     src/weather/weather_observation_json.cpp
     src/weather/transport_model_contract.cpp
     src/weather/dry_scalar_transport.cpp
+    src/weather/pressure_wind_contract.cpp
+    src/weather/pressure_wind.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -52,6 +54,11 @@ target_link_libraries(terraflux-decode-temperature-map
 
 add_executable(terraflux-run-temperature-map src/weather/run_temperature_map.cpp)
 target_link_libraries(terraflux-run-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-pressure-wind src/weather/run_pressure_wind.cpp)
+target_link_libraries(terraflux-run-pressure-wind
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -114,6 +121,11 @@ if(BUILD_TESTING)
     add_executable(terraflux-precipitation-grid-test tests/weather/precipitation_grid_test.cpp)
     target_link_libraries(terraflux-precipitation-grid-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.precipitation_grid COMMAND terraflux-precipitation-grid-test)
+    add_executable(terraflux-pressure-wind-test tests/weather/pressure_wind_test.cpp)
+    target_link_libraries(terraflux-pressure-wind-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.pressure_wind COMMAND terraflux-pressure-wind-test)
+    add_test(NAME weather.pressure_wind_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/pressure_wind_check.py $<TARGET_FILE:terraflux-run-pressure-wind>)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -145,10 +157,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-decode-radar-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-decode-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-pressure-wind PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
         target_compile_options(terraflux-weather-transport-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-pressure-wind-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

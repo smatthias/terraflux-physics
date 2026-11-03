@@ -39,6 +39,10 @@ struct DryTransportState {
     std::vector<double> wind_north_m_s;
 };
 
+// Validate grid dimensions, finite positive spacing, extent, and anchor
+// bounds. Shared by every model that uses TransportGrid2D.
+void validate_transport_grid(const TransportGrid2D& grid);
+
 // Validate structure, units' physical ranges, and grid/array size consistency.
 void validate_dry_transport_config(const DryTransportConfig& config);
 void validate_dry_transport_state(

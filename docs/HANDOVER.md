@@ -42,7 +42,8 @@ Open the URL printed by Vite. There is no login, database, backend service or li
 
 | Area | Implemented | Principal limit |
 | --- | --- | --- |
-| Temperature | 2D dry scalar advection/diffusion, fixed wind, periodic boundaries | No evolving wind/pressure or energy balance |
+| Temperature | 2D dry scalar advection/diffusion, fixed wind, periodic boundaries | No evolving pressure or energy balance |
+| Wind | Single-layer pressure-gradient, Coriolis (f/beta-plane) and linear-friction momentum over prescribed high/low pressure systems; geostrophic and balanced diagnostics | Pressure does not respond to wind; no momentum advection, so no gradient-wind curvature |
 | Input pipeline | Palette-map decoding, canonical observations, projection/gridding, timestamp alignment | NOAA helper path is unverified and disconnected from viewer |
 | Precipitation | Configurable empirical Z-R estimate, trapezoidal accumulation | Radar-derived estimate, not measured surface rain |
 | Terrain | Explicit elevation datum, slope/aspect, optional temperature lapse rate | No terrain-driven wind or pressure dynamics |
@@ -79,6 +80,7 @@ CTest includes baseline, comparison and outlet fixture regeneration, basin pondi
 
 - Public kernels: [include/terraflux/weather](../include/terraflux/weather/) and [src/weather](../src/weather/).
 - Kernel/integration tests: [tests/weather](../tests/weather/) and [tests/tools](../tests/tools/).
+- Pressure-gradient wind: [pressure_wind.hpp](../include/terraflux/weather/pressure_wind.hpp), [contract](weather/pressure-wind-model.md), [example request](../examples/pressure-wind-request.json), [CLI check](../tests/tools/pressure_wind_check.py).
 - Scenario configurations: [baseline](../examples/hydrology-scenario.json), [lower infiltration](../examples/hydrology-low-infiltration.json), [outlet](../examples/hydrology-outlet-scenario.json).
 - Scenario validation: [hydrology_scenario.hpp](../tools/hydrology_scenario.hpp) and [JSON Schema](weather/hydrology-scenario-v1.schema.json).
 - Reproduction: [C++ example generator](../tools/generate_viewer_example.cpp), [composer/build helper](../tools/build_viewer_example.py), [verification runner](../tools/verify_pipeline.py).

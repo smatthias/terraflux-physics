@@ -16,6 +16,8 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/observation-grid.md` — georeferenced observation projection, cell assignment, and quality preservation
 - `docs/weather/dry-transport-config-v1.schema.json` — dry transport configuration schema
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
+- `docs/weather/pressure-wind-model.md` — pressure-gradient wind with Coriolis deflection and surface friction: equations, balances, time stepping, configuration
+- `docs/weather/pressure-wind-run-v1.schema.json` and `pressure-wind-forecast-v1.schema.json` — pressure-wind run request and output schemas
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
@@ -33,6 +35,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
+- `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
@@ -42,6 +45,16 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - Keep map parsing and physical calculations independent of rendering, networking, and user interface code.
 - State model assumptions, spatial and temporal scales, and boundary conditions.
 - Validate simple cases before combining processes.
+
+### Wind between high- and low-pressure systems
+
+The pressure-gradient wind module (`include/terraflux/weather/pressure_wind.hpp`) accelerates a single dry layer down the gradient of a prescribed pressure field, deflects it with the Coriolis force, and slows it with linear surface friction. Air therefore does not flow straight from high to low pressure: without friction it settles into the geostrophic wind along the isobars (low on the left in the Northern Hemisphere, on the right in the Southern Hemisphere), and with friction it crosses the isobars toward low pressure by `atan(k/|f|)`. Configuration is split into `time` (start, timestep, steps), `grid` (the shared transport grid and its anchor latitude), and `atmosphere` (density, friction coefficient, Coriolis mode: `none`, `f_plane`, `beta_plane`, or `prescribed`). Pressure is given per cell or built from Gaussian high/low centers.
+
+```sh
+./build/terraflux-run-pressure-wind examples/pressure-wind-request.json pressure-wind.json
+```
+
+The output includes the analytic geostrophic and friction-balanced winds as diagnostics. With periodic gradients on an f-plane the geostrophic wind is discretely divergence-free and can be supplied as the prescribed wind of the dry transport model. See [the model contract](docs/weather/pressure-wind-model.md).
 
 ### Combined weather response
 

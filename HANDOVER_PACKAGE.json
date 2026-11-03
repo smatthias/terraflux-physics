@@ -1,0 +1,12 @@
+{
+  "package": "terraflux-physics-handover",
+  "source_commit": "aa2082e00a8104d4749a35ca06fd163c198e9984",
+  "source_branch": "feature/mobile-weather-contract",
+  "source_commit_time_utc": "2026-11-02T12:40:42+00:00",
+  "data_origin": "synthetic",
+  "ai_in_scope": false,
+  "source_files": 142,
+  "excluded_tracked_paths": [],
+  "verification": "Source baseline full CI passed; package CRC, hashes, path and common credential-pattern checks performed.",
+  "credential_scan": "Focused known-token/private-key patterns; gitleaks not installed."
+}

@@ -34,6 +34,7 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 4. Implement map decoding and georeferencing with explicit uncertainty and test fixtures.
 5. Define immutable simulation configuration and state contracts with validation. **Completed for the dry scalar transport v1 contract.**
 6. Implement the smallest dry-air transport case and compare it with analytic expectations. **Kernel implemented; constant-field, periodic-advection, diffusion, and rejection cases pass.**
+   - Pressure-gradient wind with Coriolis deflection and linear friction over a prescribed pressure field. **Kernel implemented; down-gradient, hemisphere deflection, inertial-oscillation, balanced-wind, circulation, and rejection cases pass.** See [pressure-gradient wind v1](pressure-wind-model.md).
 7. Add thermodynamic and moisture processes one at a time, with invariants and reference cases.
 8. Add terrain and surface exchange after the atmospheric baseline is stable.
 9. Add adapters for fire physics without making weather depend on the renderer or fire model.
@@ -41,6 +42,8 @@ If a legend, projection, timestamp, or feature is ambiguous, preserve that uncer
 ## First solver contract selected
 
 The first solver contract is a 2D, single-layer dry scalar advection-diffusion model for air temperature in kelvin, transported by a prescribed static east/north wind field, with configurable horizontal mixing diffusivity and periodic boundaries. It uses a uniform local east/north grid in metres, a geographic anchor for the spherical azimuthal-equidistant map transform, and row-major cell arrays. This baseline does not evolve wind or pressure and excludes vertical motion, moisture, clouds, precipitation, radiation, and terrain. See [dry transport model v1](dry-transport-model.md).
+
+The first dynamics contract is a single-layer linear momentum model: a prescribed static pressure field (per cell or Gaussian high/low centers) accelerates the air, the Coriolis force on an f-plane or beta-plane deflects it, and linear surface friction slows it. Its steady states are the geostrophic and friction-balanced winds, so flow follows the isobars rather than running straight from high to low pressure. Configuration is split into explicit time, grid, and atmosphere sections. It does not evolve pressure or advect momentum. See [pressure-gradient wind v1](pressure-wind-model.md).
 
 The observation mapper grids EPSG:4326 fields on the configured local metric grid while keeping variable and quality state separate; radar reflectivity remains dBZ and is not converted into temperature. See [observation gridding](observation-grid.md). The configured grid spacing and timestep are scenario inputs. The implemented first-order upwind and centered-diffusion kernel checks its combined per-cell stability bound before advancing. This baseline is a controlled transport experiment, not a regional forecast model.
 
