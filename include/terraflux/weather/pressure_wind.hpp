@@ -140,6 +140,20 @@ WindField balanced_wind(
     const std::vector<double>& pressure_pa,
     const PressureWindConfig& config);
 
+// One trapezoidal Coriolis/friction step for every cell. Air density may vary
+// per cell (the coupled moist-layer model diagnoses it from temperature and
+// humidity). extra_acceleration_m_s2 optionally adds an acceleration held
+// constant over the step, for example explicit momentum diffusion. Array
+// lengths must match; the caller validates the configuration.
+WindField step_pressure_wind(
+    const WindField& wind,
+    const PressureGradient& gradient,
+    const std::vector<double>& air_density_kg_m3,
+    const std::vector<double>& coriolis_parameter_s,
+    double surface_friction_coefficient_s,
+    double timestep_seconds,
+    const WindField* extra_acceleration_m_s2 = nullptr);
+
 // Apply all configured steps. The pressure-gradient force is constant per
 // step; the Coriolis and friction terms use the trapezoidal (Crank-Nicolson)
 // rule, which conserves the inertial-oscillation amplitude exactly when

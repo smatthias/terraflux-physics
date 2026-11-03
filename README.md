@@ -18,6 +18,9 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
 - `docs/weather/pressure-wind-model.md` — pressure-gradient wind with Coriolis deflection and surface friction: equations, balances, time stepping, configuration
 - `docs/weather/pressure-wind-run-v1.schema.json` and `pressure-wind-forecast-v1.schema.json` — pressure-wind run request and output schemas
+- `docs/weather/moist-air-relations.md` — estimated dependence between temperature, air density and humidity (ideal gas, Magnus form, sensitivities)
+- `docs/weather/coupled-wind-model.md` — coupled wind / moist-layer model: density feedback, scalar transport, configurable diffusion
+- `docs/weather/coupled-wind-run-v1.schema.json` and `coupled-atmosphere-v1.schema.json` — coupled run request and viewer timeline extension schemas
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
@@ -36,6 +39,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
+- `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
@@ -55,6 +59,16 @@ The pressure-gradient wind module (`include/terraflux/weather/pressure_wind.hpp`
 ```
 
 The output includes the analytic geostrophic and friction-balanced winds as diagnostics. With periodic gradients on an f-plane the geostrophic wind is discretely divergence-free and can be supplied as the prescribed wind of the dry transport model. See [the model contract](docs/weather/pressure-wind-model.md).
+
+### Coupled wind, temperature, density and humidity
+
+`terraflux-run-coupled-wind` extends the pressure-driven wind with the fields that move with it: temperature and specific humidity are transported by the wind, air density is diagnosed from pressure, temperature and humidity (`ρ = p / (R_d T (1 + 0.608 q))`) and feeds back into the pressure-gradient acceleration, and relative humidity is reported as a diagnostic. The `diffusion` section configures separate temperature, humidity and momentum diffusivities that smooth the fields between the high and the low. The estimated dependence between the three values (about −0.35 % density per K, −0.6 % per 10 g/kg, RH falling ~4.9 points per K at fixed moisture) is documented in [moist-air relations](docs/weather/moist-air-relations.md); the model contract is [coupled wind model](docs/weather/coupled-wind-model.md).
+
+```sh
+./build/terraflux-run-coupled-wind examples/coupled-wind-request.json coupled-timeline.json
+```
+
+The output is a viewer timeline with a `coupled_atmosphere` extension. Pressure is prescribed and static; there is no condensation or latent heating.
 
 ### Combined weather response
 
@@ -84,6 +98,10 @@ python3 tools/build_viewer_example.py --build-dir build --check
 ```
 
 CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 260 × 30-second dry-transport steps. The companion timeline contains 14 snapshots at ten-minute intervals, with static prescribed wind. Each positive-time frame includes radar-derived rainfall accumulated from the start up to that frame.
+
+### Coupled wind example and request editor
+
+**Load coupled wind example** opens the committed 24 × 18 output of `terraflux-run-coupled-wind` (7 snapshots over 48 h). Pressure, relative humidity, air density and specific humidity become selectable layers, and the cell inspector shows the coupled values. The **Coupled wind request** panel edits time steps, grid, atmosphere, the three diffusivities, boundaries, density mode and the high/low systems with their temperature and humidity anomalies. It reports the solver bounds (Coriolis/friction, momentum diffusion, an estimate of the scalar stability number at the spin-up peak) and the implicit upwind numerical diffusion, then downloads a request JSON to run with the C++ CLI. **Use loaded run's settings** fills the editor from an opened coupled timeline. No physics is solved in the browser.
 
 ### Timeline playback
 

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace terraflux::weather {
@@ -208,6 +209,69 @@ WindField balanced_wind(
     return wind;
 }
 
+WindField step_pressure_wind(
+    const WindField& wind,
+    const PressureGradient& gradient,
+    const std::vector<double>& air_density_kg_m3,
+    const std::vector<double>& coriolis_parameter_s,
+    double surface_friction_coefficient_s,
+    double timestep_seconds,
+    const WindField* extra_acceleration_m_s2) {
+    const std::size_t count = wind.east_m_s.size();
+    if (wind.north_m_s.size() != count || gradient.east_pa_m.size() != count ||
+        gradient.north_pa_m.size() != count || air_density_kg_m3.size() != count ||
+        coriolis_parameter_s.size() != count ||
+        (extra_acceleration_m_s2 != nullptr &&
+         (extra_acceleration_m_s2->east_m_s.size() != count ||
+          extra_acceleration_m_s2->north_m_s.size() != count))) {
+        throw std::invalid_argument("wind step arrays must all match the grid cell count");
+    }
+
+    // With alpha = k dt / 2 and gamma = f dt / 2 the update solves
+    //   (1 + alpha) u1 - gamma v1 = (1 - alpha) u0 + gamma v0 + dt a
+    //   gamma u1 + (1 + alpha) v1 = (1 - alpha) v0 - gamma u0 + dt b
+    // where a = -(1/rho) dp/dx + extra_east and b = -(1/rho) dp/dy + extra_north.
+    const double alpha = 0.5 * surface_friction_coefficient_s * timestep_seconds;
+    const double one_plus_alpha = 1.0 + alpha;
+    const double one_minus_alpha = 1.0 - alpha;
+
+    WindField result;
+    result.east_m_s.resize(count);
+    result.north_m_s.resize(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const double rho = air_density_kg_m3[i];
+        if (!std::isfinite(rho) || rho <= 0.0) {
+            throw std::invalid_argument("air density must be finite and positive in every cell");
+        }
+        double acceleration_east = -gradient.east_pa_m[i] / rho;
+        double acceleration_north = -gradient.north_pa_m[i] / rho;
+        if (extra_acceleration_m_s2 != nullptr) {
+            acceleration_east += extra_acceleration_m_s2->east_m_s[i];
+            acceleration_north += extra_acceleration_m_s2->north_m_s[i];
+        }
+        const double forcing_east = acceleration_east * timestep_seconds;
+        const double forcing_north = acceleration_north * timestep_seconds;
+        require_finite(forcing_east, "wind acceleration is not finite");
+        require_finite(forcing_north, "wind acceleration is not finite");
+
+        const double u0 = wind.east_m_s[i];
+        const double v0 = wind.north_m_s[i];
+        const double g = 0.5 * coriolis_parameter_s[i] * timestep_seconds;
+        const double rhs_u = one_minus_alpha * u0 + g * v0 + forcing_east;
+        const double rhs_v = one_minus_alpha * v0 - g * u0 + forcing_north;
+        const double determinant = one_plus_alpha * one_plus_alpha + g * g;
+        const double u1 = (one_plus_alpha * rhs_u + g * rhs_v) / determinant;
+        const double v1 = (one_plus_alpha * rhs_v - g * rhs_u) / determinant;
+        if (!std::isfinite(u1) || !std::isfinite(v1)) {
+            throw std::runtime_error(
+                "pressure wind update produced a non-finite wind component");
+        }
+        result.east_m_s[i] = u1;
+        result.north_m_s[i] = v1;
+    }
+    return result;
+}
+
 PressureWindState advance_pressure_wind(
     const PressureWindState& initial,
     const PressureWindConfig& config) {
@@ -216,7 +280,8 @@ PressureWindState advance_pressure_wind(
     const auto gradient = calculate_pressure_gradient(
         initial.pressure_pa, config.grid, config.pressure_gradient_boundary);
     const auto f = coriolis_parameter(config.grid, config.atmosphere);
-    const double rho = config.atmosphere.air_density_kg_m3;
+    const std::vector<double> density(
+        initial.pressure_pa.size(), config.atmosphere.air_density_kg_m3);
     const double k = config.atmosphere.surface_friction_coefficient_s;
     const double timestep = config.time.timestep_seconds;
 
@@ -230,45 +295,14 @@ PressureWindState advance_pressure_wind(
         throw std::invalid_argument("advanced simulation time overflows");
     }
 
-    // Per-cell constant forcing and trapezoidal coefficients. With
-    // alpha = k dt / 2 and gamma = f dt / 2 the update solves
-    //   (1 + alpha) u1 - gamma v1 = (1 - alpha) u0 + gamma v0 + dt a
-    //   gamma u1 + (1 + alpha) v1 = (1 - alpha) v0 - gamma u0 + dt b
-    // where a = -(1/rho) dp/dx and b = -(1/rho) dp/dy.
-    const std::size_t count = initial.pressure_pa.size();
-    std::vector<double> forcing_east(count);
-    std::vector<double> forcing_north(count);
-    std::vector<double> gamma(count);
-    for (std::size_t i = 0; i < count; ++i) {
-        forcing_east[i] = -gradient.east_pa_m[i] / rho * timestep;
-        forcing_north[i] = -gradient.north_pa_m[i] / rho * timestep;
-        gamma[i] = 0.5 * f[i] * timestep;
-        require_finite(forcing_east[i], "pressure-gradient acceleration is not finite");
-        require_finite(forcing_north[i], "pressure-gradient acceleration is not finite");
+    WindField wind{initial.wind_east_m_s, initial.wind_north_m_s};
+    for (std::size_t step = 0; step < config.time.steps; ++step) {
+        wind = step_pressure_wind(wind, gradient, density, f, k, timestep);
     }
-    const double alpha = 0.5 * k * timestep;
-    const double one_plus_alpha = 1.0 + alpha;
-    const double one_minus_alpha = 1.0 - alpha;
 
     PressureWindState result = initial;
-    for (std::size_t step = 0; step < config.time.steps; ++step) {
-        for (std::size_t i = 0; i < count; ++i) {
-            const double u0 = result.wind_east_m_s[i];
-            const double v0 = result.wind_north_m_s[i];
-            const double g = gamma[i];
-            const double rhs_u = one_minus_alpha * u0 + g * v0 + forcing_east[i];
-            const double rhs_v = one_minus_alpha * v0 - g * u0 + forcing_north[i];
-            const double determinant = one_plus_alpha * one_plus_alpha + g * g;
-            const double u1 = (one_plus_alpha * rhs_u + g * rhs_v) / determinant;
-            const double v1 = (one_plus_alpha * rhs_v - g * rhs_u) / determinant;
-            if (!std::isfinite(u1) || !std::isfinite(v1)) {
-                throw std::runtime_error(
-                    "pressure wind update produced a non-finite wind component");
-            }
-            result.wind_east_m_s[i] = u1;
-            result.wind_north_m_s[i] = v1;
-        }
-    }
+    result.wind_east_m_s = std::move(wind.east_m_s);
+    result.wind_north_m_s = std::move(wind.north_m_s);
     result.elapsed_seconds = static_cast<double>(final_elapsed);
     return result;
 }

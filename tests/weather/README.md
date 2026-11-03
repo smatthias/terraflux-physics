@@ -31,6 +31,19 @@ The pressure-gradient wind suite (`weather.pressure_wind`, plus the CLI check `w
 - the balanced wind as an exact fixed point of the stepper
 - all Coriolis modes and rejection of unresolved timesteps and invalid inputs
 
+The moist-air suite (`weather.moist_air`) covers reference densities and saturation values, humidity conversions, lighter warm/moist air, analytic sensitivities against finite differences, and input rejection.
+
+The coupled wind / moist-layer suite (`weather.coupled_wind`, plus the CLI and fixture check `weather.coupled_wind_cli`) covers:
+
+- equality with the standalone pressure-wind model under constant density, with uniform scalars preserved
+- first-step acceleration proportional to the diagnosed inverse density (warm and moist air accelerate faster)
+- a hand-computed periodic upwind transport step for temperature and humidity
+- hand-computed explicit diffusion steps with zero-gradient (sum-conserving) and periodic boundaries
+- reduced contrast and wind roughness with larger configured diffusivities between a high and a low; bounded density, RH and virtual temperature
+- mid-run rejection once the wind-dependent scalar stability bound is broken
+- supersaturation reported rather than removed
+- rejection of invalid diffusivities, boundaries, modes and states
+
 Build and run the registered CTest case with:
 
 ~~~sh

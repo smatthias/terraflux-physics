@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/coupled-atmosphere-v1.json",
+  "title": "TerraFlux coupled atmosphere timeline extension v1",
+  "description": "Carried as the coupled_atmosphere member of a terraflux.weather.timeline/v1 document whose frames are forecast/v1 snapshots written by terraflux-run-coupled-wind. Static arrays and every per-frame array are row-major nx * ny cell values; per-frame arrays have one entry per timeline frame, the first being the initial state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model",
+    "source_kind",
+    "request",
+    "pressure_source",
+    "temperature_source",
+    "humidity_source",
+    "pressure_pa",
+    "coriolis_parameter_s",
+    "specific_humidity_kg_kg_by_frame",
+    "relative_humidity_pct_by_frame",
+    "air_density_kg_m3_by_frame",
+    "supersaturated_cells_by_frame",
+    "scalar_stability_number_by_frame"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.coupled_atmosphere/v1"
+    },
+    "model": {
+      "const": "coupled_wind_moist_layer_v1"
+    },
+    "source_kind": {
+      "const": "engine_output"
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time",
+        "grid",
+        "atmosphere",
+        "diffusion",
+        "pressure_gradient_boundary",
+        "scalar_boundary",
+        "density_mode",
+        "snapshot_every_steps"
+      ],
+      "properties": {
+        "time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_time_utc",
+            "timestep_seconds",
+            "steps"
+          ],
+          "properties": {
+            "start_time_utc": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "timestep_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nx",
+            "ny",
+            "origin_east_m",
+            "origin_north_m",
+            "spacing_east_m",
+            "spacing_north_m",
+            "geographic_anchor_longitude_deg",
+            "geographic_anchor_latitude_deg",
+            "coordinate_system",
+            "array_order"
+          ],
+          "properties": {
+            "nx": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "ny": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "origin_east_m": {
+              "type": "number"
+            },
+            "origin_north_m": {
+              "type": "number"
+            },
+            "spacing_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "spacing_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "geographic_anchor_longitude_deg": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "geographic_anchor_latitude_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "coordinate_system": {
+              "const": "local_azimuthal_equidistant_m"
+            },
+            "array_order": {
+              "const": "row_major_y_then_x"
+            }
+          }
+        },
+        "atmosphere": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "air_density_kg_m3",
+            "surface_friction_coefficient_s",
+            "coriolis_mode",
+            "coriolis_parameter_s",
+            "earth_angular_speed_rad_s",
+            "earth_radius_m"
+          ],
+          "properties": {
+            "air_density_kg_m3": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "surface_friction_coefficient_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "coriolis_mode": {
+              "enum": [
+                "none",
+                "f_plane",
+                "beta_plane",
+                "prescribed"
+              ]
+            },
+            "coriolis_parameter_s": {
+              "type": "number"
+            },
+            "earth_angular_speed_rad_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "earth_radius_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "diffusion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "temperature_m2_s",
+            "humidity_m2_s",
+            "momentum_m2_s"
+          ],
+          "properties": {
+            "temperature_m2_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "humidity_m2_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "momentum_m2_s": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Must satisfy 2 nu dt (1/dx^2 + 1/dy^2) <= 1."
+            }
+          },
+          "description": "Horizontal mixing diffusivities between the pressure systems; additional to the implicit numerical diffusion of first-order upwind transport."
+        },
+        "pressure_gradient_boundary": {
+          "enum": [
+            "one_sided",
+            "periodic"
+          ]
+        },
+        "scalar_boundary": {
+          "enum": [
+            "zero_gradient",
+            "periodic"
+          ]
+        },
+        "density_mode": {
+          "enum": [
+            "diagnosed",
+            "constant"
+          ]
+        },
+        "snapshot_every_steps": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pressure_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_gaussian_systems"
+          ]
+        }
+      }
+    },
+    "temperature_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_gaussian_anomalies"
+          ]
+        }
+      }
+    },
+    "humidity_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_gaussian_anomalies"
+          ]
+        }
+      }
+    },
+    "pressure_pa": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    },
+    "coriolis_parameter_s": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "specific_humidity_kg_kg_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "relative_humidity_pct_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "air_density_kg_m3_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "supersaturated_cells_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "scalar_stability_number_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    }
+  }
+}

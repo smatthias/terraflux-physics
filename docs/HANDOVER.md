@@ -28,6 +28,8 @@ Open the URL printed by Vite. There is no login, database, backend service or li
 | Compare hydrology scenarios | Same forcing, baseline vs 10× lower infiltration; synchronized map, deltas and storage chart |
 | Load outlet scenario | Prescribed external surface outlet, marker, cumulative discharge and interval-average flow |
 | Regional weather demo | Separate synthetic 1,200 × 900 km clouds, pressure systems, front and humidity illustration |
+| Load coupled wind example | 7 engine snapshots of the coupled wind / moist-layer run: wind, temperature, pressure, RH, density, specific humidity |
+| Coupled wind request | Edit time steps, grid, atmosphere, diffusion and high/low systems; bound checks; download the request for the C++ CLI |
 | Open JSON | Import forecast/v1, mobile_response/v1 or timeline/v1 |
 | Open comparison JSON | Import a timeline matching baseline grid, times, terrain, rainfall, atmosphere and coverage |
 | Export all frames (CSV) | Full comparison timeline, values, deltas, units, parameters and coverage counts |
@@ -44,6 +46,7 @@ Open the URL printed by Vite. There is no login, database, backend service or li
 | --- | --- | --- |
 | Temperature | 2D dry scalar advection/diffusion, fixed wind, periodic boundaries | No evolving pressure or energy balance |
 | Wind | Single-layer pressure-gradient, Coriolis (f/beta-plane) and linear-friction momentum over prescribed high/low pressure systems; geostrophic and balanced diagnostics | Pressure does not respond to wind; no momentum advection, so no gradient-wind curvature |
+| Coupled moist layer | Wind-carried temperature and specific humidity with configurable temperature/humidity/momentum diffusion; density diagnosed from p, T, q feeds back into the wind; RH, vapour pressure, virtual temperature diagnostics; viewer layers and request editor | Static pressure, no condensation/latent heat, first-order upwind numerical diffusion dominates on coarse grids |
 | Input pipeline | Palette-map decoding, canonical observations, projection/gridding, timestamp alignment | NOAA helper path is unverified and disconnected from viewer |
 | Precipitation | Configurable empirical Z-R estimate, trapezoidal accumulation | Radar-derived estimate, not measured surface rain |
 | Terrain | Explicit elevation datum, slope/aspect, optional temperature lapse rate | No terrain-driven wind or pressure dynamics |
@@ -81,6 +84,7 @@ CTest includes baseline, comparison and outlet fixture regeneration, basin pondi
 - Public kernels: [include/terraflux/weather](../include/terraflux/weather/) and [src/weather](../src/weather/).
 - Kernel/integration tests: [tests/weather](../tests/weather/) and [tests/tools](../tests/tools/).
 - Pressure-gradient wind: [pressure_wind.hpp](../include/terraflux/weather/pressure_wind.hpp), [contract](weather/pressure-wind-model.md), [example request](../examples/pressure-wind-request.json), [CLI check](../tests/tools/pressure_wind_check.py).
+- Coupled moist layer: [coupled_wind.hpp](../include/terraflux/weather/coupled_wind.hpp), [moist_air.hpp](../include/terraflux/weather/moist_air.hpp), [contract](weather/coupled-wind-model.md), [relations](weather/moist-air-relations.md), [example request](../examples/coupled-wind-request.json), [fixture](../viewer/public/coupled/engine-timeline.json), [CLI/fixture check](../tests/tools/coupled_wind_check.py), [viewer module](../viewer/src/coupledWind.js).
 - Scenario configurations: [baseline](../examples/hydrology-scenario.json), [lower infiltration](../examples/hydrology-low-infiltration.json), [outlet](../examples/hydrology-outlet-scenario.json).
 - Scenario validation: [hydrology_scenario.hpp](../tools/hydrology_scenario.hpp) and [JSON Schema](weather/hydrology-scenario-v1.schema.json).
 - Reproduction: [C++ example generator](../tools/generate_viewer_example.cpp), [composer/build helper](../tools/build_viewer_example.py), [verification runner](../tools/verify_pipeline.py).

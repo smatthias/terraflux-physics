@@ -1,3 +1,4 @@
+import { validateCoupledAtmosphere } from './coupledWind.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 export function validate(input) {
@@ -54,6 +55,10 @@ export function validateSequence(input) {
     check(f.start_time_utc===first.start_time_utc, 'Timeline start times must match.')
     check(i===0 || f.elapsed_seconds>frames[i-1].forecast.elapsed_seconds, 'Timeline frames must have strictly increasing elapsed times.')
   })
+  if(input.coupled_atmosphere !== undefined){
+    check(input.atmosphere === undefined, 'A timeline cannot carry both a synthetic atmosphere display and a coupled engine atmosphere.')
+    validateCoupledAtmosphere(input.coupled_atmosphere, frames)
+  }
   if(input.atmosphere !== undefined){
     const a=input.atmosphere,count=first.grid.nx*first.grid.ny
     check(a?.schema_version==='terraflux.weather.atmosphere_display/v1'&&a.source_kind==='synthetic','Only explicitly synthetic atmosphere displays are currently supported.')
