@@ -21,6 +21,9 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/moist-air-relations.md` — estimated dependence between temperature, air density and humidity (ideal gas, Magnus form, sensitivities)
 - `docs/weather/coupled-wind-model.md` — coupled wind / moist-layer model: density feedback, scalar transport, configurable diffusion
 - `docs/weather/coupled-wind-run-v1.schema.json` and `coupled-atmosphere-v1.schema.json` — coupled run request and viewer timeline extension schemas
+- `docs/weather/atmospheric-column-model.md` — vertical layers: hydrostatic thinning, convective adjustment, surface-parcel ascent (LCL, LFC, EL, CAPE, CIN)
+- `docs/weather/column-run-v1.schema.json` and `column-profile-v1.schema.json` — column run request and profile output schemas
+- `docs/weather/coriolis-verification.md` — review of Coriolis direction and pressure-gradient acceleration conventions with the verification cases
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
@@ -39,7 +42,8 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
-- `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline
+- `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline, optionally with per-cell vertical column diagnostics
+- `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
@@ -68,7 +72,17 @@ The output includes the analytic geostrophic and friction-balanced winds as diag
 ./build/terraflux-run-coupled-wind examples/coupled-wind-request.json coupled-timeline.json
 ```
 
-The output is a viewer timeline with a `coupled_atmosphere` extension. Pressure is prescribed and static; there is no condensation or latent heating.
+The output is a viewer timeline with a `coupled_atmosphere` extension. Pressure is prescribed and static; there is no condensation or latent heating in the horizontal layer.
+
+### Vertical layers, thinning and convection
+
+The atmospheric column module builds hydrostatic layers above each cell from its surface pressure, temperature and humidity: pressure and density thin with height (`dp/dz = −ρg` with moist-air density; the dry ISA profile is reproduced to 10⁻⁹). Two exchange processes connect the ground to higher altitudes: dry convective adjustment with saturation adjustment (mixing unstable layers, condensing supersaturated ones with latent heating, conserving enthalpy and water) and a lifted surface parcel that gives the lifting condensation level (cloud base), level of free convection, equilibrium level (cloud top), CAPE and CIN — the basis for cumulus cloud and thunderstorm potential. Add a `column` section to a coupled request to get these per cell and frame, or run one column in detail:
+
+```sh
+./build/terraflux-run-atmospheric-column examples/column-request.json profile.json
+```
+
+See [the column model contract](docs/weather/atmospheric-column-model.md). The Coriolis and pressure-gradient conventions were reviewed against the exact solution, a direction matrix over both hemispheres and textbook magnitudes: [coriolis-verification.md](docs/weather/coriolis-verification.md).
 
 ### Combined weather response
 
@@ -101,7 +115,7 @@ CTest runs the regeneration check. The comparison allows relative floating-point
 
 ### Coupled wind example and request editor
 
-**Load coupled wind example** opens the committed 24 × 18 output of `terraflux-run-coupled-wind` (7 snapshots over 48 h). Pressure, relative humidity, air density and specific humidity become selectable layers, and the cell inspector shows the coupled values. The **Coupled wind request** panel edits time steps, grid, atmosphere, the three diffusivities, boundaries, density mode and the high/low systems with their temperature and humidity anomalies. It reports the solver bounds (Coriolis/friction, momentum diffusion, an estimate of the scalar stability number at the spin-up peak) and the implicit upwind numerical diffusion, then downloads a request JSON to run with the C++ CLI. **Use loaded run's settings** fills the editor from an opened coupled timeline. No physics is solved in the browser.
+**Load coupled wind example** opens the committed 24 × 18 output of `terraflux-run-coupled-wind` (7 snapshots over 48 h). Pressure, relative humidity, air density and specific humidity become selectable layers, and the cell inspector shows the coupled values. The **Coupled wind request** panel edits time steps, grid, atmosphere, the three diffusivities, boundaries, density mode and the high/low systems with their temperature and humidity anomalies. It reports the solver bounds (Coriolis/friction, momentum diffusion, an estimate of the scalar stability number at the spin-up peak) and the implicit upwind numerical diffusion, then downloads a request JSON to run with the C++ CLI. **Use loaded run's settings** fills the editor from an opened coupled timeline. With column diagnostics present, **Convective energy (CAPE)**, **Cloud base (LCL)** and **Equilibrium level** are additional layers and the inspector lists LCL, LFC, EL, CAPE, CIN and the potential class per cell; the editor's column fields configure layers, lapse rate, tropopause and humidity scale height. No physics is solved in the browser.
 
 ### Timeline playback
 

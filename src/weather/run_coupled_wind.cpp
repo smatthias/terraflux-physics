@@ -1,3 +1,4 @@
+#include "terraflux/weather/atmospheric_column.hpp"
 #include "terraflux/weather/coupled_wind.hpp"
 #include "terraflux/weather/pressure_wind.hpp"
 
@@ -8,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -92,6 +94,48 @@ std::vector<double> required_number_array(const Json& object, const char* key) {
                 std::string("run request array values must be finite: ") + key);
         }
         result.push_back(number);
+    }
+    return result;
+}
+
+// Optional vertical-column diagnostics configuration.
+std::optional<terraflux::weather::ColumnConfig> parse_column(const Json& request) {
+    if (!request.contains("column")) {
+        return std::nullopt;
+    }
+    const Json& column = required(request, "column");
+    terraflux::weather::ColumnConfig defaults;
+    terraflux::weather::ColumnConfig config;
+    config.layer_count = required_positive_size(column, "layer_count");
+    config.layer_thickness_m = required_number(column, "layer_thickness_m");
+    config.environment_lapse_rate_k_m = required_number(column, "environment_lapse_rate_k_m");
+    config.tropopause_height_m = optional_number(column, "tropopause_height_m", defaults.tropopause_height_m);
+    config.humidity_scale_height_m = required_number(column, "humidity_scale_height_m");
+    config.parcel_step_m = optional_number(column, "parcel_step_m", defaults.parcel_step_m);
+    terraflux::weather::validate_column_config(config);
+    return config;
+}
+
+Json column_config_json(const terraflux::weather::ColumnConfig& config) {
+    return {
+        {"layer_count", config.layer_count},
+        {"layer_thickness_m", config.layer_thickness_m},
+        {"environment_lapse_rate_k_m", config.environment_lapse_rate_k_m},
+        {"tropopause_height_m", config.tropopause_height_m},
+        {"humidity_scale_height_m", config.humidity_scale_height_m},
+        {"parcel_step_m", config.parcel_step_m},
+    };
+}
+
+// NaN entries become JSON null (missing level).
+Json nullable_array(const std::vector<double>& values) {
+    Json result = Json::array();
+    for (double value : values) {
+        if (std::isnan(value)) {
+            result.push_back(nullptr);
+        } else {
+            result.push_back(value);
+        }
     }
     return result;
 }
@@ -346,6 +390,7 @@ int main(int argc, char** argv) {
         }
 
         const auto config = parse_config(request);
+        const auto column = parse_column(request);
         Json pressure_provenance, temperature_provenance, humidity_provenance;
         terraflux::weather::CoupledWindState state;
         state.pressure_pa = parse_pressure(request, config.grid, pressure_provenance);
@@ -381,6 +426,10 @@ int main(int argc, char** argv) {
         Json density_by_frame = Json::array();
         Json supersaturated_by_frame = Json::array();
         Json stability_by_frame = Json::array();
+        Json lcl_by_frame = Json::array(), lfc_by_frame = Json::array(), el_by_frame = Json::array();
+        Json cape_by_frame = Json::array(), cin_by_frame = Json::array(), potential_by_frame = Json::array();
+        Json condensed_by_frame = Json::array();
+        Json column_mass = Json::array(), top_pressure = Json::array();
         const auto record = [&](const terraflux::weather::CoupledWindState& current) {
             const auto diagnostics = terraflux::weather::diagnose_moist_layer(current, config);
             std::vector<double> relative_humidity_pct(diagnostics.relative_humidity_fraction.size());
@@ -394,6 +443,21 @@ int main(int argc, char** argv) {
             supersaturated_by_frame.push_back(diagnostics.supersaturated_cells);
             stability_by_frame.push_back(
                 terraflux::weather::coupled_scalar_stability_number(current, config));
+            if (column) {
+                const auto d = terraflux::weather::diagnose_column_field(
+                    current.pressure_pa, current.air_temperature_k, current.specific_humidity_kg_kg, *column);
+                lcl_by_frame.push_back(nullable_array(d.lcl_height_m));
+                lfc_by_frame.push_back(nullable_array(d.lfc_height_m));
+                el_by_frame.push_back(nullable_array(d.equilibrium_level_m));
+                cape_by_frame.push_back(d.cape_j_kg);
+                cin_by_frame.push_back(d.cin_j_kg);
+                potential_by_frame.push_back(d.convective_potential);
+                condensed_by_frame.push_back(d.condensed_water_kg_m2);
+                if (column_mass.empty()) {
+                    column_mass = d.column_mass_kg_m2;
+                    top_pressure = d.top_pressure_pa;
+                }
+            }
         };
 
         record(state);
@@ -427,6 +491,22 @@ int main(int argc, char** argv) {
                 {"scalar_stability_number_by_frame", stability_by_frame},
             }},
         };
+        if (column) {
+            output["coupled_atmosphere"]["columns"] = {
+                {"schema_version", "terraflux.weather.column_diagnostics/v1"},
+                {"method", "hydrostatic_layers_convective_adjustment_surface_parcel"},
+                {"config", column_config_json(*column)},
+                {"column_mass_kg_m2", column_mass},
+                {"top_pressure_pa", top_pressure},
+                {"lcl_height_m_by_frame", lcl_by_frame},
+                {"lfc_height_m_by_frame", lfc_by_frame},
+                {"equilibrium_level_m_by_frame", el_by_frame},
+                {"cape_j_kg_by_frame", cape_by_frame},
+                {"cin_j_kg_by_frame", cin_by_frame},
+                {"convective_potential_by_frame", potential_by_frame},
+                {"condensed_water_kg_m2_by_frame", condensed_by_frame},
+            };
+        }
 
         std::ofstream output_file(output_path);
         if (!output_file) {

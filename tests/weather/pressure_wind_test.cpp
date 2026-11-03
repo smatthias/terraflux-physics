@@ -447,6 +447,111 @@ void invalid_configurations_are_rejected() {
     }, "systems driving pressure below zero must be rejected");
 }
 
+
+// ---------------------------------------------------------------------------
+// Verification block: Coriolis direction, pressure-gradient acceleration and
+// reference magnitudes, checked independently of the solver's own algebra.
+// ---------------------------------------------------------------------------
+
+// V1. The per-cell equations are linear with constant coefficients, so they
+//     have the closed form  w(t) = w_b + e^(-k t) R(-f t) (w_0 - w_b), where
+//     w = (u, v), w_b is the balanced wind and R rotates counterclockwise.
+//     The trapezoidal scheme must reproduce it for both hemispheres.
+void scheme_matches_exact_solution_in_both_hemispheres() {
+    for (double f : {1.0e-4, -1.0e-4}) {
+        const double k = 1.5e-5;
+        const double timestep = 0.02 / std::abs(f);
+        const std::size_t steps = static_cast<std::size_t>(2.0 * 2.0 * kPi / 0.02);  // two inertial periods
+        const auto grid = make_grid(3, 3, 10000.0);
+        const auto config = make_config(grid, timestep, steps, "prescribed", k, f);
+        const auto pressure = linear_pressure(grid, -1.5e-3, 0.8e-3);
+        auto state = rest_state(pressure);
+        state.wind_east_m_s.assign(9, 3.0);
+        state.wind_north_m_s.assign(9, -2.0);
+        const auto balance = balanced_wind(pressure, config);
+        const auto result = advance_pressure_wind(state, config);
+
+        const double t = timestep * static_cast<double>(steps);
+        const double du = 3.0 - balance.east_m_s[4];
+        const double dv = -2.0 - balance.north_m_s[4];
+        const double angle = -f * t;
+        const double decay = std::exp(-k * t);
+        const double expected_u = balance.east_m_s[4] + decay * (std::cos(angle) * du - std::sin(angle) * dv);
+        const double expected_v = balance.north_m_s[4] + decay * (std::sin(angle) * du + std::cos(angle) * dv);
+        const double scale = std::hypot(du, dv);
+        require_near(result.wind_east_m_s[4], expected_u, "u must follow the exact damped inertial solution", 1.0e-3 * scale);
+        require_near(result.wind_north_m_s[4], expected_v, "v must follow the exact damped inertial solution", 1.0e-3 * scale);
+    }
+}
+
+// V2. Direction matrix: for pressure falling toward each compass direction
+//     and for both hemispheres, (a) the initial acceleration points from high
+//     to low pressure, (b) the first deflection is to the right of the motion
+//     north of the equator and to the left south of it, and (c) the
+//     frictionless balanced wind keeps low pressure on its left (NH) or right
+//     (SH). Signs are taken from cross products, not from eyeballing.
+void direction_matrix_holds_for_all_gradients_and_hemispheres() {
+    const double gradients[4][2] = {{-2.0e-3, 0.0}, {0.0, -2.0e-3}, {2.0e-3, 0.0}, {0.0, 2.0e-3}};
+    for (double latitude : {45.0, -45.0}) {
+        for (const auto& gradient : gradients) {
+            const auto grid = make_grid(3, 3, 10000.0, latitude);
+            const auto pressure = linear_pressure(grid, gradient[0], gradient[1]);
+            const double toward_low_east = -gradient[0];
+            const double toward_low_north = -gradient[1];
+            const double f = coriolis_parameter(grid, make_config(grid, 1.0, 1, "f_plane").atmosphere)[4];
+            require((latitude > 0.0) == (f > 0.0), "Coriolis parameter sign must follow the hemisphere");
+
+            // (a) One short step without rotation: pure down-gradient acceleration.
+            const auto straight = advance_pressure_wind(rest_state(pressure), make_config(grid, 10.0, 1, "none"));
+            const double cross_a = toward_low_east * straight.wind_north_m_s[4] - toward_low_north * straight.wind_east_m_s[4];
+            const double dot_a = toward_low_east * straight.wind_east_m_s[4] + toward_low_north * straight.wind_north_m_s[4];
+            require(std::abs(cross_a) < 1.0e-12 && dot_a > 0.0, "initial acceleration must point from high toward low pressure");
+
+            // (b) One short step with rotation: the wind turns right (NH) or left (SH)
+            //     of the pressure-gradient force, i.e. cross(force, wind) has sign -f.
+            const auto turned = advance_pressure_wind(rest_state(pressure), make_config(grid, 600.0, 1, "f_plane"));
+            const double cross_b = toward_low_east * turned.wind_north_m_s[4] - toward_low_north * turned.wind_east_m_s[4];
+            require(cross_b * f < 0.0, "first deflection must be to the right in the NH and to the left in the SH");
+
+            // (c) Balanced flow: the left-hand normal (k x w) points toward low pressure
+            //     in the NH and away from it in the SH; the wind is along the isobars.
+            const auto geostrophic = geostrophic_wind(pressure, make_config(grid, 600.0, 1, "f_plane"));
+            const double u = geostrophic.east_m_s[4], v = geostrophic.north_m_s[4];
+            const double left_dot_low = (-v) * toward_low_east + u * toward_low_north;
+            const double along = u * toward_low_east + v * toward_low_north;
+            require(left_dot_low * f > 0.0, "geostrophic wind must keep low pressure on its left (NH) / right (SH)");
+            require(std::abs(along) < 1.0e-12 * std::hypot(u, v), "geostrophic wind must be parallel to the isobars");
+        }
+    }
+}
+
+// V3. Reference magnitudes: f at 45 N is 1.0313e-4 1/s, beta at 45 N is
+//     1.619e-11 1/(m s), and 1 hPa per 100 km at 45 N with rho = 1.2 kg/m3
+//     gives a geostrophic speed of 8.08 m/s (textbook value).
+void reference_magnitudes_match_textbook_values() {
+    AtmosphereConfig atmosphere;
+    atmosphere.coriolis_mode = "f_plane";
+    require_near(coriolis_parameter(make_grid(2, 2, 1.0, 45.0), atmosphere)[0], 1.0313e-4, "f at 45 N", 1.0e-8);
+    require_near(coriolis_parameter(make_grid(2, 2, 1.0, 0.0), atmosphere)[0], 0.0, "f at the equator", 1.0e-20);
+    require_near(coriolis_parameter(make_grid(2, 2, 1.0, 90.0), atmosphere)[0], 2.0 * atmosphere.earth_angular_speed_rad_s, "f at the pole", 1.0e-12);
+    atmosphere.coriolis_mode = "beta_plane";
+    const auto grid = make_grid(2, 2, 100000.0, 45.0);  // rows at north = -50 km and +50 km
+    const auto f = coriolis_parameter(grid, atmosphere);
+    require_near((f[2] - f[0]) / 100000.0, 1.619e-11, "beta at 45 N", 2.0e-14);
+    const auto south = coriolis_parameter(make_grid(2, 2, 100000.0, -45.0), atmosphere);
+    require(south[2] > south[0] && south[0] < 0.0, "f increases northward in both hemispheres (toward the pole in the NH, toward the equator in the SH)");
+
+    const auto reference_grid = make_grid(3, 3, 10000.0, 45.0);
+    auto config = make_config(reference_grid, 600.0, 1, "f_plane");
+    config.atmosphere.air_density_kg_m3 = 1.2;
+    const auto wind = geostrophic_wind(linear_pressure(reference_grid, 1.0e-3, 0.0), config);  // 1 hPa per 100 km
+    require_near(std::hypot(wind.east_m_s[4], wind.north_m_s[4]), 8.08, "1 hPa/100 km gives about 8 m/s at 45 N", 0.01);
+    // Pressure rising eastward puts the low to the west; in the NH the flow
+    // keeps the low on its left, so it blows northward.
+    require_near(wind.north_m_s[4], 8.08, "low to the west drives northward geostrophic flow in the NH", 0.01);
+    require_near(-1.0e-3 / 1.2, -8.33e-4, "1 hPa/100 km is an acceleration of 8.3e-4 m/s^2", 1.0e-6);
+}
+
 }  // namespace
 
 int main() {
@@ -461,6 +566,9 @@ int main() {
         balanced_wind_is_a_fixed_point_of_the_stepper();
         coriolis_parameter_modes_follow_latitude();
         invalid_configurations_are_rejected();
+        scheme_matches_exact_solution_in_both_hemispheres();
+        direction_matrix_holds_for_all_gradients_and_hemispheres();
+        reference_magnitudes_match_textbook_values();
     } catch (const std::exception& error) {
         std::cerr << "pressure wind test failed: " << error.what() << '\n';
         return 1;

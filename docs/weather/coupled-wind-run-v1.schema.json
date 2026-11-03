@@ -423,6 +423,49 @@
       "type": "integer",
       "minimum": 1,
       "description": "Optional; emit a wind snapshot after every N steps. Must not exceed steps."
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_count",
+        "layer_thickness_m",
+        "environment_lapse_rate_k_m",
+        "humidity_scale_height_m"
+      ],
+      "properties": {
+        "layer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "layer_thickness_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "environment_lapse_rate_k_m": {
+          "type": "number",
+          "minimum": -0.05,
+          "maximum": 0.05,
+          "description": "Environment T(z) = T_surface - lapse * min(z, tropopause); positive values cool with height."
+        },
+        "tropopause_height_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 11000
+        },
+        "humidity_scale_height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "q(z) = q_surface exp(-z / scale height)."
+        },
+        "parcel_step_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 50,
+          "description": "Vertical step of the parcel ascent; at most the layer thickness."
+        }
+      },
+      "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
     }
   }
 }

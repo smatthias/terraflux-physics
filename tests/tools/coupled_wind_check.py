@@ -89,3 +89,34 @@ east_of_low = cell(low['east_m'] + 3 * grid['spacing_east_m'], low['north_m'])
 assert final['wind_north']['values'][east_of_low] < -5
 assert all(f['fields']['wind_east']['units'] == 'm/s' for f in frames)
 print('coupled wind CLI and fixture checks passed')
+
+# Vertical column diagnostics: one value per cell and frame, missing levels
+# null, CAPE-consistent classification, ordered levels, and the warm, moist
+# low carrying the only convective potential at the start.
+columns = atmosphere['columns']
+assert columns['schema_version'] == 'terraflux.weather.column_diagnostics/v1'
+assert columns['config'] == request['column']
+assert len(columns['column_mass_kg_m2']) == count and all(m > 0 for m in columns['column_mass_kg_m2'])
+assert all(0 < p < 30000 for p in columns['top_pressure_pa'])
+for key in ('lcl_height_m_by_frame', 'lfc_height_m_by_frame', 'equilibrium_level_m_by_frame', 'cape_j_kg_by_frame',
+            'cin_j_kg_by_frame', 'convective_potential_by_frame', 'condensed_water_kg_m2_by_frame'):
+    assert len(columns[key]) == len(frames) and all(len(v) == count for v in columns[key]), key
+classify = lambda cape: 'none' if cape < 100 else 'weak' if cape < 1000 else 'moderate' if cape < 2500 else 'strong'
+for i in range(len(frames)):
+    lcl, lfc, el = columns['lcl_height_m_by_frame'][i], columns['lfc_height_m_by_frame'][i], columns['equilibrium_level_m_by_frame'][i]
+    cape, cin, pot = columns['cape_j_kg_by_frame'][i], columns['cin_j_kg_by_frame'][i], columns['convective_potential_by_frame'][i]
+    for j in range(count):
+        assert cape[j] >= 0 and cin[j] >= 0 and pot[j] == classify(cape[j])
+        assert lcl[j] is None or lcl[j] > 0
+        if lfc[j] is not None:
+            assert lcl[j] is not None and lfc[j] >= lcl[j] and el[j] is not None and el[j] > lfc[j] and cape[j] > 0
+        else:
+            assert cape[j] == 0 and el[j] is None
+        assert columns['condensed_water_kg_m2_by_frame'][i][j] >= 0
+cape0 = columns['cape_j_kg_by_frame'][0]
+best = max(range(count), key=lambda j: cape0[j])
+assert cape0[best] > 500 and columns['convective_potential_by_frame'][0][best] == 'weak'
+T0 = frames[0]['fields']['air_temperature']['values']
+assert T0[best] > sum(T0) / count + 3, 'the most convective column sits in the warm, moist low'
+assert max(columns['cape_j_kg_by_frame'][-1]) < max(cape0), 'without surface fluxes the convective potential decays'
+print('column diagnostics checks passed')

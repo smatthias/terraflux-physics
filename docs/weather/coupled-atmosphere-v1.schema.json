@@ -315,6 +315,175 @@
         "minimum": 0,
         "maximum": 1
       }
+    },
+    "columns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "method",
+        "config",
+        "column_mass_kg_m2",
+        "top_pressure_pa",
+        "lcl_height_m_by_frame",
+        "lfc_height_m_by_frame",
+        "equilibrium_level_m_by_frame",
+        "cape_j_kg_by_frame",
+        "cin_j_kg_by_frame",
+        "convective_potential_by_frame",
+        "condensed_water_kg_m2_by_frame"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "terraflux.weather.column_diagnostics/v1"
+        },
+        "method": {
+          "const": "hydrostatic_layers_convective_adjustment_surface_parcel"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer_count",
+            "layer_thickness_m",
+            "environment_lapse_rate_k_m",
+            "tropopause_height_m",
+            "humidity_scale_height_m",
+            "parcel_step_m"
+          ],
+          "properties": {
+            "layer_count": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "layer_thickness_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "environment_lapse_rate_k_m": {
+              "type": "number",
+              "minimum": -0.05,
+              "maximum": 0.05,
+              "description": "Environment T(z) = T_surface - lapse * min(z, tropopause); positive values cool with height."
+            },
+            "tropopause_height_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 11000
+            },
+            "humidity_scale_height_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "q(z) = q_surface exp(-z / scale height)."
+            },
+            "parcel_step_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 50,
+              "description": "Vertical step of the parcel ascent; at most the layer thickness."
+            }
+          },
+          "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
+        },
+        "column_mass_kg_m2": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "top_pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "lcl_height_m_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "lfc_height_m_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "equilibrium_level_m_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "cape_j_kg_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "cin_j_kg_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "convective_potential_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "weak",
+                "moderate",
+                "strong"
+              ]
+            }
+          }
+        },
+        "condensed_water_kg_m2_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "description": "Per-cell vertical column diagnostics for every frame. Heights are metres above the cell surface; null means the level does not exist (no LCL within the column, or no positive buoyancy area). CAPE and CIN in J/kg from the surface parcel; convective_potential is a CAPE rule-of-thumb class, not a forecast."
     }
   }
 }

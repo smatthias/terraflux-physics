@@ -3,8 +3,8 @@ project(terraflux_physics LANGUAGES CXX)
 
 include(CTest)
 
-find_package(PNG 1.6.59 REQUIRED)
-find_package(nlohmann_json 3.12.0 REQUIRED)
+find_package(PNG 1.6 REQUIRED)
+find_package(nlohmann_json 3.10.05 REQUIRED)
 
 add_library(terraflux_weather_map
     src/weather/map_sidecar.cpp
@@ -19,6 +19,7 @@ add_library(terraflux_weather_map
     src/weather/moist_air.cpp
     src/weather/coupled_wind_contract.cpp
     src/weather/coupled_wind.cpp
+    src/weather/atmospheric_column.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -67,6 +68,11 @@ target_link_libraries(terraflux-run-pressure-wind
 
 add_executable(terraflux-run-coupled-wind src/weather/run_coupled_wind.cpp)
 target_link_libraries(terraflux-run-coupled-wind
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-atmospheric-column src/weather/run_atmospheric_column.cpp)
+target_link_libraries(terraflux-run-atmospheric-column
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -142,6 +148,11 @@ if(BUILD_TESTING)
     add_test(NAME weather.coupled_wind COMMAND terraflux-coupled-wind-test)
     add_test(NAME weather.coupled_wind_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/coupled_wind_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-atmospheric-column-test tests/weather/atmospheric_column_test.cpp)
+    target_link_libraries(terraflux-atmospheric-column-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.atmospheric_column COMMAND terraflux-atmospheric-column-test)
+    add_test(NAME weather.atmospheric_column_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/column_check.py $<TARGET_FILE:terraflux-run-atmospheric-column>)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -175,6 +186,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-run-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-pressure-wind PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-coupled-wind PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-atmospheric-column PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
@@ -182,6 +194,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-pressure-wind-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-moist-air-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-coupled-wind-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-atmospheric-column-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

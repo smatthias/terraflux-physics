@@ -48,6 +48,10 @@ All pressure-wind rules apply. Additionally: diffusivities finite and non-negati
 
 The C++ types, validators, `build_gaussian_field`, `diagnose_moist_layer`, `coupled_scalar_stability_number` and `advance_coupled_wind` are in `include/terraflux/weather/coupled_wind.hpp` and `src/weather/coupled_wind*.cpp`. Schemas: [run request v1](coupled-wind-run-v1.schema.json) and the [coupled atmosphere timeline extension v1](coupled-atmosphere-v1.schema.json).
 
+## Vertical column diagnostics (optional)
+
+A `column` section enables the [atmospheric column model](atmospheric-column-model.md) per cell and frame: hydrostatic layers above the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel giving LCL (cloud base), LFC, EL (cloud top), CAPE, CIN and a convective-potential class. The coupling is one-way: the column reads the horizontal state, nothing feeds back. Results are written to `coupled_atmosphere.columns`.
+
 ## Command line and viewer output
 
 ```sh

@@ -18,6 +18,10 @@ test('form and request convert both ways', () => {
   const form = defaultCoupledForm()
   form.centers[1].temperature_anomaly_k = 6.5
   form.momentum_diffusivity_m2_s = 0
+  form.column_enabled = false
+  assert.equal(formToRequest(form).column, undefined)
+  form.column_enabled = true
+  form.column_lapse_rate_k_m = 0.007
   form.coriolis_mode = 'prescribed'
   form.coriolis_parameter_s = -9e-5
   assert.deepEqual(formFromRequest(formToRequest(form)), form)
@@ -48,6 +52,11 @@ test('request check mirrors the solver bounds', () => {
   assert.match(checkCoupledRequest(dry).errors.join(' '), /Specific humidity/)
   const unresolved = exampleRequest(); unresolved.time.timestep_seconds = 3000; unresolved.grid.spacing_east_m = unresolved.grid.spacing_north_m = 10000
   assert.ok(checkCoupledRequest(unresolved).warnings.some(w => /spin-up peak/.test(w)))
+  const frozen = exampleRequest(); frozen.column.environment_lapse_rate_k_m = 0.03
+  assert.match(checkCoupledRequest(frozen).errors.join(' '), /below 0 K/)
+  const superadiabatic = exampleRequest(); superadiabatic.column.environment_lapse_rate_k_m = 0.011
+  assert.ok(checkCoupledRequest(superadiabatic).warnings.some(w => /dry adiabatic/.test(w)))
+  assert.equal(ok.estimates.column_top_m, 12000)
   const noRotation = exampleRequest(); noRotation.atmosphere.coriolis_mode = 'none'; noRotation.atmosphere.surface_friction_coefficient_s = 0
   assert.ok(checkCoupledRequest(noRotation).warnings.some(w => /grows without bound/.test(w)))
 })
@@ -65,6 +74,10 @@ test('engine fixture validates as a coupled timeline and round-trips its request
     assert.ok(frame.coupled.stability <= 1)
   }
   assert.equal(frames[0].coupled.request.diffusion.temperature_m2_s, 5000)
+  assert.equal(frames[0].coupled.columns.lcl.length, count)
+  assert.ok(Math.max(...frames[0].coupled.columns.cape) > 500 && frames[0].coupled.columns.potential.includes('weak'))
+  assert.ok(Math.max(...frames.at(-1).coupled.columns.cape) < Math.max(...frames[0].coupled.columns.cape))
+  assert.equal(frames[0].coupled.columns.config.layer_count, 24)
   const request = requestFromCoupledAtmosphere(fixture().coupled_atmosphere, frames)
   assert.deepEqual(request, exampleRequest())
   assert.deepEqual(formFromRequest(request), defaultCoupledForm())
@@ -77,6 +90,10 @@ test('invalid coupled extensions are rejected', () => {
   assert.throws(() => validateSequence(short), /frame count/)
   const mixed = fixture(); mixed.atmosphere = {}
   assert.throws(() => validateSequence(mixed), /cannot carry both/)
+  const badLevel = fixture(); badLevel.coupled_atmosphere.columns.cape_j_kg_by_frame[0][3] = -1
+  assert.throws(() => validateSequence(badLevel), /CAPE/)
+  const badOrder = fixture(); const cols = badOrder.coupled_atmosphere.columns; const j = cols.lfc_height_m_by_frame[0].findIndex(v => v !== null); cols.lfc_height_m_by_frame[0][j] = cols.equilibrium_level_m_by_frame[0][j] + 1
+  assert.throws(() => validateSequence(badOrder), /ordered/)
   const wrongGrid = fixture(); wrongGrid.coupled_atmosphere.request.grid.nx = 5
   assert.throws(() => validateCoupledAtmosphere(wrongGrid.coupled_atmosphere, validateSequence({ schema_version: 'terraflux.weather.timeline/v1', frames: wrongGrid.frames })), /grid must match/)
 })

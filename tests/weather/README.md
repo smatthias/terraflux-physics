@@ -44,6 +44,19 @@ The coupled wind / moist-layer suite (`weather.coupled_wind`, plus the CLI and f
 - supersaturation reported rather than removed
 - rejection of invalid diffusivities, boundaries, modes and states
 
+The pressure-wind suite also carries a verification block (cases V1–V3): exact damped-inertial solution in both hemispheres, a direction matrix over four gradient directions and both hemispheres using cross products, and textbook reference magnitudes (`f`, `β`, 1 hPa/100 km → 8.08 m/s). See [coriolis-verification.md](../../docs/weather/coriolis-verification.md).
+
+The atmospheric column suite (`weather.atmospheric_column`, plus the CLI check `weather.atmospheric_column_cli` and the column block of `weather.coupled_wind_cli`) covers:
+
+- dry ISA interface pressures against the analytic linear-lapse and isothermal formulas (10⁻⁹) and the ISA table (0.1 %); monotonic thinning; layer masses summing to the column mass
+- moist columns being lighter
+- potential temperature, dry/moist lapse rates, dew point inversion and Bolton θ_e helpers
+- the moist ascent against an in-test fourth-order pressure-coordinate integration (0.01 K) with θ_e conserved to 2.5 K
+- the LCL against Bolton's closed form (0.4 % in pressure) and Espy's rule
+- convective indices: stable dry columns have no LFC; CAPE grows with moisture; LCL ≤ LFC < EL; a dry-adiabatic environment is neutral
+- convective adjustment mixing and condensing with enthalpy and water conserved to 10⁻⁹, stable/unsaturated results, idempotence, untouched stable columns
+- per-cell field diagnostics with missing levels and configuration/state rejections
+
 Build and run the registered CTest case with:
 
 ~~~sh

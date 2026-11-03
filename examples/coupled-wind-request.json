@@ -17,7 +17,7 @@
   },
   "atmosphere": {
     "air_density_kg_m3": 1.225,
-    "surface_friction_coefficient_s": 2.0e-5,
+    "surface_friction_coefficient_s": 2e-05,
     "coriolis_mode": "beta_plane"
   },
   "diffusion": {
@@ -32,8 +32,20 @@
     "pressure_systems": {
       "background_pressure_pa": 101500.0,
       "centers": [
-        { "kind": "high", "east_m": -300000.0, "north_m": -40000.0, "pressure_anomaly_pa": 800.0, "radius_m": 350000.0 },
-        { "kind": "low",  "east_m": 260000.0,  "north_m": 100000.0, "pressure_anomaly_pa": -900.0, "radius_m": 300000.0 }
+        {
+          "kind": "high",
+          "east_m": -300000.0,
+          "north_m": -40000.0,
+          "pressure_anomaly_pa": 800.0,
+          "radius_m": 350000.0
+        },
+        {
+          "kind": "low",
+          "east_m": 260000.0,
+          "north_m": 100000.0,
+          "pressure_anomaly_pa": -900.0,
+          "radius_m": 300000.0
+        }
       ]
     }
   },
@@ -41,17 +53,45 @@
     "air_temperature_k": {
       "background": 287.0,
       "anomalies": [
-        { "east_m": -300000.0, "north_m": -40000.0, "radius_m": 350000.0, "amplitude": -4.0 },
-        { "east_m": 260000.0,  "north_m": 100000.0, "radius_m": 300000.0, "amplitude": 5.0 }
+        {
+          "east_m": -300000.0,
+          "north_m": -40000.0,
+          "radius_m": 350000.0,
+          "amplitude": -4.0
+        },
+        {
+          "east_m": 260000.0,
+          "north_m": 100000.0,
+          "radius_m": 300000.0,
+          "amplitude": 6.0
+        }
       ]
     },
     "specific_humidity_kg_kg": {
       "background": 0.007,
       "anomalies": [
-        { "east_m": -300000.0, "north_m": -40000.0, "radius_m": 350000.0, "amplitude": -0.003 },
-        { "east_m": 260000.0,  "north_m": 100000.0, "radius_m": 300000.0, "amplitude": 0.004 }
+        {
+          "east_m": -300000.0,
+          "north_m": -40000.0,
+          "radius_m": 350000.0,
+          "amplitude": -0.003
+        },
+        {
+          "east_m": 260000.0,
+          "north_m": 100000.0,
+          "radius_m": 300000.0,
+          "amplitude": 0.006
+        }
       ]
     }
+  },
+  "column": {
+    "layer_count": 24,
+    "layer_thickness_m": 500.0,
+    "environment_lapse_rate_k_m": 0.0065,
+    "tropopause_height_m": 11000.0,
+    "humidity_scale_height_m": 2500.0,
+    "parcel_step_m": 50.0
   },
   "snapshot_every_steps": 96
 }

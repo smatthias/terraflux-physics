@@ -10,6 +10,7 @@ export const CORIOLIS_MODES = ['none', 'f_plane', 'beta_plane', 'prescribed']
 export const DENSITY_MODES = ['diagnosed', 'constant']
 export const SCALAR_BOUNDARIES = ['zero_gradient', 'periodic']
 export const GRADIENT_BOUNDARIES = ['one_sided', 'periodic']
+export const CONVECTIVE_POTENTIALS = ['none', 'weak', 'moderate', 'strong']
 const EARTH_OMEGA = 7.2921159e-5, EARTH_RADIUS = 6371000
 
 // Form model: pressure centers carry co-located temperature and humidity
@@ -23,9 +24,11 @@ export function defaultCoupledForm() {
     temperature_diffusivity_m2_s: 5000, humidity_diffusivity_m2_s: 5000, momentum_diffusivity_m2_s: 5000,
     pressure_gradient_boundary: 'one_sided', scalar_boundary: 'zero_gradient', density_mode: 'diagnosed',
     background_pressure_pa: 101500, background_temperature_k: 287, background_humidity_kg_kg: 0.007,
+    column_enabled: true, column_layer_count: 24, column_layer_thickness_m: 500, column_lapse_rate_k_m: 0.0065,
+    column_tropopause_height_m: 11000, column_humidity_scale_height_m: 2500, column_parcel_step_m: 50,
     centers: [
       { kind: 'high', east_m: -300000, north_m: -40000, radius_m: 350000, pressure_anomaly_pa: 800, temperature_anomaly_k: -4, humidity_anomaly_kg_kg: -0.003 },
-      { kind: 'low', east_m: 260000, north_m: 100000, radius_m: 300000, pressure_anomaly_pa: -900, temperature_anomaly_k: 5, humidity_anomaly_kg_kg: 0.004 },
+      { kind: 'low', east_m: 260000, north_m: 100000, radius_m: 300000, pressure_anomaly_pa: -900, temperature_anomaly_k: 6, humidity_anomaly_kg_kg: 0.006 },
     ],
   }
 }
@@ -34,6 +37,10 @@ export function formToRequest(form) {
   const anomaly = (c, amplitude) => ({ east_m: c.east_m, north_m: c.north_m, radius_m: c.radius_m, amplitude })
   const atmosphere = { air_density_kg_m3: form.air_density_kg_m3, surface_friction_coefficient_s: form.surface_friction_coefficient_s, coriolis_mode: form.coriolis_mode }
   if (form.coriolis_mode === 'prescribed') atmosphere.coriolis_parameter_s = form.coriolis_parameter_s
+  const column = form.column_enabled ? { column: {
+    layer_count: form.column_layer_count, layer_thickness_m: form.column_layer_thickness_m, environment_lapse_rate_k_m: form.column_lapse_rate_k_m,
+    tropopause_height_m: form.column_tropopause_height_m, humidity_scale_height_m: form.column_humidity_scale_height_m, parcel_step_m: form.column_parcel_step_m,
+  } } : {}
   return {
     schema_version: 'terraflux.weather.coupled-wind-run/v1',
     time: { start_time_utc: form.start_time_utc, timestep_seconds: form.timestep_seconds, steps: form.steps },
@@ -51,6 +58,7 @@ export function formToRequest(form) {
       air_temperature_k: { background: form.background_temperature_k, anomalies: form.centers.map(c => anomaly(c, c.temperature_anomaly_k)) },
       specific_humidity_kg_kg: { background: form.background_humidity_kg_kg, anomalies: form.centers.map(c => anomaly(c, c.humidity_anomaly_kg_kg)) },
     },
+    ...column,
     snapshot_every_steps: form.snapshot_every_steps,
   }
 }
@@ -77,6 +85,10 @@ export function formFromRequest(request) {
     temperature_diffusivity_m2_s: request.diffusion.temperature_m2_s, humidity_diffusivity_m2_s: request.diffusion.humidity_m2_s, momentum_diffusivity_m2_s: request.diffusion.momentum_m2_s,
     pressure_gradient_boundary: request.pressure_gradient_boundary ?? 'one_sided', scalar_boundary: request.scalar_boundary ?? 'zero_gradient', density_mode: request.density_mode ?? 'diagnosed',
     background_pressure_pa: systems.background_pressure_pa, background_temperature_k: t.background, background_humidity_kg_kg: q.background,
+    column_enabled: request.column !== undefined,
+    column_layer_count: request.column?.layer_count ?? 24, column_layer_thickness_m: request.column?.layer_thickness_m ?? 500,
+    column_lapse_rate_k_m: request.column?.environment_lapse_rate_k_m ?? 0.0065, column_tropopause_height_m: request.column?.tropopause_height_m ?? 11000,
+    column_humidity_scale_height_m: request.column?.humidity_scale_height_m ?? 2500, column_parcel_step_m: request.column?.parcel_step_m ?? 50,
     centers: centers.map((c, i) => ({ kind: c.kind, east_m: c.east_m, north_m: c.north_m, radius_m: c.radius_m, pressure_anomaly_pa: c.pressure_anomaly_pa, temperature_anomaly_k: ta[i].amplitude, humidity_anomaly_kg_kg: qa[i].amplitude })),
   }
 }
@@ -100,6 +112,7 @@ export function requestFromCoupledAtmosphere(atmosphere, frames) {
       air_temperature_k: t ?? { values: clone(frames[0].forecast.fields.air_temperature.values) },
       specific_humidity_kg_kg: q ?? { values: clone(atmosphere.specific_humidity_kg_kg_by_frame[0]) },
     },
+    ...(atmosphere.columns ? { column: clone(atmosphere.columns.config) } : {}),
     snapshot_every_steps: r.snapshot_every_steps ?? r.time.steps,
   }
 }
@@ -146,7 +159,26 @@ export function checkCoupledRequest(request) {
     const high = qf.background + (qf.anomalies ?? []).reduce((s, x) => s + Math.max(0, x.amplitude), 0)
     fail(finite(qf.background) && low >= 0 && high < 1, 'Specific humidity must stay within [0, 1) kg/kg.')
   }
+  const col = request.column
+  if (col !== undefined) {
+    fail(Number.isInteger(col.layer_count) && col.layer_count >= 2, 'Column needs at least 2 layers.')
+    fail(finite(col.layer_thickness_m) && col.layer_thickness_m > 0, 'Column layer thickness must be positive.')
+    fail(finite(col.environment_lapse_rate_k_m) && Math.abs(col.environment_lapse_rate_k_m) <= 0.05, 'Environment lapse rate must be within ±0.05 K/m.')
+    fail(finite(col.tropopause_height_m) && col.tropopause_height_m >= 0, 'Tropopause height must not be negative.')
+    fail(finite(col.humidity_scale_height_m) && col.humidity_scale_height_m > 0, 'Humidity scale height must be positive.')
+    fail(finite(col.parcel_step_m) && col.parcel_step_m > 0 && col.parcel_step_m <= col.layer_thickness_m, 'Parcel step must be positive and no larger than the layer thickness.')
+    if (tf?.background !== undefined && finite(col.layer_count) && finite(col.layer_thickness_m)) {
+      const coldest = tf.background + (tf.anomalies ?? []).reduce((s, x) => s + Math.min(0, x.amplitude), 0)
+      const top = Math.min(col.layer_count * col.layer_thickness_m, col.tropopause_height_m)
+      fail(coldest - col.environment_lapse_rate_k_m * top > 0, 'The environment lapse rate drives the column below 0 K.')
+    }
+  }
   if (errors.length) return { errors, warnings, estimates }
+  if (col !== undefined) {
+    estimates.column_top_m = col.layer_count * col.layer_thickness_m
+    // Dry-adiabatic reference: the troposphere is stable when the lapse rate is below g / c_p.
+    if (col.environment_lapse_rate_k_m > 9.80665 / 1004.6) warnings.push('Environment lapse rate exceeds the dry adiabatic 9.76 K/km; the column will be mixed by convective adjustment before the parcel diagnostics.')
+  }
 
   // Coriolis parameter over the grid (beta plane varies with north distance).
   const phi = g.geographic_anchor_latitude_deg * Math.PI / 180
@@ -238,5 +270,29 @@ export function validateCoupledAtmosphere(atmosphere, frames) {
     check(Number.isInteger(a.supersaturated_cells_by_frame[i]) && a.supersaturated_cells_by_frame[i] >= 0 && finite(a.scalar_stability_number_by_frame[i]), 'Invalid coupled frame diagnostics.')
     frame.coupled = { pressure: a.pressure_pa, humidity: rh, density: rho, specificHumidity: q, coriolis: a.coriolis_parameter_s, supersaturated: a.supersaturated_cells_by_frame[i], stability: a.scalar_stability_number_by_frame[i], request: r, sources: { pressure: a.pressure_source, temperature: a.temperature_source, humidity: a.humidity_source }, raw: a }
   })
+  if (a.columns !== undefined) validateColumnDiagnostics(a.columns, frames)
   return a
+}
+
+// Optional vertical-column diagnostics (LCL, LFC, EL, CAPE, CIN) per cell.
+export function validateColumnDiagnostics(columns, frames) {
+  const c = columns, count = frames[0].forecast.grid.nx * frames[0].forecast.grid.ny
+  check(c?.schema_version === 'terraflux.weather.column_diagnostics/v1' && c.method === 'hydrostatic_layers_convective_adjustment_surface_parcel', 'Unsupported column diagnostics contract.')
+  const cfg = c.config
+  check(cfg && Number.isInteger(cfg.layer_count) && cfg.layer_count >= 2 && finite(cfg.layer_thickness_m) && cfg.layer_thickness_m > 0 && finite(cfg.environment_lapse_rate_k_m) && finite(cfg.tropopause_height_m) && finite(cfg.humidity_scale_height_m) && cfg.humidity_scale_height_m > 0 && finite(cfg.parcel_step_m) && cfg.parcel_step_m > 0, 'Invalid column configuration.')
+  check(Array.isArray(c.column_mass_kg_m2) && c.column_mass_kg_m2.length === count && c.column_mass_kg_m2.every(v => finite(v) && v > 0), 'Invalid column mass field.')
+  check(Array.isArray(c.top_pressure_pa) && c.top_pressure_pa.length === count && c.top_pressure_pa.every(v => finite(v) && v > 0), 'Invalid column top pressure field.')
+  for (const key of ['lcl_height_m_by_frame', 'lfc_height_m_by_frame', 'equilibrium_level_m_by_frame', 'cape_j_kg_by_frame', 'cin_j_kg_by_frame', 'convective_potential_by_frame', 'condensed_water_kg_m2_by_frame']) check(Array.isArray(c[key]) && c[key].length === frames.length, `Column ${key} frame count mismatch.`)
+  const level = v => v === null || (finite(v) && v >= 0)
+  frames.forEach((frame, i) => {
+    const lcl = c.lcl_height_m_by_frame[i], lfc = c.lfc_height_m_by_frame[i], el = c.equilibrium_level_m_by_frame[i]
+    const cape = c.cape_j_kg_by_frame[i], cin = c.cin_j_kg_by_frame[i], potential = c.convective_potential_by_frame[i], condensed = c.condensed_water_kg_m2_by_frame[i]
+    check([lcl, lfc, el, cape, cin, potential, condensed].every(v => Array.isArray(v) && v.length === count), 'Column arrays do not match the grid.')
+    check(lcl.every(level) && lfc.every(level) && el.every(level), 'Invalid column levels.')
+    check(cape.every(v => finite(v) && v >= 0) && cin.every(v => finite(v) && v >= 0) && condensed.every(v => finite(v) && v >= 0), 'Invalid CAPE, CIN or condensate.')
+    check(potential.every(v => CONVECTIVE_POTENTIALS.includes(v)), 'Invalid convective potential label.')
+    check(lfc.every((v, j) => v === null || (lcl[j] !== null && el[j] !== null && v >= lcl[j] && el[j] > v && cape[j] > 0)), 'Column levels must be ordered LCL <= LFC < EL with positive CAPE.')
+    frame.coupled.columns = { lcl, lfc, el, cape, cin, potential, condensed, config: cfg }
+  })
+  return c
 }
