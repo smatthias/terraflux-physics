@@ -19,6 +19,8 @@
 #include "terraflux/weather/ocean_circulation.hpp"
 #include "terraflux/weather/synthetic_terrain.hpp"
 #include "utc_time.hpp"
+#include "terraflux/weather/ocean_circulation.hpp"
+#include "terraflux/weather/synthetic_terrain.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -795,6 +797,8 @@ void parse_rain(const Json& section, ForcingRequest& f, OceanConfig& c, Json& pr
 ForcingRequest parse_forcing(const Json& request, OceanConfig& c, const TimeRequest& time) {
     ForcingRequest f;
     f.start_epoch_seconds = terraflux::weather::detail::utc_seconds(time.start_time_utc);
+ForcingRequest parse_forcing(const Json& request, const OceanConfig& c) {
+    ForcingRequest f;
     const Json& section = required(request, "forcing");
     Json wind_provenance;
     if (section.contains("wind")) {
@@ -945,6 +949,11 @@ OceanForcing forcing_at(const ForcingRequest& f, double elapsed, double dt, cons
                 out.target_temperature_k[i] = sample(w.temperature, at, i);
             }
         }
+        std::size_t k = 0;
+        while (k + 1 < w.elapsed.size() && w.elapsed[k + 1] <= mid) ++k;
+        out.wind_stress_east_pa = w.stress_east[k];
+        out.wind_stress_north_pa = w.stress_north[k];
+        out.target_temperature_k = w.temperature[k];
     }
     for (const auto& r : f.rivers) {
         RiverSource s = r.source;
@@ -1272,6 +1281,10 @@ int main(int argc, char** argv) {
             validate_ocean_config(config);
         }
         OceanState state = initialize_ocean(config);
+        const OceanConfig config = parse_config(request, time, elevation, basin_provenance);
+        const ForcingRequest forcing = parse_forcing(request, config);
+        OceanState state = initialize_ocean(config);
+        std::vector<double> wind_east, wind_north;
 
         // Spin-up (not recorded): the gyres need the Rossby-wave crossing time to establish.
         for (std::size_t k = 0; k < time.spinup_steps; ++k) {
@@ -1294,6 +1307,13 @@ int main(int argc, char** argv) {
             if (extended) add_extension_blocks(frame, state, diagnostics, current, config, air_sea, rain, heat_error);
             ocean_frames.push_back(std::move(frame));
             heat_error = 0.0;
+        const double initial_volume = state.volume_m3, initial_salt = state.salt_kg;
+
+        Json frames = Json::array(), ocean_frames = Json::array();
+        OceanForcing current = forcing_at(forcing, 0.0, config.timestep_seconds, config, wind_east, wind_north);
+        auto record = [&]() {
+            frames.push_back(forecast_frame_json(current.target_temperature_k, wind_east, wind_north, state.elapsed_seconds, time, config.grid));
+            ocean_frames.push_back(frame_json(state, diagnose_ocean(state, current, config), config));
         };
         record();
         for (std::size_t k = 0; k < time.steps; ++k) {

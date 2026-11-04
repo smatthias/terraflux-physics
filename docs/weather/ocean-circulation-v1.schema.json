@@ -281,6 +281,8 @@
               }
             },
             "description": "volume = initial + river + net_precipitation + sponge + rain_sea + coastal_runoff - evaporation; rain_coast = coastal_runoff + coastal_loss + storage change."
+              }
+            }
           },
           "streams": {
             "type": "array",
@@ -908,6 +910,9 @@
         "initial_storage_m3": {
           "type": "number",
           "minimum": 0
+        }
+      }
+          }
         }
       }
     }

@@ -239,6 +239,7 @@ struct OceanState {
     std::vector<double> recent_rain_m;
     std::vector<double> recent_runoff_m;
     std::vector<double> recent_river_m;
+    std::vector<double> freshwater_m;   // surface freshwater content (metres of fresh water in the mixed layer)
     // Diagnostics of the last step (cell centres).
     std::vector<double> speed_m_s;
     std::vector<double> u_centre_m_s;
@@ -357,6 +358,9 @@ struct OceanDiagnostics {
     double max_sst_k{0.0};
     double mean_mixed_layer_depth_m{0.0};
     double max_mixed_layer_depth_m{0.0};
+struct OceanDiagnostics {
+    std::vector<OceanStream> streams;
+    std::vector<RiverPlume> plumes;
     std::size_t formation_cells{0};
     double formation_area_m2{0.0};
     double mean_salinity_psu{0.0};

@@ -55,6 +55,7 @@ export function validateOcean(block, frames, terrain) {
       check(finite(f.thickness_m[j]) && f.thickness_m[j] >= 0 && finite(f.salinity_psu[j]) && f.salinity_psu[j] >= 0 && f.salinity_psu[j] <= 45, 'Invalid thickness or salinity.')
       // The slab's fresh surface lens cannot be saltier than the layer; evaporation and the layered column can make it so.
       check(finite(f.surface_salinity_psu[j]) && f.surface_salinity_psu[j] >= 0 && f.surface_salinity_psu[j] <= 45 && (layered || airSea || f.surface_salinity_psu[j] <= f.salinity_psu[j] + 1e-6), 'Surface salinity cannot exceed the bulk salinity.')
+      check(finite(f.surface_salinity_psu[j]) && f.surface_salinity_psu[j] >= 0 && f.surface_salinity_psu[j] <= f.salinity_psu[j] + 1e-6, 'Surface salinity cannot exceed the bulk salinity.')
       check(finite(f.temperature_k[j]) && (!water || (f.temperature_k[j] > 250 && f.temperature_k[j] < 330)), 'Invalid ocean temperature.')
       check(finite(f.sinking_m_s[j]) && f.sinking_m_s[j] >= 0 && typeof f.front[j] === 'boolean' && Number.isInteger(f.stream_id[j]) && f.stream_id[j] >= -1, 'Invalid sinking, front or stream id.')
       if (!water) check(f.u_m_s[j] === 0 && f.v_m_s[j] === 0 && f.thickness_m[j] === 0 && f.sinking_m_s[j] === 0 && f.stream_id[j] === -1 && !f.front[j], 'Land cells carry no ocean state.')
@@ -75,6 +76,7 @@ export function validateOcean(block, frames, terrain) {
     const c = f.cumulative_m3
     const fresh = (c.rain_sea ?? 0) + (c.coastal_runoff ?? 0) - (c.evaporation ?? 0)
     check(Math.abs(f.volume_m3 - b.initial_volume_m3 - c.river - c.net_precipitation - c.sponge - fresh) <= 1e-6 * Math.max(b.initial_volume_m3, 1), 'Ocean volume budget: rivers + net precipitation + sponge + rain + coastal runoff - evaporation must explain the change.')
+    check(Math.abs(f.volume_m3 - b.initial_volume_m3 - c.river - c.net_precipitation - c.sponge) <= 1e-6 * Math.max(b.initial_volume_m3, 1), 'Ocean volume budget: rivers + net precipitation + sponge must explain the change.')
     check(Math.abs(f.volume_balance_error_m3) <= 1e-6 * Math.max(b.initial_volume_m3, 1) && Math.abs(f.salt_balance_error_kg) <= 1e-6 * Math.max(b.initial_salt_kg, 1), 'Per-step ocean budget errors too large.')
     if (previous) check(c.river + 1e-6 >= previous.cumulative_m3.river && c.sinking + 1e-6 >= previous.cumulative_m3.sinking, 'Cumulative river input and sinking cannot decrease.')
     else check(c.river === 0 && c.sinking === 0 && c.net_precipitation === 0 && c.sponge === 0, 'The first frame is the initial state.')
@@ -89,6 +91,7 @@ export function validateOcean(block, frames, terrain) {
       processes, rain: null, airSea: null, thermal: null, lenses: [], heat: null,
     }
     if (processes.length) Object.assign(frame.ocean, validateExtensions(b, f, i, grid, { layered, airSea, raining, fractions, receiver }))
+    }
     previous = f
   })
   return b
@@ -225,6 +228,7 @@ export function salinityColor(salinity, reference = 35) {
 export function temperatureColor(kelvin) {
   const t = Math.max(0, Math.min(1, (kelvin - 275) / 22))
   return `hsl(${Math.round(230 - 230 * t)}, 70%, ${Math.round(30 + 20 * t)}%)`
+  return `hsl(${Math.round(230 - 230 * t)} 70% ${Math.round(30 + 20 * t)}%)`
 }
 
 // Time series of the overturning, main-stream transport and river input over the frames.

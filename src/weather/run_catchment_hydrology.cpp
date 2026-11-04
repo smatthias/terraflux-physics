@@ -389,6 +389,9 @@ CoupledForcing load_coupled_forcing(const std::string& path, double offset_secon
                 if (duration.size() != source_count) throw std::invalid_argument("coupled precipitation duration does not match its grid");
             }
             for (std::size_t j = 0; j < source_count; ++j) rate[j] += std::max(0.0, pr[j]) * std::min(1.0, std::max(0.0, duration[j]));
+            const auto pr = required_number_array(required(atmosphere, "precipitation").at("frames").at(k), "rate_mm_h");
+            if (pr.size() != source_count) throw std::invalid_argument("coupled precipitation frame does not match its grid");
+            for (std::size_t j = 0; j < source_count; ++j) rate[j] += std::max(0.0, pr[j]);
         }
         const auto temperature = required_number_array(required(required(frame, "fields"), "air_temperature"), "values");
         if (temperature.size() != source_count) throw std::invalid_argument("coupled temperature frame does not match its grid");
@@ -403,6 +406,7 @@ CoupledForcing load_coupled_forcing(const std::string& path, double offset_secon
     };
     if (has_orography) provenance["sources"].push_back("coupled_atmosphere.orography.orographic_precipitation_rate_mm_h");
     if (has_precipitation) provenance["sources"].push_back("coupled_atmosphere.precipitation.rate_mm_h x duration_fraction");
+    if (has_precipitation) provenance["sources"].push_back("coupled_atmosphere.precipitation.rate_mm_h");
     provenance["sources"].push_back("frames.fields.air_temperature");
     return result;
 }

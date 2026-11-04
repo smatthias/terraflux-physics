@@ -260,6 +260,9 @@ void validate_ocean_config(const OceanConfig& c) {
     double warmest = c.initial_temperature_k;
     for (std::size_t i = 0; i < c.initial_surface_temperature_k.size(); ++i) if (c.ocean[i]) warmest = std::max(warmest, c.initial_surface_temperature_k[i]);
     const double g_prime = std::max(p.minimum_reduced_gravity_m_s2, reduced_gravity_m_s2(warmest, c.initial_salinity_psu, p));
+    // Stability: gravity waves of the reduced-gravity layer, Coriolis, drag, viscosity and diffusion.
+    const double dt = c.timestep_seconds, dx = c.grid.spacing_east_m, dy = c.grid.spacing_north_m;
+    const double g_prime = std::max(p.minimum_reduced_gravity_m_s2, reduced_gravity_m_s2(c.initial_temperature_k, c.initial_salinity_psu, p));
     const double wave_speed = std::sqrt(1.5 * g_prime * c.initial_thickness_m * 1.5);
     if (dt * wave_speed * (1.0 / dx + 1.0 / dy) > 1.0) throw std::invalid_argument("ocean timestep violates the gravity-wave CFL bound dt c (1/dx + 1/dy) <= 1");
     double f_max = 0.0;
@@ -577,6 +580,11 @@ void diagnose_fields(OceanState& s, const OceanConfig& c) {
     long double store = 0.0L;
     for (std::size_t i = 0; i < s.coastal_store_m.size(); ++i) store += static_cast<long double>(s.coastal_store_m[i]) * g.area;
     s.coastal_storage_m3 = static_cast<double>(store);
+        s.surface_salinity_psu[i] = s.salinity_psu[i] * std::max(0.0, 1.0 - s.freshwater_m[i] / p.mixed_layer_depth_m);
+        s.freshwater_fraction[i] = std::max(0.0, (p.reference_salinity_psu - s.surface_salinity_psu[i]) / p.reference_salinity_psu);
+        ke += 0.5L * p.reference_density_kg_m3 * s.thickness_m[i] * g.area * (s.speed_m_s[i] * s.speed_m_s[i]);
+    }
+    s.kinetic_energy_j = static_cast<double>(ke);
     // Mixing fronts: surface-salinity gradient magnitude over water neighbours.
     const double threshold = p.front_gradient_psu_per_100km / 1.0e5;
     for (std::size_t i = 0; i < count; ++i) {
@@ -682,6 +690,8 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
         for (double& x : *v) x *= memory;
     }
     for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s}) v->assign(count, 0.0);
+    OceanState s = previous;
+    s.sinking_m_s.assign(count, 0.0);
     double water_area = 0.0;
     for (std::size_t i = 0; i < count; ++i) if (c.ocean[i]) water_area += area;
 
@@ -727,6 +737,8 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
         const double surface_salinity = layers ? ls0[i * layers] : previous.salinity_psu[i] * std::max(0.0, 1.0 - previous.freshwater_m[i] / p.mixed_layer_depth_m);
         const double surface_temperature = layers ? lt0[i * layers] : previous.temperature_k[i];  // the column sinks when its surface is dense
         const double gp = reduced_gravity_m_s2(surface_temperature, surface_salinity, p);  // a fresh cap stops the sinking
+        const double surface_salinity = previous.salinity_psu[i] * std::max(0.0, 1.0 - previous.freshwater_m[i] / p.mixed_layer_depth_m);
+        const double gp = reduced_gravity_m_s2(previous.temperature_k[i], surface_salinity, p);  // a fresh cap stops the sinking
         if (gp < p.formation_reduced_gravity_m_s2 && previous.thickness_m[i] > p.minimum_thickness_m) {
             const double factor = std::max(0.0, 1.0 - std::max(gp, 0.0) / p.formation_reduced_gravity_m_s2);
             s.sinking_m_s[i] = factor * (previous.thickness_m[i] - p.minimum_thickness_m) / p.convection_time_scale_s;
@@ -778,6 +790,9 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
     std::vector<double> hs(count, 0.0), ht(count, 0.0);
     long double river_total = 0.0L, precip_total = 0.0L, sponge_volume = 0.0L, sponge_salt = 0.0L;
     long double evaporation_total = 0.0L, surface_heat = 0.0L, heat_source = 0.0L, sponge_heat = 0.0L;   // heat in K m3
+    // 3. Thickness and tracer update (flux form), then sources.
+    std::vector<double> hs(count, 0.0), ht(count, 0.0);
+    long double river_total = 0.0L, precip_total = 0.0L, sponge_volume = 0.0L, sponge_salt = 0.0L;
     std::vector<double> river_depth(count, 0.0), river_salt(count, 0.0), river_heat(count, 0.0);
     for (const auto& r : f.rivers) {
         const double depth = r.discharge_m3_s * dt / area;
@@ -967,6 +982,18 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             heat = static_cast<double>(column_heat);
             salt = static_cast<double>(column_salt);
         }
+        // Rain dilutes, evaporation leaves the salt behind; both at the local temperature.
+        double pe = f.net_precipitation_m_s[i] * dt;
+        if (pe < 0.0) pe = -std::min(-pe, std::max(0.0, h - p.minimum_thickness_m));
+        h += pe;
+        heat += pe * t0;
+        if (pe > 0.0) fresh += pe;
+        fresh = std::max(0.0, fresh) * (1.0 - std::min(1.0, dt / p.freshwater_mixing_time_s));
+        s.freshwater_m[i] = std::min(fresh, p.mixed_layer_depth_m);
+        precip_total += static_cast<long double>(pe) * area / dt;
+        if (!(h > 0.0)) throw std::runtime_error("ocean layer thickness became non-positive; reduce the timestep or the sinks");
+        // Surface temperature relaxation.
+        heat += h * (f.target_temperature_k[i] - heat / h) * std::min(1.0, dt / p.temperature_relaxation_s);
         // Sponge: relax thickness and tracers toward the initial state; the change is a budget source.
         if (!c.sponge.empty() && c.sponge[i] > 0.0) {
             const double rate = c.sponge[i] * dt / p.sponge_time_scale_s;
@@ -998,6 +1025,14 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
         }
         // The layered column carries its own surface salinity; report the equivalent slab freshwater content.
         if (layers) s.freshwater_m[i] = p.mixed_layer_depth_m * (1.0 - s.layer_salinity_psu[i * layers] / std::max(1.0e-9, salt / h));
+            const double t2 = heat / h + (c.initial_temperature_k - heat / h) * rate;
+            sponge_volume += static_cast<long double>(h2 - h) * area;
+            sponge_salt += (static_cast<long double>(h2) * s2 - salt) * 1.0e-3 * p.reference_density_kg_m3 * area;
+            h = h2;
+            salt = h2 * s2;
+            heat = h2 * t2;
+            s.freshwater_m[i] *= 1.0 - rate;
+        }
         s.thickness_m[i] = h;
         hs[i] = salt;
         ht[i] = heat;
@@ -1110,6 +1145,9 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
     }
     s.heat_balance_error_j = static_cast<double>(((heat_after - heat_before) - (heat_source * area + sponge_heat)) * rho_cp);
     s.coastal_balance_error_m3 = (s.coastal_storage_m3 - store_before) - (s.rain_coast_m3_s - s.coastal_runoff_m3_s - s.coastal_loss_m3_s) * dt;
+    const double expected_volume_change = (static_cast<double>(river_total) + static_cast<double>(precip_total)) * dt + static_cast<double>(sponge_volume);  // sinking and upwelling cancel
+    s.volume_balance_error_m3 = (s.volume_m3 - previous.volume_m3) - expected_volume_change;
+    s.salt_balance_error_kg = (s.salt_kg - previous.salt_kg) - static_cast<double>(salt_source);
     s.cumulative_river_m3 += static_cast<double>(river_total) * dt;
     s.cumulative_net_precipitation_m3 += static_cast<double>(precip_total) * dt;
     s.cumulative_sinking_m3 += static_cast<double>(sink_total) * dt;
