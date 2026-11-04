@@ -201,6 +201,19 @@ if(BUILD_TESTING)
     add_test(NAME weather.ocean_circulation COMMAND terraflux-ocean-circulation-test)
     add_test(NAME weather.ocean_circulation_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_circulation_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    add_executable(terraflux-ocean-heat-rain-test tests/weather/ocean_heat_rain_test.cpp)
+    target_link_libraries(terraflux-ocean-heat-rain-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.ocean_heat_rain COMMAND terraflux-ocean-heat-rain-test)
+    add_test(NAME weather.ocean_heat_rain_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_heat_rain_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    add_test(NAME weather.viewer_ocean_heat_rain
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/ocean-heat-rain-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean-heat/engine-timeline.json --check)
+    add_test(NAME weather.viewer_ocean_streams
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/atlantic-streams-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean/engine-timeline.json --check)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
