@@ -4,6 +4,7 @@
 // terraflux-run-coupled-wind, and the resulting timeline is opened here.
 import { validateCloudFormation } from './cloudFormation.js'
 import { validatePrecipitation } from './weatherMap.js'
+import { validateSurface, validateStormSystems, validateSevereConvection } from './stormSystems.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 const clone = value => JSON.parse(JSON.stringify(value))
@@ -51,6 +52,9 @@ export function defaultCoupledForm() {
     column_tropopause_height_m: 11000, column_humidity_scale_height_m: 2500, column_parcel_step_m: 50,
     cloud_enabled: false, cloud: defaultCloudConfig(), cloud_heating_amplitude_k: 6, cloud_heating_phase_seconds: 7200,
     precip_enabled: false, precip: defaultPrecipConfig(),
+    inversion_enabled: false, inversion_base_m: 1500, inversion_depth_m: 500, inversion_strength_k: 1, lapse_rate_above_inversion_k_m: 0.0085,
+    surface_enabled: false, coast_east_m: -200000, land_side: 'west', sea_surface_temperature_k: 302.5, sst_gradient_north_k_per_m: 0,
+    storms_enabled: false, storm_seeds: [], severe_enabled: false,
     airmasses: [],
     centers: [
       { kind: 'high', east_m: -300000, north_m: -40000, radius_m: 350000, pressure_anomaly_pa: 800, temperature_anomaly_k: -4, humidity_anomaly_kg_kg: -0.003 },
@@ -69,7 +73,11 @@ export function formToRequest(form) {
   const column = form.column_enabled ? { column: {
     layer_count: form.column_layer_count, layer_thickness_m: form.column_layer_thickness_m, environment_lapse_rate_k_m: form.column_lapse_rate_k_m,
     tropopause_height_m: form.column_tropopause_height_m, humidity_scale_height_m: form.column_humidity_scale_height_m, parcel_step_m: form.column_parcel_step_m,
+    ...(form.inversion_enabled ? { inversion_base_m: form.inversion_base_m, inversion_depth_m: form.inversion_depth_m, inversion_strength_k: form.inversion_strength_k, lapse_rate_above_inversion_k_m: form.lapse_rate_above_inversion_k_m } : {}),
   } } : {}
+  const surface = form.surface_enabled ? { surface: { land: { coast_east_m: form.coast_east_m, land_side: form.land_side }, sea_surface_temperature_k: { background: form.sea_surface_temperature_k, gradient_north_k_per_m: form.sst_gradient_north_k_per_m } } } : {}
+  const storms = form.surface_enabled && form.column_enabled && form.storms_enabled ? { storms: { seeds: form.storm_seeds.map(x => ({ east_m: x.east_m, north_m: x.north_m, max_wind_m_s: x.max_wind_m_s, radius_max_wind_m: x.radius_max_wind_m })) } } : {}
+  const severe = form.cloud_enabled && form.severe_enabled ? { severe: {} } : {}
   return {
     schema_version: 'terraflux.weather.coupled-wind-run/v1',
     time: { start_time_utc: form.start_time_utc, timestep_seconds: form.timestep_seconds, steps: form.steps },
@@ -90,6 +98,9 @@ export function formToRequest(form) {
     ...column,
     ...cloud,
     ...precip,
+    ...surface,
+    ...storms,
+    ...severe,
     snapshot_every_steps: form.snapshot_every_steps,
   }
 }
@@ -114,6 +125,13 @@ export function formFromRequest(request) {
   if (pr !== undefined) {
     check(cf !== undefined && PRECIP_CONFIG_KEYS.every(([k]) => finite(pr[k])) && Object.keys(pr).length === PRECIP_CONFIG_KEYS.length, 'The editor represents the full precipitation configuration only, with cloud formation enabled.')
   }
+  const col = request.column
+  if (col && col.inversion_strength_k !== undefined) check(['inversion_base_m', 'inversion_depth_m', 'inversion_strength_k', 'lapse_rate_above_inversion_k_m'].every(k => finite(col[k])), 'The editor needs all four inversion values.')
+  const sf = request.surface
+  if (sf !== undefined) check(sf.land?.coast_east_m !== undefined && sf.sea_surface_temperature_k?.background !== undefined, 'The editor represents straight coasts and background sea-surface temperature only.')
+  const stm = request.storms
+  if (stm !== undefined) check(Object.keys(stm).length === 1 && Array.isArray(stm.seeds), 'The editor represents storm seeds with default storm physics only.')
+  if (request.severe !== undefined) check(Object.keys(request.severe).length === 0, 'The editor represents default severe-convection settings only.')
   const g = request.grid
   check(g.origin_east_m === -0.5 * g.nx * g.spacing_east_m && g.origin_north_m === -0.5 * g.ny * g.spacing_north_m, 'The editor centers the grid on the geographic anchor.')
   return {
@@ -133,9 +151,22 @@ export function formFromRequest(request) {
     cloud_enabled: cf !== undefined, cloud: cf ? Object.fromEntries(CLOUD_CONFIG_KEYS.map(([k]) => [k, cf[k]])) : defaultCloudConfig(),
     cloud_heating_amplitude_k: cf?.surface_heating.amplitude_k ?? 6, cloud_heating_phase_seconds: cf?.surface_heating.phase_seconds ?? 7200,
     precip_enabled: pr !== undefined, precip: pr ? Object.fromEntries(PRECIP_CONFIG_KEYS.map(([k]) => [k, pr[k]])) : defaultPrecipConfig(),
+    inversion_enabled: col?.inversion_strength_k !== undefined, inversion_base_m: col?.inversion_base_m ?? 1500, inversion_depth_m: col?.inversion_depth_m ?? 500,
+    inversion_strength_k: col?.inversion_strength_k ?? 1, lapse_rate_above_inversion_k_m: col?.lapse_rate_above_inversion_k_m ?? 0.0085,
+    surface_enabled: sf !== undefined, coast_east_m: sf?.land.coast_east_m ?? -200000, land_side: sf?.land.land_side ?? 'west',
+    sea_surface_temperature_k: sf?.sea_surface_temperature_k.background ?? 302.5, sst_gradient_north_k_per_m: sf?.sea_surface_temperature_k.gradient_north_k_per_m ?? 0,
+    storms_enabled: stm !== undefined, storm_seeds: (stm?.seeds ?? []).map(x => ({ east_m: x.east_m, north_m: x.north_m, max_wind_m_s: x.max_wind_m_s, radius_max_wind_m: x.radius_max_wind_m ?? 40000 })),
+    severe_enabled: request.severe !== undefined,
     airmasses: ta.slice(centers.length).map((a, i) => ({ east_m: a.east_m, north_m: a.north_m, radius_m: a.radius_m, temperature_anomaly_k: a.amplitude, humidity_anomaly_kg_kg: qa[centers.length + i].amplitude })),
     centers: centers.map((c, i) => ({ kind: c.kind, east_m: c.east_m, north_m: c.north_m, radius_m: c.radius_m, pressure_anomaly_pa: c.pressure_anomaly_pa, temperature_anomaly_k: ta[i].amplitude, humidity_anomaly_kg_kg: qa[i].amplitude })),
   }
+}
+
+// Column configuration as a request: the echoed config lists the inversion
+// fields explicitly (zero strength / negative lapse mean "none").
+function columnRequest(config) {
+  const { inversion_base_m, inversion_depth_m, inversion_strength_k, lapse_rate_above_inversion_k_m, ...rest } = config
+  return inversion_strength_k > 0 ? { ...rest, inversion_base_m, inversion_depth_m, inversion_strength_k, lapse_rate_above_inversion_k_m } : rest
 }
 
 // Rebuild the run request recorded in an engine output.
@@ -157,9 +188,12 @@ export function requestFromCoupledAtmosphere(atmosphere, frames) {
       air_temperature_k: t ?? { values: clone(frames[0].forecast.fields.air_temperature.values) },
       specific_humidity_kg_kg: q ?? { values: clone(atmosphere.specific_humidity_kg_kg_by_frame[0]) },
     },
-    ...(atmosphere.columns ? { column: clone(atmosphere.columns.config) } : {}),
+    ...(atmosphere.columns ? { column: columnRequest(atmosphere.columns.config) } : {}),
     ...(atmosphere.clouds ? { cloud_formation: clone(atmosphere.clouds.config) } : {}),
     ...(atmosphere.precipitation ? { precipitation: clone(atmosphere.precipitation.config) } : {}),
+    ...(atmosphere.surface && atmosphere.surface.source?.land?.kind === 'straight_coast' ? { surface: { land: { coast_east_m: atmosphere.surface.source.land.coast_east_m, land_side: atmosphere.surface.source.land.land_side }, sea_surface_temperature_k: { background: atmosphere.surface.source.sea_surface_temperature.background, gradient_north_k_per_m: atmosphere.surface.source.sea_surface_temperature.gradient_north_k_per_m } } } : {}),
+    ...(atmosphere.storms ? { storms: { seeds: clone(atmosphere.storms.config.seeds) } } : {}),
+    ...(atmosphere.severe ? { severe: {} } : {}),
     snapshot_every_steps: r.snapshot_every_steps ?? r.time.steps,
   }
 }
@@ -235,7 +269,21 @@ export function checkCoupledRequest(request) {
     fail(!finite(pr.lightning_top_temperature_k) || pr.lightning_top_temperature_k < 273.15, 'Lightning needs a cloud-top limit below 0 °C (273.15 K).')
     for (const key of ['stratiform_efficiency', 'convective_efficiency', 'convective_updraft_fraction', 'updraft_parcel_factor', 'virga_surface_rh']) fail(!finite(pr[key]) || pr[key] <= 1, `${key} must not exceed 1.`)
   }
+  const sf = request.surface, stm = request.storms
+  if (stm !== undefined) fail(sf !== undefined && col !== undefined, 'Storm systems require the surface and column sections.')
+  if (sf !== undefined) {
+    fail(finite(sf.sea_surface_temperature_k?.background) && sf.sea_surface_temperature_k.background > 0, 'Sea-surface temperature must be positive.')
+    fail(['west', 'east'].includes(sf.land?.land_side) && finite(sf.land?.coast_east_m), 'Coastline needs a finite position and a land side.')
+  }
+  if (stm !== undefined) for (const seed of stm.seeds ?? []) fail(finite(seed.east_m) && finite(seed.north_m) && finite(seed.max_wind_m_s) && seed.max_wind_m_s > 0 && finite(seed.radius_max_wind_m) && seed.radius_max_wind_m > 0, 'Storm seeds need a finite position, positive wind and radius.')
+  if (request.severe !== undefined) fail(cf !== undefined, 'Severe convection requires cloud formation.')
+  if (col?.inversion_strength_k !== undefined) fail(col.inversion_strength_k >= 0 && col.inversion_depth_m > 0 && col.inversion_base_m >= 0, 'An inversion needs a positive depth and non-negative base and strength.')
   if (errors.length) return { errors, warnings, estimates }
+  if (stm !== undefined && sf !== undefined) {
+    const phi = g.geographic_anchor_latitude_deg * Math.PI / 180
+    if (Math.abs(2 * EARTH_OMEGA * Math.sin(phi)) < 2.5e-5) warnings.push('Within about 10° of the equator the Coriolis parameter is too weak for tropical cyclones to spin up.')
+    if (sf.sea_surface_temperature_k.background < 299.65) warnings.push('Sea-surface temperature below 26.5 °C: no potential intensity, storms will not intensify.')
+  }
   if (col !== undefined) {
     estimates.column_top_m = col.layer_count * col.layer_thickness_m
     // Dry-adiabatic reference: the troposphere is stable when the lapse rate is below g / c_p.
@@ -335,6 +383,9 @@ export function validateCoupledAtmosphere(atmosphere, frames) {
   if (a.columns !== undefined) validateColumnDiagnostics(a.columns, frames)
   if (a.clouds !== undefined) validateCloudFormation(a.clouds, frames)
   if (a.precipitation !== undefined) { check(a.clouds !== undefined, 'Precipitation outcomes require the clouds block.'); validatePrecipitation(a.precipitation, frames) }
+  if (a.surface !== undefined) validateSurface(a.surface, frames)
+  if (a.storms !== undefined) { check(a.surface !== undefined, 'Storm systems require the surface block.'); validateStormSystems(a.storms, frames) }
+  if (a.severe !== undefined) { check(a.clouds !== undefined, 'Severe convection requires the clouds block.'); validateSevereConvection(a.severe, frames) }
   return a
 }
 
@@ -344,6 +395,7 @@ export function validateColumnDiagnostics(columns, frames) {
   check(c?.schema_version === 'terraflux.weather.column_diagnostics/v1' && c.method === 'hydrostatic_layers_convective_adjustment_surface_parcel', 'Unsupported column diagnostics contract.')
   const cfg = c.config
   check(cfg && Number.isInteger(cfg.layer_count) && cfg.layer_count >= 2 && finite(cfg.layer_thickness_m) && cfg.layer_thickness_m > 0 && finite(cfg.environment_lapse_rate_k_m) && finite(cfg.tropopause_height_m) && finite(cfg.humidity_scale_height_m) && cfg.humidity_scale_height_m > 0 && finite(cfg.parcel_step_m) && cfg.parcel_step_m > 0, 'Invalid column configuration.')
+  check(['inversion_base_m', 'inversion_depth_m', 'inversion_strength_k', 'lapse_rate_above_inversion_k_m'].every(k => cfg[k] === undefined || finite(cfg[k])), 'Invalid inversion configuration.')
   check(Array.isArray(c.column_mass_kg_m2) && c.column_mass_kg_m2.length === count && c.column_mass_kg_m2.every(v => finite(v) && v > 0), 'Invalid column mass field.')
   check(Array.isArray(c.top_pressure_pa) && c.top_pressure_pa.length === count && c.top_pressure_pa.every(v => finite(v) && v > 0), 'Invalid column top pressure field.')
   for (const key of ['lcl_height_m_by_frame', 'lfc_height_m_by_frame', 'equilibrium_level_m_by_frame', 'cape_j_kg_by_frame', 'cin_j_kg_by_frame', 'convective_potential_by_frame', 'condensed_water_kg_m2_by_frame']) check(Array.isArray(c[key]) && c[key].length === frames.length, `Column ${key} frame count mismatch.`)

@@ -19430,7 +19430,11 @@
     "environment_lapse_rate_k_m": 0.0065,
     "tropopause_height_m": 11000.0,
     "humidity_scale_height_m": 2500.0,
-    "parcel_step_m": 50.0
+    "parcel_step_m": 50.0,
+    "inversion_base_m": 0.0,
+    "inversion_depth_m": 0.0,
+    "inversion_strength_k": 0.0,
+    "lapse_rate_above_inversion_k_m": -1.0
    },
    "column_mass_kg_m2": [
     8435.306309617363,

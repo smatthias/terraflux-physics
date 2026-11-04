@@ -1,6 +1,7 @@
 // Cloud formation view support: validation of the documented
 // terraflux.weather.cloud_formation/v1 block, a synthetic mock in the same
 // format, categorical styling and per-frame metrics. No physics runs here.
+import { mockStormBlocks } from './stormSystems.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 
@@ -176,6 +177,7 @@ export function cloudFormationDemo() {
       pressure_pa: pressure, coriolis_parameter_s: coriolis, specific_humidity_kg_kg_by_frame: humidity, relative_humidity_pct_by_frame: rh, air_density_kg_m3_by_frame: density, supersaturated_cells_by_frame: supersaturated, scalar_stability_number_by_frame: stability,
       clouds: { schema_version: 'terraflux.weather.cloud_formation/v1', method: 'frontal_convergence_overrunning_heated_parcel_convection', source_kind: 'synthetic', config, frames: cloudFrames },
       precipitation: { schema_version: 'terraflux.weather.precipitation_outcomes/v1', method: 'genus_condensation_rate_wet_bulb_phase_updraft_hail', source_kind: 'synthetic', config: pconfig, frames: precipitationFrames },
+      ...mockStormBlocks(frames, grid),
     },
   }
 }

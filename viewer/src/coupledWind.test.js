@@ -83,6 +83,29 @@ test('cloud formation example round-trips through the editor with air masses and
   assert.deepEqual(requestFromCoupledAtmosphere(fixture.coupled_atmosphere, frames), request)
 })
 
+test('hurricane and tornado examples round-trip through the editor', () => {
+  for (const name of ['hurricane-landfall-request.json', 'tornado-outbreak-request.json']) {
+    const request = JSON.parse(readFileSync(join(root, 'examples', name), 'utf8'))
+    const form = formFromRequest(request)
+    assert.deepEqual(formToRequest(form), request, name)
+    assert.deepEqual(checkCoupledRequest(request).errors, [], name)
+  }
+  const hurricane = JSON.parse(readFileSync(join(root, 'examples', 'hurricane-landfall-request.json'), 'utf8'))
+  const form = formFromRequest(hurricane)
+  assert.equal(form.surface_enabled, true); assert.equal(form.storms_enabled, true); assert.equal(form.storm_seeds.length, 2); assert.equal(form.severe_enabled, true); assert.equal(form.inversion_enabled, false)
+  const tornado = formFromRequest(JSON.parse(readFileSync(join(root, 'examples', 'tornado-outbreak-request.json'), 'utf8')))
+  assert.equal(tornado.inversion_enabled, true); assert.equal(tornado.inversion_strength_k, 1)
+  const fixture = JSON.parse(readFileSync(join(root, 'viewer', 'public', 'hurricane', 'engine-timeline.json'), 'utf8'))
+  const frames = validateSequence(fixture)
+  assert.deepEqual(requestFromCoupledAtmosphere(fixture.coupled_atmosphere, frames), hurricane)
+  const equatorial = JSON.parse(JSON.stringify(hurricane)); equatorial.grid.geographic_anchor_latitude_deg = 3
+  assert.ok(checkCoupledRequest(equatorial).warnings.some(w => /equator/.test(w)))
+  const cold = JSON.parse(JSON.stringify(hurricane)); cold.surface.sea_surface_temperature_k.background = 295
+  assert.ok(checkCoupledRequest(cold).warnings.some(w => /26.5/.test(w)))
+  const noSurface = JSON.parse(JSON.stringify(hurricane)); delete noSurface.surface
+  assert.match(checkCoupledRequest(noSurface).errors.join(' '), /require the surface/)
+})
+
 test('engine fixture validates as a coupled timeline and round-trips its request', () => {
   const frames = validateSequence(fixture())
   assert.equal(frames.length, 7)
