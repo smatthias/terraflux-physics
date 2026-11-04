@@ -80,6 +80,12 @@ The precipitation outcomes suite (`weather.precipitation_outcomes`, plus the pre
 - a pinned regression (12 × 10 baroclinic scenario at 6 K and 0 K heating): type and intensity counts, totals and selected cell values
 - configuration and input rejections
 
+The storm systems suite (`weather.storm_systems`, plus `weather.storm_systems_cli` covering the hurricane and tornado examples) covers: MPI/GPI/Holland/surge/category/Kaplan–DeMaria references; the environment over sea, land and near the equator with solid-body vorticity and baroclinic shear; monotonic intensification to the potential intensity; landfall event, reduction and exact inland decay; Fujiwhara rotation sense in both hemispheres; merger of overlapping cores; genesis only in favourable environments; Rankine/Holland/rain/surge fields; rejections.
+
+The severe convection suite (`weather.severe_convection`) covers: STP reference values and clamps; the capping inversion raising CIN and storing CAPE until heating breaks the cap; helicity sign and Bunkers deviation mirrored between hemispheres; deep shear equal to the Ekman shear plus the thermal wind; tornado potential requiring strong flow and released convection; rejections. The column suite also covers the inversion profile.
+
+The orography suite (`weather.orography`, plus `weather.orography_cli` covering the Alps and Rockies examples) covers: the exact dry adiabatic rate for unsaturated slope flow and descent, the moist rate with condensation for saturated ascent; the foehn across a 2 km ridge (windward precipitation, moist-rate cooling, 4–9 K lee warming, drying, flag); orientation-controlled Froude blocking (north–south range blocked with a barrier jet, east–west range untouched, fast flow unblocked); nocturnal cold pools in a basin and their daytime erosion; the diurnal tendency helper and rejections; a pinned regression.
+
 Build and run the registered CTest case with:
 
 ~~~sh

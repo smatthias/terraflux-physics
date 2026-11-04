@@ -193,6 +193,19 @@ void validate_column_config(const ColumnConfig& config) {
     if (config.parcel_step_m <= 0.0 || config.parcel_step_m > config.layer_thickness_m) {
         throw std::invalid_argument("parcel step must be positive and no larger than the layer thickness");
     }
+    require_finite(config.inversion_base_m, "inversion base must be finite");
+    require_finite(config.inversion_depth_m, "inversion depth must be finite");
+    require_finite(config.inversion_strength_k, "inversion strength must be finite");
+    if (config.inversion_base_m < 0.0 || config.inversion_depth_m < 0.0 || config.inversion_strength_k < 0.0) {
+        throw std::invalid_argument("inversion base, depth and strength must not be negative");
+    }
+    if (config.inversion_strength_k > 0.0 && config.inversion_depth_m <= 0.0) {
+        throw std::invalid_argument("an inversion needs a positive depth");
+    }
+    require_finite(config.lapse_rate_above_inversion_k_m, "lapse rate above the inversion must be finite");
+    if (config.lapse_rate_above_inversion_k_m > 0.05) {
+        throw std::invalid_argument("lapse rate above the inversion must not exceed 0.05 K/m");
+    }
 }
 
 void validate_column(const AtmosphericColumn& c) {
@@ -240,8 +253,20 @@ AtmosphericColumn build_hydrostatic_column(
         throw std::invalid_argument("surface specific humidity must be within [0, 1)");
     }
     const auto environment_t = [&](double z) {
-        return surface_temperature_k -
-               config.environment_lapse_rate_k_m * std::min(z, config.tropopause_height_m);
+        const double zc = std::min(z, config.tropopause_height_m);
+        if (config.inversion_strength_k <= 0.0) {
+            return surface_temperature_k - config.environment_lapse_rate_k_m * zc;
+        }
+        // Capping inversion: below the base the environment lapse applies,
+        // through the layer the temperature rises by the strength, above it
+        // the (steeper) elevated-mixed-layer lapse rate applies.
+        const double base = config.inversion_base_m, top = base + config.inversion_depth_m;
+        const double above = config.lapse_rate_above_inversion_k_m < 0.0
+                                 ? config.environment_lapse_rate_k_m : config.lapse_rate_above_inversion_k_m;
+        const double t_base = surface_temperature_k - config.environment_lapse_rate_k_m * std::min(base, zc);
+        if (zc <= base) return t_base;
+        if (zc <= top) return t_base + config.inversion_strength_k * (zc - base) / config.inversion_depth_m;
+        return t_base + config.inversion_strength_k - above * (zc - top);
     };
     const auto environment_q = [&](double z) {
         return surface_specific_humidity_kg_kg * std::exp(-z / config.humidity_scale_height_m);

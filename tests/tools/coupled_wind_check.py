@@ -95,7 +95,7 @@ print('coupled wind CLI and fixture checks passed')
 # low carrying the only convective potential at the start.
 columns = atmosphere['columns']
 assert columns['schema_version'] == 'terraflux.weather.column_diagnostics/v1'
-assert columns['config'] == request['column']
+assert columns['config'] == dict(request['column'], inversion_base_m=0.0, inversion_depth_m=0.0, inversion_strength_k=0.0, lapse_rate_above_inversion_k_m=-1.0)
 assert len(columns['column_mass_kg_m2']) == count and all(m > 0 for m in columns['column_mass_kg_m2'])
 assert all(0 < p < 30000 for p in columns['top_pressure_pa'])
 for key in ('lcl_height_m_by_frame', 'lfc_height_m_by_frame', 'equilibrium_level_m_by_frame', 'cape_j_kg_by_frame',

@@ -49,6 +49,17 @@ struct ColumnConfig {
     double humidity_scale_height_m{2500.0};
     // Vertical step of the parcel integration.
     double parcel_step_m{50.0};
+    // Optional temperature inversion (capping layer): between
+    // inversion_base_m and inversion_base_m + inversion_depth_m the
+    // temperature rises by inversion_strength_k instead of falling; the
+    // environment above is warmer by the same amount ("loaded gun" profile
+    // that stores convective energy behind a cap). Zero strength disables it.
+    double inversion_base_m{0.0};
+    double inversion_depth_m{0.0};
+    double inversion_strength_k{0.0};
+    // Lapse rate above the inversion (elevated mixed layer); negative means
+    // "same as the environment lapse rate".
+    double lapse_rate_above_inversion_k_m{-1.0};
 };
 
 struct AtmosphericColumn {

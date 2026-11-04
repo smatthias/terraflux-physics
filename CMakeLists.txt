@@ -22,6 +22,8 @@ add_library(terraflux_weather_map
     src/weather/atmospheric_column.cpp
     src/weather/cloud_formation.cpp
     src/weather/precipitation_outcomes.cpp
+    src/weather/storm_systems.cpp
+    src/weather/severe_convection.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -163,6 +165,19 @@ if(BUILD_TESTING)
     add_executable(terraflux-precipitation-outcomes-test tests/weather/precipitation_outcomes_test.cpp)
     target_link_libraries(terraflux-precipitation-outcomes-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.precipitation_outcomes COMMAND terraflux-precipitation-outcomes-test)
+    add_executable(terraflux-storm-systems-test tests/weather/storm_systems_test.cpp)
+    target_link_libraries(terraflux-storm-systems-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.storm_systems COMMAND terraflux-storm-systems-test)
+    add_executable(terraflux-severe-convection-test tests/weather/severe_convection_test.cpp)
+    target_link_libraries(terraflux-severe-convection-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.severe_convection COMMAND terraflux-severe-convection-test)
+    add_test(NAME weather.storm_systems_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/storm_systems_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-orography-test tests/weather/orography_test.cpp)
+    target_link_libraries(terraflux-orography-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.orography COMMAND terraflux-orography-test)
+    add_test(NAME weather.orography_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/orography_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -207,6 +222,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-atmospheric-column-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-cloud-formation-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-precipitation-outcomes-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-storm-systems-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-severe-convection-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-orography-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

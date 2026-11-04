@@ -25,6 +25,9 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/column-run-v1.schema.json` and `column-profile-v1.schema.json` — column run request and profile output schemas
 - `docs/weather/coriolis-verification.md` — review of Coriolis direction and pressure-gradient acceleration conventions with the verification cases
 - `docs/weather/cloud-formation-model.md` and `cloud-formation-v1.schema.json` — fronts (cold/warm/stationary), frontal and convective cloud, thunderstorms; the documented output format accepted from the engine or from mocks
+- `docs/weather/storm-systems-model.md`, `storm-systems-v1.schema.json` and `surface-v1.schema.json` — tropical cyclones: potential intensity from humid air over a warm sea, genesis index, Fujiwhara interaction and mergers, landfall with surge and inland decay
+- `docs/weather/severe-convection-model.md` and `severe-convection-v1.schema.json` — capping temperature inversions, low-level shear and helicity, the Significant Tornado Parameter
+- `docs/weather/orography-model.md` and `orography-v1.schema.json` — mountains and valleys: ridge orientation as a weather border, Froude blocking and barrier jets, foehn (moist ascent ~0.6 K/100 m, dry descent ~1 K/100 m), orographic precipitation, valley cold-air pools
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -138,6 +141,28 @@ CTest runs the regeneration check. The comparison allows relative floating-point
 ### Weather map view
 
 **Weather map** (scene header) switches from the field explorer to a flat map with layers that can be toggled independently in **01b / Weather map layers**: base field (temperature / surface pressure / none), isobars at 1, 2 or 4 hPa with labels, fronts, cloud cover by genus, 3D cloud volumes, precipitation rate shading, precipitation symbols, ⚡/◆ hazard markers and wind vectors. The legend follows the active layers. It works for any coupled timeline; cloud and precipitation layers need the cloud formation example or mock.
+
+### Hurricanes, mergers, landfall and tornadoes
+
+With `surface` (coastline, sea-surface temperature) and `storms` sections the coupled CLI tracks tropical cyclones as objects: their energy is Emanuel's potential intensity from the enthalpy of saturated air at the sea surface versus the boundary layer; genesis follows the Emanuel–Nolan index (vorticity, mid-level humidity, potential intensity, shear); storms move with the steering flow and beta drift, rotate around each other through their induced winds (Fujiwhara) and merge when their cores overlap; at landfall the wind drops, a surge estimate is recorded and the storm decays by Kaplan–DeMaria. A `severe` section with a `column` inversion adds tornado potential: the capping inversion stores CAPE until heating breaks it, the Ekman turning of the surface wind supplies low-level helicity, and the Significant Tornado Parameter classifies the environment. See [storm systems](docs/weather/storm-systems-model.md) and [severe convection](docs/weather/severe-convection-model.md).
+
+```sh
+./build/terraflux-run-coupled-wind examples/hurricane-landfall-request.json hurricane.json
+./build/terraflux-run-coupled-wind examples/tornado-outbreak-request.json tornado.json
+```
+
+**Load hurricane landfall example** opens the committed run on the weather map with cyclone centres, category colours, tracks, landfall/merger/genesis markers, the storm wind field, coastal surge and land/sea as switchable layers; the field explorer adds storm wind, potential intensity, genesis index, surge, tornado parameter and helicity layers, and the request editor has the coastline, sea temperature, storm seeds, severe toggle and inversion fields.
+
+### Mountains: orientation, foehn and cold-air pools
+
+An `orography` section gives the coupled layer terrain (per cell, or synthetic ridges with an explicit axis orientation plus basins). Air moving along slopes changes temperature at the adiabatic rates — saturated ascent at the moist rate (about 0.6 K/100 m for cool air, computed from the thermodynamics), descent at the dry rate (about 1 K/100 m) — so a ridge crossing produces orographic precipitation on the windward side and the **foehn** (warm, dry) on the lee. Flow that cannot climb a range is blocked according to the cross-barrier Froude number and deflected along it, so a north–south range (Rockies) blocks zonal flow while an east–west range (Alps) blocks the north–south exchange; flow parallel to a ridge is untouched. A diurnal surface cycle enhanced in valleys lets cold air pool in basins at night. See [orography](docs/weather/orography-model.md).
+
+```sh
+./build/terraflux-run-coupled-wind examples/alps-foehn-request.json alps.json
+./build/terraflux-run-coupled-wind examples/rockies-barrier-request.json rockies.json
+```
+
+**Load Alps foehn example** opens the weather map on a hillshaded 3D relief with lifting, foehn, cold-pool, orographic-precipitation and blocking layers; the editor builds ridges by orientation.
 
 ### Timeline playback
 

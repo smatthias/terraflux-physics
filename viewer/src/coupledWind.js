@@ -5,6 +5,7 @@
 import { validateCloudFormation } from './cloudFormation.js'
 import { validatePrecipitation } from './weatherMap.js'
 import { validateSurface, validateStormSystems, validateSevereConvection } from './stormSystems.js'
+import { validateOrography } from './orography.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 const clone = value => JSON.parse(JSON.stringify(value))
@@ -35,6 +36,14 @@ export const PRECIP_CONFIG_KEYS = [
   ['virga_min_base_m', 'Virga minimum base m', 2000], ['minimum_rate_mm_h', 'Minimum reported rate mm/h', 0.05],
 ]
 export const defaultPrecipConfig = () => Object.fromEntries(PRECIP_CONFIG_KEYS.map(([k, , v]) => [k, v]))
+// Orography process parameters edited in the request form.
+export const OROGRAPHY_KEYS = [
+  ['blocking_time_scale_s', 'Blocking time scale s', 1800], ['obstacle_radius_m', 'Obstacle look-ahead radius m', 200000],
+  ['influence_radius_m', 'Valley neighbourhood radius m', 100000], ['brunt_vaisala_s', 'Stability N 1/s', 0.01],
+  ['boundary_layer_depth_m', 'Boundary-layer depth m', 1500], ['daytime_heating_k_per_s', 'Daytime heating K/s', 0],
+  ['nocturnal_cooling_k_per_s', 'Nocturnal cooling K/s', 0], ['diurnal_phase_seconds', 'Sunrise offset s', 0],
+  ['valley_pooling_per_km', 'Valley pooling per km depth', 1], ['initial_lapse_rate_k_m', 'Initial lapse rate K/m', 0.0065],
+]
 const EARTH_OMEGA = 7.2921159e-5, EARTH_RADIUS = 6371000
 
 // Form model: pressure centers carry co-located temperature and humidity
@@ -55,6 +64,8 @@ export function defaultCoupledForm() {
     inversion_enabled: false, inversion_base_m: 1500, inversion_depth_m: 500, inversion_strength_k: 1, lapse_rate_above_inversion_k_m: 0.0085,
     surface_enabled: false, coast_east_m: -200000, land_side: 'west', sea_surface_temperature_k: 302.5, sst_gradient_north_k_per_m: 0,
     storms_enabled: false, storm_seeds: [], severe_enabled: false,
+    orography_enabled: false, terrain_base_elevation_m: 400, ridges: [], basins: [],
+    orography: { blocking_time_scale_s: 1800, obstacle_radius_m: 200000, influence_radius_m: 100000, brunt_vaisala_s: 0.01, boundary_layer_depth_m: 1500, daytime_heating_k_per_s: 0, nocturnal_cooling_k_per_s: 0, diurnal_phase_seconds: 0, valley_pooling_per_km: 1, initial_lapse_rate_k_m: 0.0065 },
     airmasses: [],
     centers: [
       { kind: 'high', east_m: -300000, north_m: -40000, radius_m: 350000, pressure_anomaly_pa: 800, temperature_anomaly_k: -4, humidity_anomaly_kg_kg: -0.003 },
@@ -78,6 +89,7 @@ export function formToRequest(form) {
   const surface = form.surface_enabled ? { surface: { land: { coast_east_m: form.coast_east_m, land_side: form.land_side }, sea_surface_temperature_k: { background: form.sea_surface_temperature_k, gradient_north_k_per_m: form.sst_gradient_north_k_per_m } } } : {}
   const storms = form.surface_enabled && form.column_enabled && form.storms_enabled ? { storms: { seeds: form.storm_seeds.map(x => ({ east_m: x.east_m, north_m: x.north_m, max_wind_m_s: x.max_wind_m_s, radius_max_wind_m: x.radius_max_wind_m })) } } : {}
   const severe = form.cloud_enabled && form.severe_enabled ? { severe: {} } : {}
+  const orography = form.orography_enabled ? { orography: { terrain: { base_elevation_m: form.terrain_base_elevation_m, ridges: form.ridges.map(r => ({ orientation_deg: r.orientation_deg, center_east_m: r.center_east_m, center_north_m: r.center_north_m, height_m: r.height_m, half_width_m: r.half_width_m, length_m: r.length_m })), basins: form.basins.map(b => ({ center_east_m: b.center_east_m, center_north_m: b.center_north_m, depth_m: b.depth_m, radius_m: b.radius_m })) }, ...Object.fromEntries(OROGRAPHY_KEYS.map(([k]) => [k, form.orography[k]])) } } : {}
   return {
     schema_version: 'terraflux.weather.coupled-wind-run/v1',
     time: { start_time_utc: form.start_time_utc, timestep_seconds: form.timestep_seconds, steps: form.steps },
@@ -98,6 +110,7 @@ export function formToRequest(form) {
     ...column,
     ...cloud,
     ...precip,
+    ...orography,
     ...surface,
     ...storms,
     ...severe,
@@ -132,6 +145,8 @@ export function formFromRequest(request) {
   const stm = request.storms
   if (stm !== undefined) check(Object.keys(stm).length === 1 && Array.isArray(stm.seeds), 'The editor represents storm seeds with default storm physics only.')
   if (request.severe !== undefined) check(Object.keys(request.severe).length === 0, 'The editor represents default severe-convection settings only.')
+  const og = request.orography
+  if (og !== undefined) check(og.terrain?.ridges !== undefined && og.terrain.base_elevation_m !== undefined && OROGRAPHY_KEYS.every(([k]) => finite(og[k])) && Object.keys(og).length === OROGRAPHY_KEYS.length + 1, 'The editor represents synthetic ridges/basins terrain with every orography parameter only.')
   const g = request.grid
   check(g.origin_east_m === -0.5 * g.nx * g.spacing_east_m && g.origin_north_m === -0.5 * g.ny * g.spacing_north_m, 'The editor centers the grid on the geographic anchor.')
   return {
@@ -157,6 +172,10 @@ export function formFromRequest(request) {
     sea_surface_temperature_k: sf?.sea_surface_temperature_k.background ?? 302.5, sst_gradient_north_k_per_m: sf?.sea_surface_temperature_k.gradient_north_k_per_m ?? 0,
     storms_enabled: stm !== undefined, storm_seeds: (stm?.seeds ?? []).map(x => ({ east_m: x.east_m, north_m: x.north_m, max_wind_m_s: x.max_wind_m_s, radius_max_wind_m: x.radius_max_wind_m ?? 40000 })),
     severe_enabled: request.severe !== undefined,
+    orography_enabled: og !== undefined, terrain_base_elevation_m: og?.terrain.base_elevation_m ?? 400,
+    ridges: (og?.terrain.ridges ?? []).map(r => ({ orientation_deg: r.orientation_deg, center_east_m: r.center_east_m, center_north_m: r.center_north_m, height_m: r.height_m, half_width_m: r.half_width_m, length_m: r.length_m })),
+    basins: (og?.terrain.basins ?? []).map(b => ({ center_east_m: b.center_east_m, center_north_m: b.center_north_m, depth_m: b.depth_m, radius_m: b.radius_m })),
+    orography: og ? Object.fromEntries(OROGRAPHY_KEYS.map(([k]) => [k, og[k]])) : Object.fromEntries(OROGRAPHY_KEYS.map(([k, , v]) => [k, v])),
     airmasses: ta.slice(centers.length).map((a, i) => ({ east_m: a.east_m, north_m: a.north_m, radius_m: a.radius_m, temperature_anomaly_k: a.amplitude, humidity_anomaly_kg_kg: qa[centers.length + i].amplitude })),
     centers: centers.map((c, i) => ({ kind: c.kind, east_m: c.east_m, north_m: c.north_m, radius_m: c.radius_m, pressure_anomaly_pa: c.pressure_anomaly_pa, temperature_anomaly_k: ta[i].amplitude, humidity_anomaly_kg_kg: qa[i].amplitude })),
   }
@@ -192,6 +211,7 @@ export function requestFromCoupledAtmosphere(atmosphere, frames) {
     ...(atmosphere.clouds ? { cloud_formation: clone(atmosphere.clouds.config) } : {}),
     ...(atmosphere.precipitation ? { precipitation: clone(atmosphere.precipitation.config) } : {}),
     ...(atmosphere.surface && atmosphere.surface.source?.land?.kind === 'straight_coast' ? { surface: { land: { coast_east_m: atmosphere.surface.source.land.coast_east_m, land_side: atmosphere.surface.source.land.land_side }, sea_surface_temperature_k: { background: atmosphere.surface.source.sea_surface_temperature.background, gradient_north_k_per_m: atmosphere.surface.source.sea_surface_temperature.gradient_north_k_per_m } } } : {}),
+    ...(atmosphere.orography && atmosphere.orography.config.terrain.kind === 'synthetic_ridges_and_basins' ? { orography: { terrain: { base_elevation_m: atmosphere.orography.config.terrain.base_elevation_m, ridges: clone(atmosphere.orography.config.terrain.ridges), basins: clone(atmosphere.orography.config.terrain.basins) }, ...Object.fromEntries(OROGRAPHY_KEYS.map(([k]) => [k, atmosphere.orography.config[k]])) } } : {}),
     ...(atmosphere.storms ? { storms: { seeds: clone(atmosphere.storms.config.seeds) } } : {}),
     ...(atmosphere.severe ? { severe: {} } : {}),
     snapshot_every_steps: r.snapshot_every_steps ?? r.time.steps,
@@ -277,6 +297,14 @@ export function checkCoupledRequest(request) {
   }
   if (stm !== undefined) for (const seed of stm.seeds ?? []) fail(finite(seed.east_m) && finite(seed.north_m) && finite(seed.max_wind_m_s) && seed.max_wind_m_s > 0 && finite(seed.radius_max_wind_m) && seed.radius_max_wind_m > 0, 'Storm seeds need a finite position, positive wind and radius.')
   if (request.severe !== undefined) fail(cf !== undefined, 'Severe convection requires cloud formation.')
+  const og = request.orography
+  if (og !== undefined) {
+    for (const [key, label] of OROGRAPHY_KEYS) fail(finite(og[key]), `${label} must be a finite number.`)
+    fail(!finite(og.blocking_time_scale_s) || og.blocking_time_scale_s >= t.timestep_seconds, 'The blocking time scale must be at least one timestep.')
+    fail(!finite(og.brunt_vaisala_s) || og.brunt_vaisala_s > 0, 'The stability frequency must be positive.')
+    for (const r of og.terrain?.ridges ?? []) fail(finite(r.orientation_deg) && finite(r.height_m) && r.half_width_m > 0 && r.length_m > 0, 'Ridges need an orientation, height, positive half width and length.')
+    for (const b of og.terrain?.basins ?? []) fail(finite(b.depth_m) && b.radius_m > 0, 'Basins need a depth and a positive radius.')
+  }
   if (col?.inversion_strength_k !== undefined) fail(col.inversion_strength_k >= 0 && col.inversion_depth_m > 0 && col.inversion_base_m >= 0, 'An inversion needs a positive depth and non-negative base and strength.')
   if (errors.length) return { errors, warnings, estimates }
   if (stm !== undefined && sf !== undefined) {
@@ -386,6 +414,7 @@ export function validateCoupledAtmosphere(atmosphere, frames) {
   if (a.surface !== undefined) validateSurface(a.surface, frames)
   if (a.storms !== undefined) { check(a.surface !== undefined, 'Storm systems require the surface block.'); validateStormSystems(a.storms, frames) }
   if (a.severe !== undefined) { check(a.clouds !== undefined, 'Severe convection requires the clouds block.'); validateSevereConvection(a.severe, frames) }
+  if (a.orography !== undefined) validateOrography(a.orography, frames, frames[0].terrain)
   return a
 }
 

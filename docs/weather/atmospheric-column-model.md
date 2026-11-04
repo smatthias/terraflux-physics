@@ -46,6 +46,8 @@ The adjusted column is the environment used for the parcel ascent, and the conde
 | `tropopause_height_m` | isothermal above | 11 000 |
 | `humidity_scale_height_m` | `H_q` | 2500 |
 | `parcel_step_m` | ascent step, ≤ layer thickness | 50 |
+| `inversion_base_m`, `inversion_depth_m`, `inversion_strength_k` | optional capping inversion: temperature rises by the strength through the layer and the profile above keeps the offset | 0 (none) |
+| `lapse_rate_above_inversion_k_m` | lapse rate of the elevated mixed layer above the cap; negative = environment lapse rate | −1 |
 
 Validation rejects fewer than 2 layers, non-positive thickness or scale height, a lapse rate that drives the column below 0 K, a parcel step above the layer thickness, and surface states outside the moist-air ranges.
 

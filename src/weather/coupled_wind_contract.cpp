@@ -2,6 +2,8 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <string>
+#include <utility>
 
 namespace terraflux::weather {
 namespace {
@@ -42,6 +44,32 @@ void validate_coupled_wind_config(const CoupledWindConfig& config) {
     }
     if (config.density_mode != "diagnosed" && config.density_mode != "constant") {
         throw std::invalid_argument("density_mode must be diagnosed or constant");
+    }
+
+    const auto& o = config.orography;
+    if (o.enabled) {
+        if (o.elevation_m.size() != config.grid.nx * config.grid.ny) {
+            throw std::invalid_argument("orography elevation must match the grid cell count");
+        }
+        for (double h : o.elevation_m) {
+            require_finite(h, "orography elevation must be finite");
+        }
+        for (auto [value, name] : {std::pair{o.blocking_time_scale_s, "blocking time scale"}, std::pair{o.influence_radius_m, "influence radius"}, std::pair{o.obstacle_radius_m, "obstacle radius"},
+                                   std::pair{o.brunt_vaisala_s, "Brunt-Vaisala frequency"}, std::pair{o.boundary_layer_depth_m, "boundary layer depth"}}) {
+            if (!std::isfinite(value) || value <= 0.0) {
+                throw std::invalid_argument(std::string("orography ") + name + " must be positive");
+            }
+        }
+        for (auto [value, name] : {std::pair{o.daytime_heating_k_per_s, "daytime heating"}, std::pair{o.nocturnal_cooling_k_per_s, "nocturnal cooling"},
+                                   std::pair{o.valley_pooling_per_km, "valley pooling"}}) {
+            if (!std::isfinite(value) || value < 0.0) {
+                throw std::invalid_argument(std::string("orography ") + name + " must not be negative");
+            }
+        }
+        require_finite(o.diurnal_phase_seconds, "orography diurnal phase must be finite");
+        if (config.time.timestep_seconds > o.blocking_time_scale_s) {
+            throw std::invalid_argument("timestep must not exceed the orographic blocking time scale");
+        }
     }
 
     // Explicit momentum diffusion bound; the scalar bound also depends on the

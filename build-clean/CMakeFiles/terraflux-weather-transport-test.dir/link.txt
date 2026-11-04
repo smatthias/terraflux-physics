@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-weather-transport-test.dir/tests/weather/dry_scalar_transport_test.cpp.o -o terraflux-weather-transport-test  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 

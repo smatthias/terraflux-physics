@@ -352,7 +352,11 @@
             "environment_lapse_rate_k_m",
             "tropopause_height_m",
             "humidity_scale_height_m",
-            "parcel_step_m"
+            "parcel_step_m",
+            "inversion_base_m",
+            "inversion_depth_m",
+            "inversion_strength_k",
+            "lapse_rate_above_inversion_k_m"
           ],
           "properties": {
             "layer_count": {
@@ -384,6 +388,29 @@
               "exclusiveMinimum": 0,
               "default": 50,
               "description": "Vertical step of the parcel ascent; at most the layer thickness."
+            },
+            "inversion_base_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Base of a capping temperature inversion."
+            },
+            "inversion_depth_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0
+            },
+            "inversion_strength_k": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Temperature rise through the layer; 0 disables the inversion. The environment above keeps the offset (loaded-gun profile)."
+            },
+            "lapse_rate_above_inversion_k_m": {
+              "type": "number",
+              "maximum": 0.05,
+              "default": -1,
+              "description": "Lapse rate above the inversion (elevated mixed layer); negative = same as the environment."
             }
           },
           "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
@@ -493,6 +520,18 @@
     },
     "precipitation": {
       "$ref": "https://terraflux.example/schemas/weather/precipitation-outcomes-v1.json"
+    },
+    "surface": {
+      "$ref": "https://terraflux.example/schemas/weather/surface-v1.json"
+    },
+    "storms": {
+      "$ref": "https://terraflux.example/schemas/weather/storm-systems-v1.json"
+    },
+    "severe": {
+      "$ref": "https://terraflux.example/schemas/weather/severe-convection-v1.json"
+    },
+    "orography": {
+      "$ref": "https://terraflux.example/schemas/weather/orography-v1.json"
     }
   }
 }
