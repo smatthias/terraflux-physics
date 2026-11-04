@@ -1,5 +1,6 @@
 import { validateCoupledAtmosphere } from './coupledWind.js'
 import { validateHydrology } from './hydrology.js'
+import { validateOcean } from './ocean.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 export function validate(input) {
@@ -152,6 +153,10 @@ export function validateSequence(input) {
   if(input.hydrology !== undefined){
     check(input.terrain !== undefined, 'Catchment hydrology requires the terrain grid.')
     validateHydrology(input.hydrology, frames, frames[0].terrain)
+  }
+  if(input.ocean !== undefined){
+    check(input.terrain !== undefined, 'Ocean circulation requires the terrain grid.')
+    validateOcean(input.ocean, frames, frames[0].terrain)
   }
   if(input.terrain_derivatives !== undefined){
     const d=input.terrain_derivatives, count=first.grid.nx*first.grid.ny

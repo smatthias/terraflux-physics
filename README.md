@@ -29,6 +29,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/severe-convection-model.md` and `severe-convection-v1.schema.json` — capping temperature inversions, low-level shear and helicity, the Significant Tornado Parameter
 - `docs/weather/orography-model.md` and `orography-v1.schema.json` — mountains and valleys: ridge orientation as a weather border, Froude blocking and barrier jets, foehn (moist ascent ~0.6 K/100 m, dry descent ~1 K/100 m), orographic precipitation, valley cold-air pools
 - `docs/weather/catchment-hydrology-model.md`, `catchment-run-v1.schema.json` and `catchment-hydrology-v1.schema.json` — where the rain goes: depression-filled D8 drainage network with lakes, basins and ocean/edge outlets, snow → surface → soil → groundwater stores with Darcy flow and baseflow, kinematic overland/channel routing with bankfull overflow, and the hazard layer (flood depth × velocity classes, stream-power erosion/deposition, infinite-slope landslides with runout, rainfall intensity–duration warnings)
+- `docs/weather/ocean-circulation-model.md`, `ocean-run-v1.schema.json` and `ocean-circulation-v1.schema.json` — the ocean streams: a reduced-gravity upper layer on a β-plane (Sverdrup interior, Stommel western boundary current, separation and extension, subpolar gyre), salinity and temperature with density feedback, river exchange points with surface plumes and mixing fronts, deep-water formation and the overturning that fresh water weakens
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -172,6 +173,14 @@ An `orography` section gives the coupled layer terrain (per cell, or synthetic r
 ```sh
 ./build/terraflux-run-catchment-hydrology examples/alpine-flood-request.json flood.json
 ```
+
+`terraflux-run-ocean-circulation` takes a basin (continents from the synthetic terrain builder or a mask, optional sponge rows as an open-boundary proxy), the ocean layer and physics parameters, and a forcing (gyre, uniform or coupled-wind wind stress; surface-temperature targets with cold formation patches; net precipitation; rivers with constant, event-driven or catchment-fed discharge). It runs the reduced-gravity layer — the wind-stress curl drives a Sverdrup interior whose return is the western boundary current, density gradients and deep-water formation drive the overturning — and reports the streams (core streamlines, speed, transport in Sverdrups), the salinity at the surface and in the layer, the exchange points with their plumes, the mixing fronts and the formation sites, with closed volume and salt budgets. See [ocean-circulation-model.md](docs/weather/ocean-circulation-model.md).
+
+```sh
+./build/terraflux-run-ocean-circulation examples/atlantic-streams-request.json ocean.json
+```
+
+**Load Atlantic streams example** opens the **Ocean streams** view: water coloured by surface salinity (or speed, temperature, thermocline depth, freshwater fraction), streams sized by transport and coloured by speed with labels, current arrows, river mouths ⊕ with discharge and plume salinity, fronts, formation sites ⇩, and time series of the overturning, the main stream and the river input — the example's meltwater pulse collapses the overturning.
 
 **Load alpine flood example** opens the **Catchment** view (rivers sized by upstream area and coloured by discharge, lakes at their level, overland water, snow, rain; click a cell to trace its water to the outlet) and the **Hazards** view (flood classes, reaches above bankfull, erosion/deposition, landslides with runout, rainfall-threshold warnings); the field explorer adds discharge, soil saturation, water-table depth, snowpack, erosion, deposition, factor of safety and flood class, and the metrics panel shows the budget and a hydrograph at the peak or selected reach.
 

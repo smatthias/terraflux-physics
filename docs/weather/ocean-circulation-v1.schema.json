@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/ocean-circulation-v1.json",
+  "title": "TerraFlux ocean circulation v1 (ocean block of a timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "request",
+    "basin_source",
+    "forcing_source",
+    "snapshot_every_steps",
+    "ocean_mask",
+    "sponge",
+    "initial_volume_m3",
+    "initial_salt_kg",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.ocean.circulation/v1"
+    },
+    "method": {
+      "const": "reduced_gravity_c_grid_sverdrup_stommel_formation"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "time",
+        "grid",
+        "ocean",
+        "physics"
+      ]
+    },
+    "basin_source": {
+      "type": "object",
+      "required": [
+        "kind",
+        "sponge"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_ocean_mask",
+            "prescribed_cell_values",
+            "synthetic_ridges_and_basins"
+          ]
+        }
+      }
+    },
+    "forcing_source": {
+      "type": "object",
+      "required": [
+        "wind",
+        "surface_temperature",
+        "net_precipitation",
+        "rivers"
+      ]
+    },
+    "snapshot_every_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "ocean_mask": {
+      "type": "array",
+      "items": {
+        "type": "boolean"
+      }
+    },
+    "sponge": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "initial_volume_m3": {
+      "type": "number",
+      "description": "Upper-layer volume at frame 0; volume = initial + cumulative river + net precipitation + sponge in every frame.",
+      "minimum": 0
+    },
+    "initial_salt_kg": {
+      "type": "number",
+      "minimum": 0
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "elapsed_seconds",
+          "u_m_s",
+          "v_m_s",
+          "thickness_m",
+          "salinity_psu",
+          "surface_salinity_psu",
+          "temperature_k",
+          "sinking_m_s",
+          "front",
+          "stream_id",
+          "overturning_sv",
+          "mean_upwelling_m_s",
+          "river_input_m3_s",
+          "net_precipitation_m3_s",
+          "sponge_volume_m3_s",
+          "sponge_salt_kg_s",
+          "volume_m3",
+          "salt_kg",
+          "kinetic_energy_j",
+          "volume_balance_error_m3",
+          "salt_balance_error_kg",
+          "cumulative_m3",
+          "streams",
+          "exchange_points",
+          "formation_cells",
+          "formation_area_km2",
+          "mean_salinity_psu",
+          "min_salinity_psu",
+          "max_speed_m_s",
+          "stream_count"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "u_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Cell-centre east current; 0 on land."
+          },
+          "v_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "thickness_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Upper-layer thickness (thermocline depth)."
+          },
+          "salinity_psu": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 45
+            },
+            "description": "Bulk layer salinity."
+          },
+          "surface_salinity_psu": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 45
+            },
+            "description": "S (1 - F / h_mix): what plumes and fronts are diagnosed on."
+          },
+          "temperature_k": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "sinking_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Deep-water formation rate."
+          },
+          "front": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "Surface-salinity gradient above the front threshold."
+          },
+          "stream_id": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -1
+            }
+          },
+          "overturning_sv": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_upwelling_m_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "river_input_m3_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "net_precipitation_m3_s": {
+            "type": "number"
+          },
+          "sponge_volume_m3_s": {
+            "type": "number"
+          },
+          "sponge_salt_kg_s": {
+            "type": "number"
+          },
+          "volume_m3": {
+            "type": "number",
+            "minimum": 0
+          },
+          "salt_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "kinetic_energy_j": {
+            "type": "number",
+            "minimum": 0
+          },
+          "volume_balance_error_m3": {
+            "type": "number"
+          },
+          "salt_balance_error_kg": {
+            "type": "number"
+          },
+          "cumulative_m3": {
+            "type": "object",
+            "required": [
+              "river",
+              "net_precipitation",
+              "sinking",
+              "sponge"
+            ],
+            "properties": {
+              "river": {
+                "type": "number"
+              },
+              "net_precipitation": {
+                "type": "number"
+              },
+              "sinking": {
+                "type": "number"
+              },
+              "sponge": {
+                "type": "number"
+              }
+            }
+          },
+          "streams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "core_cell",
+                "cell_count",
+                "max_speed_m_s",
+                "mean_speed_m_s",
+                "transport_sv",
+                "mean_salinity_psu",
+                "mean_temperature_k",
+                "direction",
+                "path"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "core_cell": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "cell_count": {
+                  "type": "integer",
+                  "minimum": 2
+                },
+                "max_speed_m_s": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "mean_speed_m_s": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "transport_sv": {
+                  "type": "number",
+                  "description": "Across the section through the core, 1 Sv = 1e6 m3/s."
+                },
+                "mean_salinity_psu": {
+                  "type": "number"
+                },
+                "mean_temperature_k": {
+                  "type": "number"
+                },
+                "direction": {
+                  "enum": [
+                    "northward",
+                    "southward",
+                    "eastward",
+                    "westward"
+                  ]
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "description": "Core streamline in grid fractions, traced upstream and downstream from the core."
+                }
+              }
+            },
+            "description": "Sorted by transport, largest first."
+          },
+          "exchange_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "mouth_cell",
+                "discharge_m3_s",
+                "mouth_salinity_psu",
+                "minimum_salinity_psu",
+                "plume_area_km2",
+                "plume_freshwater_m3",
+                "plume_extent_km",
+                "deflection_deg"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "mouth_cell": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "discharge_m3_s": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "mouth_salinity_psu": {
+                  "type": "number",
+                  "description": "Surface salinity at the mouth.",
+                  "minimum": 0
+                },
+                "minimum_salinity_psu": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "plume_area_km2": {
+                  "type": "number",
+                  "description": "Surface water fresher than the reference by the deficit, connected to the mouth.",
+                  "minimum": 0
+                },
+                "plume_freshwater_m3": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "plume_extent_km": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "deflection_deg": {
+                  "type": "number",
+                  "description": "Bearing of the plume's freshwater centroid from the mouth, clockwise from north.",
+                  "minimum": 0,
+                  "exclusiveMaximum": 360
+                }
+              }
+            }
+          },
+          "formation_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "formation_area_km2": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_salinity_psu": {
+            "type": "number",
+            "minimum": 0
+          },
+          "min_salinity_psu": {
+            "type": "number",
+            "description": "Minimum surface salinity.",
+            "minimum": 0
+          },
+          "max_speed_m_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "stream_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
