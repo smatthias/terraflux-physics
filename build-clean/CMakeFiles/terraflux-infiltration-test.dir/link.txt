@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-infiltration-test.dir/tests/weather/infiltration_test.cpp.o -o terraflux-infiltration-test  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 
