@@ -10,7 +10,7 @@ The default command performs, in order:
 
 1. CMake configuration with BUILD_TESTING enabled and Release mode.
 2. C++ build.
-3. CTest, including kernel tests, gridding/composer integration, scenario validation, baseline/variant/outlet fixture regeneration, timestep sensitivity and basin checks. The ocean and polar fixture checks regenerate multi-year runs. `weather.viewer_polar_ocean` alone takes about 3.5 minutes; it carries the CTest label `slow`, so `ctest --test-dir build -LE slow` skips it in quick local loops.
+3. CTest, including kernel tests, gridding/composer integration, scenario validation, baseline/variant/outlet fixture regeneration, timestep sensitivity and basin checks. The ocean and polar fixture checks regenerate multi-year runs. `weather.viewer_polar_ocean` alone takes about 5 minutes; it carries the CTest label `slow`, so `ctest --test-dir build -LE slow` skips it in quick local loops.
 4. Python composer and verification-runner tests.
 5. Locked viewer installation with npm ci.
 6. Viewer data, comparison and CSV tests.

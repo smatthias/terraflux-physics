@@ -586,6 +586,74 @@ void glacial_meltwater_and_icebergs() {
     require(!d.lenses.empty() && d.lenses.front().kind == "glacial" && d.lenses.front().glacial_share > 0.99, "the lens is attributed to the glacier");
 }
 
+void sea_ice_drifts_with_wind_and_current() {
+    // Half-covered sea at its freezing point under air at the freezing point: little thermodynamics, an eastward wind.
+    auto c = polar_basin(seawater_freezing_point_k(34.0));
+    c.sea_ice.initial_thickness_m = 1.0;
+    c.sea_ice.initial_concentration = 0.5;
+    c.sea_ice.initial_band_k = 1.0;
+    auto f = polar_air(c, seawater_freezing_point_k(34.0), 0.0);
+    f.wind_speed_m_s.assign(49, 10.0);
+    f.wind_stress_east_pa.assign(49, 0.1);
+    // One step from rest: the ice moves at 2 % of the wind, turned 30 degrees to the right in the north, to the left
+    // in the south and not at all without rotation (the current after one step is a millimetre per second).
+    const std::size_t centre = 3 * 7 + 3;
+    for (double f0 : {1.3e-4, -1.3e-4, 0.0}) {
+        auto rot = c;
+        rot.physics.coriolis_mode = "prescribed";
+        rot.physics.coriolis_parameter_s = f0;
+        const auto s1 = advance_ocean(initialize_ocean(rot), f, rot);
+        const double expected_north = f0 > 0.0 ? -0.1 : f0 < 0.0 ? 0.1 : 0.0;
+        const double expected_east = f0 == 0.0 ? 0.2 : 0.2 * std::cos(kPi / 6.0);
+        require_near(s1.ice_drift_east_m_s[centre], expected_east, "Nansen drift: 2 % of the wind", 0.005);
+        require_near(s1.ice_drift_north_m_s[centre], expected_north, "turned right of the wind in the north, left in the south", 0.005);
+    }
+    // A week of wind: the ice piles up on the eastern coast and leaves open water in the west; the drift conserves
+    // the ice (the volume changes only by the thermodynamic growth).
+    auto s = initialize_ocean(c);
+    auto fixed = c;
+    fixed.sea_ice.drift = false;
+    auto still = initialize_ocean(fixed);
+    const double area = 60000.0 * 60000.0;
+    double grown = 0.0;
+    for (int k = 0; k < 24 * 7; ++k) {
+        const double before = s.ice_volume_m3;
+        s = advance_ocean(s, f, c);
+        still = advance_ocean(still, f, fixed);
+        double growth = 0.0;
+        for (double g : s.ice_growth_m_s) growth += g * 3600.0 * area;
+        grown += growth;
+        require_near(s.ice_volume_m3 - before, growth, "drift neither creates nor destroys ice", 1.0e-9 * before + 1.0);
+        require(std::abs(s.volume_balance_error_m3) < 1.0e-9 * s.volume_m3 && std::abs(s.heat_balance_error_j) < 1.0e-11 * s.volume_m3 * 1025.0 * 3990.0 * 300.0, "ocean budgets with drifting ice");
+        for (std::size_t i = 0; i < 49; ++i) require(s.ice_concentration[i] <= c.sea_ice.physics.maximum_concentration + 1.0e-12 && (c.ocean[i] || s.ice_concentration[i] == 0.0), "concentration capped, no ice on land");
+    }
+    const std::size_t west = 3 * 7 + 1, east = 3 * 7 + 5;
+    require(s.ice_concentration[east] > 0.95 && s.ice_concentration[west] < 0.25, "the wind packs the ice against the eastern coast and opens the west");
+    require(s.ice_thickness_m[east] > 1.2 && s.ice_thickness_m[east] <= c.sea_ice.maximum_ridge_thickness_m + 0.2, "converging ice ridges, up to the ridge thickness");
+    require(std::abs(still.ice_concentration[east] - still.ice_concentration[west]) < 0.01, "without drift the cover stays uniform");
+    require_near(s.ice_volume_m3 - initialize_ocean(c).ice_volume_m3, grown, "over the week the ice changed only by growth and melt", 1.0e-6 * s.ice_volume_m3);
+    // Without internal stress free drift would pile all the ice onto the coast; packed cells take no more.
+    auto strong = c;
+    strong.sea_ice.maximum_ridge_thickness_m = 1.5;
+    auto sp = initialize_ocean(strong);
+    for (int k = 0; k < 24 * 30; ++k) sp = advance_ocean(sp, f, strong);
+    require(sp.ice_thickness_m[east] < 1.5 + 0.3, "ridging stops at the ridge thickness (plus thermodynamic growth)");
+    require(sp.ice_concentration[east - 1] > 0.9, "the ice stops behind the packed coastal cell");
+    // Ice drifting onto warm water melts there (the export of fresh water to where the ice melts).
+    auto warm = c;
+    warm.initial_temperature_k = seawater_freezing_point_k(34.0);
+    warm.initial_surface_temperature_k.assign(49, seawater_freezing_point_k(34.0));
+    for (std::size_t i = 0; i < 49; ++i) if (i % 7 >= 4) warm.initial_surface_temperature_k[i] = 276.15;   // warm eastern half, ice-free at the start
+    auto sw = initialize_ocean(warm);
+    require(sw.ice_concentration[east] == 0.0 && sw.ice_concentration[west] > 0.0, "ice only over the cold western half");
+    double melt_east = 0.0;
+    for (int k = 0; k < 24 * 5; ++k) {
+        sw = advance_ocean(sw, f, warm);
+        for (std::size_t i = 0; i < 49; ++i) if (i % 7 >= 4) melt_east += -std::min(0.0, sw.ice_growth_m_s[i]) * 3600.0 * area;
+    }
+    require(melt_east > 0.0, "the drifting ice melts over the warm water");
+}
+
 void ocean_sea_ice_contract() {
     auto c = polar_basin(272.0);
     auto bad = c;
@@ -595,6 +663,10 @@ void ocean_sea_ice_contract() {
     require_rejected([&] { validate_ocean_config(bad); }, "sea-ice physics");
     bad = c; bad.sea_ice.initial_concentration = 1.5;
     require_rejected([&] { validate_ocean_config(bad); }, "initial concentration");
+    bad = c; bad.sea_ice.wind_drift_factor = 0.5;
+    require_rejected([&] { validate_ocean_config(bad); }, "wind drift factor");
+    bad = c; bad.sea_ice.maximum_ridge_thickness_m = 0.0;
+    require_rejected([&] { validate_ocean_config(bad); }, "ridge thickness");
     const auto s = initialize_ocean(c);
     auto f = polar_air(c, 260.0, 0.0);
     auto no_air = f;
@@ -630,6 +702,7 @@ int main() {
         ocean_sea_ice_melts_in_summer();
         warm_water_melts_ice_from_below();
         glacial_meltwater_and_icebergs();
+        sea_ice_drifts_with_wind_and_current();
         ocean_sea_ice_contract();
     } catch (const std::exception& error) {
         std::cerr << "polar melt test failed: " << error.what() << '\n';

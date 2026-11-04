@@ -198,11 +198,11 @@ python3 tools/build_ocean_example.py --build-dir build --check    # compare with
 - a central-Arctic sea-ice column;
 - a two-box Atlantic overturning calibrated to today's 17 Sv, whose fresh water comes from Greenland, the Arctic and a stronger water cycle and whose tipping point falls with polar amplification.
 
-It reports when the summer sea ice goes, when Greenland starts losing mass at its surface, when the overturning crosses its tipping point, weakens by 25 % / 50 % and collapses, with a 9-member ensemble over the two least-known quantities. It also reports the sea level, ocean temperature and oxygen solubility. In the ocean CLI, `physics.sea_ice`, an `ice_sheet` section, `forcing.warming` and `forcing.hosing` add sea ice, a coupled ice sheet, climate warming and meltwater hosing to the layered ocean with seasons. See [polar-melt-model.md](docs/weather/polar-melt-model.md) and [ocean-circulation-model.md §8](docs/weather/ocean-circulation-model.md#8-polar-processes-sea-ice-a-coupled-ice-sheet-warming-and-meltwater-hosing).
+It reports when the summer sea ice goes, when Greenland starts losing mass at its surface, when the overturning crosses its tipping point, weakens by 25 % / 50 % and collapses, with a 9-member ensemble over the two least-known quantities. It also reports the sea level, ocean temperature and oxygen solubility. In the ocean CLI, `physics.sea_ice`, an `ice_sheet` section, `forcing.warming` and `forcing.hosing` add drifting sea ice, a coupled ice sheet, climate warming and meltwater hosing to the layered ocean with seasons. Hosing can also be ramped down to test recovery: `examples/polar-ocean-recovery-request.json` runs for about 10 minutes. See [polar-melt-model.md](docs/weather/polar-melt-model.md) and [ocean-circulation-model.md §8](docs/weather/ocean-circulation-model.md#8-polar-processes-sea-ice-a-coupled-ice-sheet-warming-and-meltwater-hosing).
 
 ```sh
 ./build/terraflux-run-polar-melt examples/polar-melt-request.json polar.json            # about 50 s
-./build/terraflux-run-ocean-circulation examples/polar-ocean-request.json polar-ocean.json   # about 3.5 min
+./build/terraflux-run-ocean-circulation examples/polar-ocean-request.json polar-ocean.json   # about 5 min
 python3 tools/build_ocean_example.py --build-dir build --cli terraflux-run-polar-melt \
   --request examples/polar-melt-request.json --output viewer/public/polar/engine-timeline.json --check
 ```

@@ -345,6 +345,14 @@ OceanConfig parse_config(const Json& request, TimeRequest& time, std::vector<dou
             read_into(si, "initial_thickness_m", ice.initial_thickness_m);
             read_into(si, "initial_concentration", ice.initial_concentration);
             read_into(si, "initial_band_k", ice.initial_band_k);
+            if (si.contains("drift")) {
+                if (!si.at("drift").is_boolean()) throw std::invalid_argument("run request field must be boolean: drift");
+                ice.drift = si.at("drift").get<bool>();
+            }
+            read_into(si, "wind_drift_factor", ice.wind_drift_factor);
+            read_into(si, "wind_turning_deg", ice.wind_turning_deg);
+            read_into(si, "maximum_drift_m_s", ice.maximum_drift_m_s);
+            read_into(si, "maximum_ridge_thickness_m", ice.maximum_ridge_thickness_m);
             auto& ip = ice.physics;
             read_into(si, "albedo_cold", ip.albedo_cold);
             read_into(si, "albedo_melting", ip.albedo_melting);
@@ -488,6 +496,7 @@ struct WarmingRequest {
 struct HosingRequest {
     bool enabled{false};
     double east_m{0.0}, north_m{0.0}, radius_m{1.0}, start_seconds{0.0}, ramp_sv_per_year{0.0}, max_sv{0.0};
+    double end_seconds{std::numeric_limits<double>::infinity()};   // after it the hosing ramps down at the same rate
     std::vector<std::size_t> cells;
 };
 
@@ -974,6 +983,8 @@ ForcingRequest parse_forcing(const Json& request, OceanConfig& c, const TimeRequ
         hr.start_seconds = optional_number(h, "start_seconds", 0.0);
         hr.ramp_sv_per_year = required_number(h, "ramp_sv_per_year");
         hr.max_sv = required_number(h, "max_sv");
+        hr.end_seconds = optional_number(h, "end_seconds", hr.end_seconds);
+        if (!(hr.end_seconds > hr.start_seconds)) throw std::invalid_argument("forcing.hosing.end_seconds must come after start_seconds");
         if (!(hr.radius_m > 0.0) || hr.ramp_sv_per_year < 0.0 || hr.ramp_sv_per_year > 1.0 || hr.max_sv < 0.0 || hr.max_sv > 5.0) throw std::invalid_argument("forcing.hosing needs a positive radius, a ramp within 0-1 Sv/yr and max_sv within 0-5");
         const auto& g = c.grid;
         for (std::size_t i = 0; i < c.ocean.size(); ++i) {
@@ -983,13 +994,18 @@ ForcingRequest parse_forcing(const Json& request, OceanConfig& c, const TimeRequ
         }
         if (hr.cells.empty()) throw std::invalid_argument("forcing.hosing region holds no sea cell");
         f.provenance["hosing"] = {{"center_east_m", hr.east_m}, {"center_north_m", hr.north_m}, {"radius_m", hr.radius_m}, {"start_seconds", hr.start_seconds}, {"ramp_sv_per_year", hr.ramp_sv_per_year},
-                                  {"max_sv", hr.max_sv}, {"cells", hr.cells.size()}, {"profile", "F = min(max_sv, ramp (t - start)), fresh water at 0 degC spread evenly over the region's sea cells"}};
+                                  {"max_sv", hr.max_sv}, {"cells", hr.cells.size()}, {"profile", "F = min(max_sv, ramp (t - start)) until end_seconds, then down at the same ramp; fresh water at 0 degC spread evenly over the region's sea cells"}};
+        if (std::isfinite(hr.end_seconds)) f.provenance["hosing"]["end_seconds"] = hr.end_seconds;
     }
     return f;
 }
 
 double hosing_sv(const HosingRequest& h, double t) {
-    return h.enabled ? std::min(h.max_sv, std::max(0.0, h.ramp_sv_per_year * (t - h.start_seconds) / (365.25 * 86400.0))) : 0.0;
+    if (!h.enabled) return 0.0;
+    const double year = 365.25 * 86400.0;
+    auto up = [&](double time) { return std::min(h.max_sv, std::max(0.0, h.ramp_sv_per_year * (time - h.start_seconds) / year)); };
+    if (t <= h.end_seconds) return up(t);
+    return std::max(0.0, up(h.end_seconds) - h.ramp_sv_per_year * (t - h.end_seconds) / year);
 }
 
 // Forcing for the interval starting at `elapsed`.
@@ -1316,7 +1332,11 @@ std::vector<double> front_thermal_forcing(const OceanState& s, const OceanConfig
     return tf;
 }
 
-IceSheetForcing ice_sheet_forcing(const IceSheetCoupling& ice, const IceSheetState& state, const OceanForcing& air, const OceanState& ocean, const OceanConfig& c) {
+// The snowfall scales with the annual-mean air (the surface-temperature target plus the air offset, with warming but
+// without the seasonal and daily cycles) so that the seasons do not move the snow into the summer; a coupled
+// atmosphere has no separate annual mean and its air temperature is used.
+IceSheetForcing ice_sheet_forcing(const IceSheetCoupling& ice, const IceSheetState& state, const OceanForcing& air, const OceanState& ocean, const OceanConfig& c, const ForcingRequest& request) {
+    const bool analytic_air = request.air_sea.enabled && !request.air_sea.coupled;
     const std::size_t count = c.ocean.size();
     IceSheetForcing f;
     f.air_temperature_k.assign(count, 273.15);
@@ -1325,7 +1345,8 @@ IceSheetForcing ice_sheet_forcing(const IceSheetCoupling& ice, const IceSheetSta
         const double ta = air.air_temperature_k.empty() ? air.target_temperature_k[i] : air.air_temperature_k[i];
         f.air_temperature_k[i] = std::min(330.0, std::max(180.0, ta));
         if (c.ocean[i]) continue;
-        const double surface_t = ta - ice.config.physics.lapse_rate_k_m * std::max(0.0, state.surface_elevation_m[i]);
+        const double annual = analytic_air ? air.target_temperature_k[i] + request.air_sea.air_temperature_offset_k : ta;
+        const double surface_t = annual - ice.config.physics.lapse_rate_k_m * std::max(0.0, state.surface_elevation_m[i]);
         double p = ice.precipitation_m_we_yr * std::exp(ice.precipitation_per_k * (surface_t - ice.precipitation_reference_k)) / (365.25 * 86400.0);
         if (!air.rain_m_s.empty()) p += air.rain_m_s[i];
         f.precipitation_m_s[i] = std::min(1.0e-5, p);
@@ -1433,6 +1454,7 @@ void add_extension_blocks(Json& frame, const OceanState& s, const OceanDiagnosti
         Json surface = Json::array();
         for (std::size_t i = 0; i < count; ++i) surface.push_back(water[i] && s.ice_concentration[i] > 0.0 ? tidy(s.ice_surface_temperature_k[i], 5) : 0.0);
         frame["sea_ice"] = {{"ice_thickness_m", sea_array(s.ice_thickness_m, water, 1.0, 4)}, {"ice_concentration", sea_array(s.ice_concentration, water, 1.0, 3)}, {"ice_surface_temperature_k", surface}, {"ocean_to_ice_heat_w_m2", sea_array(s.ocean_to_ice_heat_w_m2, water, 1.0, 3)},
+                            {"ice_drift_east_m_s", sea_array(s.ice_drift_east_m_s, water, 1.0, 3)}, {"ice_drift_north_m_s", sea_array(s.ice_drift_north_m_s, water, 1.0, 3)},
                             {"ice_area_km2", tidy(s.ice_area_m2 / 1.0e6, 5)}, {"ice_extent_km2", tidy(extent / 1.0e6, 5)}, {"ice_volume_km3", tidy(s.ice_volume_m3 / 1.0e9, 5)},
                             {"ice_water_m3_s", tidy(s.ice_water_m3_s, 5)}, {"cumulative_ice_water_m3", s.cumulative_ice_water_m3}};
     }
@@ -1515,7 +1537,7 @@ int main(int argc, char** argv) {
             if (ice.enabled) {
                 if (global_step % ice.step_every == 0) {
                     const double span = static_cast<double>(ice.step_every) * config.timestep_seconds;
-                    ice_state = advance_ice_sheet(ice_state, ice_sheet_forcing(ice, ice_state, f, state, config), ice.config, span);
+                    ice_state = advance_ice_sheet(ice_state, ice_sheet_forcing(ice, ice_state, f, state, config, forcing), ice.config, span);
                     for (std::size_t i = 0; i < count; ++i) {
                         ice_liquid[i] = std::max(0.0, ice_state.runoff_to_sea_m3_s[i] - ice_state.frontal_melt_to_sea_m3_s[i]);
                         ice_solid[i] = ice_state.icebergs_to_sea_m3_s[i] + ice_state.frontal_melt_to_sea_m3_s[i];
@@ -1626,7 +1648,8 @@ int main(int argc, char** argv) {
                 ocean["request"]["physics"]["sea_ice"] = {{"initial_thickness_m", config.sea_ice.initial_thickness_m}, {"initial_concentration", config.sea_ice.initial_concentration},
                     {"initial_band_k", config.sea_ice.initial_band_k}, {"albedo_cold", ip.albedo_cold}, {"albedo_melting", ip.albedo_melting}, {"conductivity_w_m_k", ip.conductivity_w_m_k},
                     {"ice_salinity_psu", ip.ice_salinity_psu}, {"minimum_thickness_m", ip.minimum_thickness_m}, {"new_ice_thickness_m", ip.new_ice_thickness_m},
-                    {"heat_transfer_coefficient", ip.heat_transfer_coefficient}, {"friction_velocity_m_s", ip.friction_velocity_m_s}, {"maximum_concentration", ip.maximum_concentration}};
+                    {"heat_transfer_coefficient", ip.heat_transfer_coefficient}, {"friction_velocity_m_s", ip.friction_velocity_m_s}, {"maximum_concentration", ip.maximum_concentration},
+                    {"drift", config.sea_ice.drift}, {"wind_drift_factor", config.sea_ice.wind_drift_factor}, {"wind_turning_deg", config.sea_ice.wind_turning_deg}, {"maximum_drift_m_s", config.sea_ice.maximum_drift_m_s}, {"maximum_ridge_thickness_m", config.sea_ice.maximum_ridge_thickness_m}};
             }
             if (ice.enabled) {
                 Json domain = Json::array();

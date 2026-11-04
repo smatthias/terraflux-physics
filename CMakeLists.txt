@@ -224,7 +224,7 @@ if(BUILD_TESTING)
         --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/polar/engine-timeline.json --check)
     add_test(NAME weather.polar_ocean_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/polar_ocean_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
-    # Regenerates the ten-year polar ocean fixture (about 3.5 minutes): excluded by `ctest -LE slow`.
+    # Regenerates the ten-year polar ocean fixture (about 5 minutes): excluded by `ctest -LE slow`.
     add_test(NAME weather.viewer_polar_ocean
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
         --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/polar-ocean-request.json

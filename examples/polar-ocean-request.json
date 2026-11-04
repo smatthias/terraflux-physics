@@ -136,7 +136,7 @@
     "initial_dome": {
       "center_thickness_m": 2500.0
     },
-    "precipitation_m_we_yr": 0.35,
+    "precipitation_m_we_yr": 0.6,
     "front_depth_m": 300.0,
     "step_every": 32,
     "physics": {

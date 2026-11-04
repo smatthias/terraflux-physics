@@ -140,6 +140,11 @@ These extensions bring polar melt into the 2-D ocean. Sea ice forms and melts on
   - **Salt.** Freezing rejects brine; ice keeps 5 psu. Melt returns nearly fresh water at the freezing point.
   - **Minimum thickness.** Ice thinner than `minimum_thickness_m` melts with the water's heat.
   - **Wind.** The ice shelters the water: the wind stress on the ocean is scaled by 1 − a.
+  - **Drift.** The ice drifts freely with the upper-ocean current plus 2 % of the 10 m wind, turned 30° to the right of the wind in the northern hemisphere and to the left in the southern (Nansen's rule). The speed is capped at 1.5 m/s.
+    - Area, volume and surface temperature move upwind between sea cells, in sub-steps of Courant number ≤ 0.25. Coasts are walls.
+    - Converging ice ridges: the concentration is capped at the maximum, the volume kept and the ice thickens.
+    - Free drift has no internal ice stress. A packed cell (at the maximum concentration and at least `maximum_ridge_thickness_m` thick) therefore takes no more ice; this is a cavitating-fluid stand-in for the ice strength (Flato & Hibler 1992).
+    - Drifting ice carries its fresh water to where it melts.
   - **Initial ice.** Ice is placed where the initial surface lies within `initial_band_k` of freezing. The initial water is never below its freezing point.
   - **Budgets.** The ocean's heat budget includes the heat given to the ice. Water and salt are conserved between ocean and ice.
 - **Glacial fresh water.** The forcing carries per-cell `glacial_meltwater_m3_s` and `glacial_ice_m3_s`.
@@ -148,11 +153,11 @@ These extensions bring polar melt into the 2-D ocean. Sea ice forms and melts on
   - Both feed the lens attribution as a fourth source, `glacial`.
 - **Seasons.** `forcing.air_sea.seasonal_amplitude_south_k` / `_north_k` add an annual air temperature cycle, warmest on day 196, to the analytic air.
 - **Warming.** `forcing.warming` adds dT = min(max_k, rate·(t − start)) × amplification to the surface-temperature target and the air. The amplification changes linearly from south to north, so polar amplification is possible. It is off during the spin-up.
-- **Hosing.** `forcing.hosing` adds F = min(max_sv, ramp·(t − start)) of fresh water at 0 °C, spread evenly over the sea cells within a circle.
+- **Hosing.** `forcing.hosing` adds F = min(max_sv, ramp·(t − start)) of fresh water at 0 °C, spread evenly over the sea cells within a circle. After the optional `end_seconds` it ramps down at the same rate to zero, which lets you test whether the circulation recovers (§8.6).
 - **Coupled ice sheet** (`ice_sheet`). The ice sheet lives on the land cells of an elliptic region; the bed is the terrain.
   - It starts as an elliptic dome and steps every `step_every` ocean steps with the ice-sheet kernel of [polar-melt-model.md](polar-melt-model.md) §1.1.
   - Its air is the air-sea air temperature over the land, reduced by the lapse rate to its surface.
-  - Snowfall scales with temperature (`precipitation_m_we_yr` at `precipitation_reference_k`, `precipitation_per_k`).
+  - Snowfall scales with the annual-mean air: the surface-temperature target plus the air offset, with the warming but without the seasons. The parameters are `precipitation_m_we_yr` at `precipitation_reference_k` and `precipitation_per_k`. Summer warmth therefore does not move the snow into the summer. Under a coupled atmosphere its air temperature is used.
   - The ocean thermal forcing of its fronts is the layered column's temperature above freezing at `front_depth_m` in the adjacent sea cells.
   - Its runoff reaches the nearest sea cells as meltwater, and its icebergs and frontal melt as ice.
   - Warming therefore melts it, and a warmer ocean eats its fronts.
@@ -161,17 +166,17 @@ These extensions bring polar melt into the 2-D ocean. Sea ice forms and melts on
 
 | Section | Keys (default) |
 |---|---|
-| `physics.sea_ice` | `enabled` (true), `initial_thickness_m` (1.5), `initial_concentration` (0.9), `initial_band_k` (0.5), `albedo_cold` (0.65), `albedo_melting` (0.5), `conductivity_w_m_k` (2.03), `ice_salinity_psu` (5), `minimum_thickness_m` (0.05), `new_ice_thickness_m` (0.5), `heat_transfer_coefficient` (0.006), `friction_velocity_m_s` (0.01), `maximum_concentration` (0.99) |
+| `physics.sea_ice` | `enabled` (true), `initial_thickness_m` (1.5), `initial_concentration` (0.9), `initial_band_k` (0.5), `albedo_cold` (0.65), `albedo_melting` (0.5), `conductivity_w_m_k` (2.03), `ice_salinity_psu` (5), `minimum_thickness_m` (0.05), `new_ice_thickness_m` (0.5), `heat_transfer_coefficient` (0.006), `friction_velocity_m_s` (0.01), `maximum_concentration` (0.99), `drift` (true), `wind_drift_factor` (0.02), `wind_turning_deg` (30), `maximum_drift_m_s` (1.5), `maximum_ridge_thickness_m` (4) |
 | `forcing.air_sea` | `seasonal_amplitude_south_k`, `seasonal_amplitude_north_k` (0; analytic air only) |
 | `forcing.warming` | `rate_k_per_year` (required, within ±2), `start_seconds` (0), `max_k` (5), `amplification_south` / `amplification_north` (1) |
-| `forcing.hosing` | `center_east_m`, `center_north_m`, `radius_m`, `ramp_sv_per_year` (0–1), `max_sv` (0–5), `start_seconds` (0) |
-| `ice_sheet` | `region {center_east_m, center_north_m, radius_east_m, radius_north_m}`, `initial_dome {center_thickness_m, optional centre and radii}`, `precipitation_m_we_yr` (0.35), `precipitation_reference_k` (263.15), `precipitation_per_k` (0.07), `front_depth_m` (300), `step_every` (24), `physics {rate_factor_pa3_s, degree_day_factor_snow_mm_k_day, degree_day_factor_ice_mm_k_day, pdd_standard_deviation_k, refreezing_fraction, lapse_rate_k_m, front_water_depth_m, marine_front_fraction}` |
+| `forcing.hosing` | `center_east_m`, `center_north_m`, `radius_m`, `ramp_sv_per_year` (0–1), `max_sv` (0–5), `start_seconds` (0), `end_seconds` (none: then down at the same ramp) |
+| `ice_sheet` | `region {center_east_m, center_north_m, radius_east_m, radius_north_m}`, `initial_dome {center_thickness_m, optional centre and radii}`, `precipitation_m_we_yr` (0.4), `precipitation_reference_k` (263.15), `precipitation_per_k` (0.07), `front_depth_m` (300), `step_every` (24), `physics {rate_factor_pa3_s, degree_day_factor_snow_mm_k_day, degree_day_factor_ice_mm_k_day, pdd_standard_deviation_k, refreezing_fraction, lapse_rate_k_m, front_water_depth_m, marine_front_fraction}` |
 
 ### 8.3 Output
 
 `processes` adds `sea_ice`, `ice_sheet`, `warming` and `hosing`, and the forcing provenance records the warming and hosing. Per frame:
 
-- **`sea_ice`.** Per cell `ice_thickness_m` (of the covered part), `ice_concentration`, `ice_surface_temperature_k` (0 without ice) and `ocean_to_ice_heat_w_m2`. Totals `ice_area_km2` (Σ a·A), `ice_extent_km2` (cells above 15 %), `ice_volume_km3` (Σ a·h·A), `ice_water_m3_s` (melt positive) and `cumulative_ice_water_m3`. Under ice the `air_sea` fluxes are those of the open fraction, and `net_heat_w_m2` = shortwave + longwave + sensible + latent − `ocean_to_ice_heat_w_m2`.
+- **`sea_ice`.** Per cell `ice_thickness_m` (of the covered part), `ice_concentration`, `ice_surface_temperature_k` (0 without ice), `ocean_to_ice_heat_w_m2` and the drift `ice_drift_east_m_s` / `ice_drift_north_m_s`. Totals `ice_area_km2` (Σ a·A), `ice_extent_km2` (cells above 15 %), `ice_volume_km3` (Σ a·h·A), `ice_water_m3_s` (melt positive) and `cumulative_ice_water_m3`. Under ice the `air_sea` fluxes are those of the open fraction, and `net_heat_w_m2` = shortwave + longwave + sensible + latent − `ocean_to_ice_heat_w_m2`.
 - **`ice_sheet`.** `ice_thickness_m`, `surface_elevation_m`, `smb_m_ice_yr`, `melt_m_ice_yr`, `volume_m3`, `sea_level_equivalent_m`, `sea_level_rise_m`, `smb_gt_yr`, `runoff_m3_s`, `calving_m3_s`, `frontal_ablation_m3_s` and `mean_front_thermal_forcing_k`. The top-level `ice_sheet` block holds `domain`, `bed_elevation_m`, `initial_volume_m3`, `initial_sea_level_equivalent_m` and `source`.
 - **Polar processes only.** `hosing_sv`; `glacial {meltwater_m3_s, ice_m3_s, cumulative_m3}`; `thermal.surface_oxygen_umol_kg` (oxygen saturation from SST and surface salinity, 0 on land); `cumulative_m3.ice_water` and `.glacial`; and `source_shares.glacial` on every lens, whose `kind` may be `glacial`.
 
@@ -191,15 +196,18 @@ The example basin is 3,400 × 4,200 km on 17 × 21 cells of 200 km, anchored at 
 
 - air warming at 0.4 K/yr up to +4 K, 2.5× in the north;
 - hosing near the sinking region ramping by 0.05 Sv/yr up to 0.5 Sv;
-- quarterly snapshots, about 3.5 minutes of computation.
+- quarterly snapshots, about 5 minutes of computation.
 
 What happens:
 
-- **Seasonal sinking.** The deep-water formation happens in winter: 26–30 Sv in January–April, 1–3 Sv in summer.
-- **Overturning.** The annual mean falls from 16.2 Sv in year 0 to 4.1 Sv in year 9 (−74 %). It is 25 % weaker from year 3 and 50 % weaker from year 5.
-- **Northern water.** The deepest northern mixing shrinks from about 500 m to 280 m. The northern surface warms by 3.8 K (annual mean) and its oxygen capacity falls from 342 to 317 µmol/kg.
-- **Sea ice.** The summer sea ice is gone from year 1. The winter maximum first grows from 1.6 to 2.3 M km² in years 0–4, which is consistent with less heat carried north by the weakening overturning and a fresher surface that freezes more easily. It then shrinks to 1.3 M km² as the warming takes over.
-- **Ice sheet.** Its surface mass balance falls from +87 to −44 Gt/yr. It raises the sea by 7.3 mm, about 0.7 mm/yr.
+- **Seasonal sinking.** The deep-water formation happens in winter: 25–30 Sv in January–April, 0–6 Sv in summer.
+- **Overturning.** The annual mean falls from 15.9 Sv in year 0 to 4.2 Sv in year 9 (−73 %). It is 25 % weaker from year 3 and 50 % weaker from year 5.
+- **Northern water.** The deepest northern mixing shrinks from about 470 m to 270 m. The northern surface warms by 3.9 K (annual mean) and its oxygen capacity falls from 344 to 318 µmol/kg.
+- **Sea ice.** The ice drifts north-westward at up to about 20 km/day and piles up, ridged to 4 m, against the northern edge of the basin and the coast of the ice-sheet island. There it survives the summers until year 6; from year 7 the summers are ice-free.
+  - The winter maximum first grows from 1.3 to 1.9 M km² in years 0–3. This is consistent with less heat carried north by the weakening overturning and a fresher surface that freezes more easily.
+  - It then shrinks to 0.8 M km² by year 9 as the warming takes over.
+- **Ice sheet.** The warmer air first brings more snow: the surface mass balance rises from 110 to 181 Gt/yr in years 0–6, then falls to 96 Gt/yr in year 9 as melt takes over. Summer balances go negative from year 8.
+  - Its discharge (icebergs and frontal melt, about 13,000 m³/s or 420 Gt/yr) exceeds that gain, so it loses mass throughout. It raises the sea by 5.2 mm, about 0.5 mm/yr.
 
 These are the responses of a coarse, idealised basin to a fast, prescribed forcing: a process demonstration, not a projection.
 
@@ -219,29 +227,38 @@ In the **Ocean streams** view:
   - summer melt returning water and restoring open water;
   - warm water melting ice from below;
   - meltwater and icebergs (volume, no salt, latent cooling, a glacier lens);
+  - free drift: 2 % of the wind, turned right of it in the north, left in the south and not at all without rotation. The drift conserves the ice, packs it against the downwind coast and opens the upwind side, ridges up to the ridge thickness, and carries ice that melts over warm water;
   - the contract.
-- `tests/tools/polar_ocean_check.py` (`weather.polar_ocean_cli`, about 30 s) runs one year of the example from January twice: with quick hosing (0.5 Sv within six months) and +2 K of warming, and as a control without either. It checks, from the files alone:
+- `tests/tools/polar_ocean_check.py` (`weather.polar_ocean_cli`, about 40 s) runs one year of the example from January twice: with quick hosing (0.5 Sv within six months, ramping down from October) and +2 K of warming, and as a control without either. It checks, from the files alone:
   - every identity above;
   - the sea-ice maps against their totals;
   - the ice surface at most melting;
   - oxygen falling with temperature;
-  - the hosing ramp;
+  - the hosing ramp up and down;
+  - the drift (none on land, within its cap);
   - the ice sheet on land.
   It also checks the physics:
   - seasonal ice and winter sinking;
+  - spring drift of centimetres to decimetres per second;
+  - ridged ice within the ridge thickness plus growth;
   - a next-winter overturning at least 20 % weaker with hosing (16.5 vs 24.5 Sv in the current run) under a fresher northern surface;
   - a glacial lens;
   - a warmer, less oxygenated south;
   - ice-sheet mass loss.
-  Finally it checks that invalid requests (sea ice without layers or air-sea, out-of-range ice and warming parameters, hosing without sea cells, an ice sheet without land) fail with their message and write nothing. With `jsonschema` it validates requests and outputs.
-- `weather.viewer_polar_ocean` regenerates the fixture and compares it (about 3.5 minutes, label `slow`: `ctest -LE slow` skips it).
+  Finally it checks that invalid requests (sea ice without layers or air-sea, out-of-range ice, drift, ridge and warming parameters, hosing without sea cells or ending before it starts, an ice sheet without land) fail with their message and write nothing. With `jsonschema` it validates requests and outputs.
+- `weather.viewer_polar_ocean` regenerates the fixture and compares it (about 5 minutes, label `slow`: `ctest -LE slow` skips it).
 - The viewer validates the polar blocks on load (`viewer/src/ocean.js`, tests in `ocean.test.js`).
 
 ### 8.6 Limitations
 
-- **Sea ice.** Thermodynamic only: no drift, rheology or ridging, so the ice stays in its cell. There is no snow on the ice, no heat stored in the ice, a single thickness category and no melt ponds. Leads close at `maximum_concentration`.
-- **Ice sheet.** Coarse: 17 cells of 200 km in the example, so it stands in for Greenland's mass budget, not its geometry. Its snowfall is a temperature-scaled parameter, not the atmosphere's precipitation, so summer snowfall can exceed winter snowfall. The air over it is the analytic air-sea air.
-- **Overturning.** A parametrised sinking of the slab (§1): hosing and warming weaken it, but it has no guaranteed tipping point or hysteresis. Use the box model for those questions. A decade is far too short for the deep ocean to adjust.
+- **Sea ice.** Free drift without rheology. Ridging is limited by a packed-cell rule, not by ice strength, so ice can neither resist divergence nor transmit stress across a pack. There is no snow on the ice, no heat stored in the ice, a single thickness category and no melt ponds. Leads close at `maximum_concentration`. On 200 km cells the upwind transport is diffusive.
+- **Ice sheet.** Coarse: 17 cells of 200 km in the example, so it stands in for Greenland's mass budget, not its geometry. Its snowfall is a parameter scaled with the annual-mean air, not the atmosphere's precipitation. The air over it is the analytic air-sea air.
+- **Overturning: no tipping point here.** The sinking is parametrised from the local surface density (§1), so the salt-advection feedback that gives the box model its tipping point and hysteresis is weak in this closed basin. The recovery experiment shows it: [examples/polar-ocean-recovery-request.json](../../examples/polar-ocean-recovery-request.json) runs 25 years without warming, hosing up to 0.5 Sv until year 8 and then ramping down to zero by year 13. Compare it with the same request without `forcing.hosing`.
+  - The annual-mean overturning keeps weakening for about two years after the hosing peaks, down to 23 % of the control in years 10–11.
+  - Once the hosing stops it recovers: 53 % of the control in year 15, 79 % in year 19, and a plateau of about 88 % from year 21 on.
+  - The remaining 12 % is the fresh water the closed basin keeps. Its mean salinity is still 0.27 psu below the control at year 24 and returns only as slowly as the upwelling brings deep salt.
+  - So the 2-D ocean shows the weakening, its lag and a slow recovery, but no self-sustaining collapsed state. Use the box model for the tipping point.
+  - Ten years is also far too short for the deep ocean to adjust.
 - **No feedback to the air.** Warming, seasons and hosing are prescribed. The ice does not warm or moisten the air above it, and the air does not react to the open water.
 
 ## 9. Limitations

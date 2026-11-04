@@ -101,3 +101,18 @@ test('polar contract rejects inconsistent blocks', () => {
   mutate(b => { b.equilibrium_diagram.start.reversed[0][1] = 3 }, 'equilibrium diagram')
   assert.throws(() => validatePolar(base.polar, frames, { values: [1, 2] }), /terrain/)
 })
+
+test('optional early-warning statistics of a noisy run are validated and listed', () => {
+  const base = fixture()
+  const frames = validateSequence(base)
+  const terrain = frames[0].terrain
+  const copy = JSON.parse(JSON.stringify(base.polar))
+  const high = find(copy, 'high')
+  high.early_warning = { window_years: 50, until_year: 2137, autocorrelation: [0.1, 0.2, 0.3], variance: [0.01, 0.02, 0.03], kendall_tau_autocorrelation: 0.3, kendall_tau_variance: 0.55, caveat: 'windows' }
+  validatePolar(copy, frames, terrain)
+  const row = eventTable(copy).find(r => r.scenario === high.name)
+  assert.deepEqual(row.early_warning, { window: 50, until: 2137, autocorrelation_tau: 0.3, variance_tau: 0.55 })
+  assert.equal(eventTable(copy).find(r => r.scenario.startsWith('low')).early_warning, null)
+  high.early_warning.kendall_tau_variance = 1.5
+  assert.throws(() => validatePolar(copy, frames, terrain), /early-warning/)
+})

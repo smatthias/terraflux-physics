@@ -259,6 +259,10 @@ void validate_ocean_config(const OceanConfig& c) {
         if (!std::isfinite(c.sea_ice.initial_thickness_m) || c.sea_ice.initial_thickness_m < 0.0 || c.sea_ice.initial_thickness_m > 20.0) throw std::invalid_argument("ocean sea_ice.initial_thickness_m must lie within 0-20 m");
         if (!std::isfinite(c.sea_ice.initial_concentration) || c.sea_ice.initial_concentration < 0.0 || c.sea_ice.initial_concentration > c.sea_ice.physics.maximum_concentration) throw std::invalid_argument("ocean sea_ice.initial_concentration must lie within 0 and the maximum concentration");
         require_finite_nonnegative(c.sea_ice.initial_band_k, "sea_ice.initial_band_k");
+        if (!std::isfinite(c.sea_ice.wind_drift_factor) || c.sea_ice.wind_drift_factor < 0.0 || c.sea_ice.wind_drift_factor > 0.1) throw std::invalid_argument("ocean sea_ice.wind_drift_factor must lie within 0-0.1");
+        if (!std::isfinite(c.sea_ice.wind_turning_deg) || std::abs(c.sea_ice.wind_turning_deg) > 90.0) throw std::invalid_argument("ocean sea_ice.wind_turning_deg must lie within +-90");
+        if (!std::isfinite(c.sea_ice.maximum_ridge_thickness_m) || c.sea_ice.maximum_ridge_thickness_m < c.sea_ice.physics.minimum_thickness_m || c.sea_ice.maximum_ridge_thickness_m > 30.0) throw std::invalid_argument("ocean sea_ice.maximum_ridge_thickness_m must lie between the minimum thickness and 30 m");
+        if (!std::isfinite(c.sea_ice.maximum_drift_m_s) || c.sea_ice.maximum_drift_m_s <= 0.0 || c.sea_ice.maximum_drift_m_s > 5.0) throw std::invalid_argument("ocean sea_ice.maximum_drift_m_s must lie within 0-5 m/s");
     }
     // Coastal runoff.
     require_finite_nonnegative(c.coastal.band_m, "coastal.band_m");
@@ -641,6 +645,102 @@ void diagnose_fields(OceanState& s, const OceanConfig& c) {
     }
 }
 
+// Free drift of the sea ice: velocity = upper-ocean current + Nansen wind drift, capped; upwind (donor-cell)
+// transport of the area a, the volume a h and the surface temperature (weighted by area) between sea cells, in
+// sub-steps of Courant number <= 0.25; ridging caps the area at the maximum concentration.
+void drift_sea_ice(OceanState& s, const OceanForcing& f, const OceanConfig& c, const Geometry& g, const std::vector<double>& coriolis) {
+    const std::size_t nx = g.nx, count = g.count;
+    const auto& si = c.sea_ice;
+    const double turn = si.wind_turning_deg * 3.14159265358979323846 / 180.0;
+    std::vector<double>& ue = s.ice_drift_east_m_s;
+    std::vector<double>& un = s.ice_drift_north_m_s;
+    bool any = false;
+    double fastest = 0.0;
+    for (std::size_t i = 0; i < count; ++i) {
+        ue[i] = un[i] = 0.0;
+        if (!c.ocean[i] || s.ice_concentration[i] <= 0.0) continue;
+        any = true;
+        // The current at the cell centre: the mean of its existing faces.
+        double cu = 0.0, cv = 0.0;
+        int nu = 0, nv = 0;
+        if (g.u_face(i)) { cu += s.u_m_s[i]; ++nu; }
+        if (i % nx > 0 && g.u_face(i - 1)) { cu += s.u_m_s[i - 1]; ++nu; }
+        if (g.v_face(i)) { cv += s.v_m_s[i]; ++nv; }
+        if (i >= nx && g.v_face(i - nx)) { cv += s.v_m_s[i - nx]; ++nv; }
+        cu = nu ? cu / nu : 0.0;
+        cv = nv ? cv / nv : 0.0;
+        // The wind: its direction from the stress, its speed from the air-sea forcing; turned right (NH) or left (SH).
+        const double tx = f.wind_stress_east_pa[i], ty = f.wind_stress_north_pa[i], tau = std::hypot(tx, ty);
+        double wu = 0.0, wv = 0.0;
+        if (tau > 0.0 && !f.wind_speed_m_s.empty()) {
+            const double speed = si.wind_drift_factor * f.wind_speed_m_s[i];
+            const double angle = coriolis[i] > 0.0 ? -turn : coriolis[i] < 0.0 ? turn : 0.0;   // clockwise in the north, none without rotation
+            const double ex = tx / tau, ey = ty / tau;
+            wu = speed * (ex * std::cos(angle) - ey * std::sin(angle));
+            wv = speed * (ex * std::sin(angle) + ey * std::cos(angle));
+        }
+        double u = cu + wu, v = cv + wv;
+        const double sp = std::hypot(u, v);
+        if (sp > si.maximum_drift_m_s) { u *= si.maximum_drift_m_s / sp; v *= si.maximum_drift_m_s / sp; }
+        ue[i] = u;
+        un[i] = v;
+        fastest = std::max(fastest, std::max(std::abs(u) / g.dx, std::abs(v) / g.dy));
+    }
+    if (!any || fastest == 0.0) return;
+    const double dt = c.timestep_seconds;
+    const int substeps = std::max(1, static_cast<int>(std::ceil(fastest * dt / 0.25)));
+    const double h = dt / substeps;
+    std::vector<double> area(count), volume(count), heat(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        area[i] = s.ice_concentration[i];
+        volume[i] = s.ice_concentration[i] * s.ice_thickness_m[i];
+        heat[i] = s.ice_concentration[i] * s.ice_surface_temperature_k[i];
+    }
+    std::vector<double> fa(count), fv(count), ft(count), ga(count), gv(count), gt(count);
+    const double full = si.physics.maximum_concentration * (1.0 - 1.0e-9);
+    // A packed cell (at the maximum concentration and the ridge thickness) takes no more ice.
+    auto packed = [&](std::size_t k) { return area[k] >= full && volume[k] >= area[k] * si.maximum_ridge_thickness_m; };
+    for (int step = 0; step < substeps; ++step) {
+        for (std::size_t i = 0; i < count; ++i) {
+            fa[i] = fv[i] = ft[i] = ga[i] = gv[i] = gt[i] = 0.0;
+            if (g.u_face(i)) {
+                const double u = 0.5 * (ue[i] + ue[i + 1]);
+                const std::size_t up = u >= 0.0 ? i : i + 1, down = u >= 0.0 ? i + 1 : i;
+                const double w = packed(down) ? 0.0 : u * h / g.dx;
+                fa[i] = w * area[up]; fv[i] = w * volume[up]; ft[i] = w * heat[up];
+            }
+            if (g.v_face(i)) {
+                const double v = 0.5 * (un[i] + un[i + nx]);
+                const std::size_t up = v >= 0.0 ? i : i + nx, down = v >= 0.0 ? i + nx : i;
+                const double w = packed(down) ? 0.0 : v * h / g.dy;
+                ga[i] = w * area[up]; gv[i] = w * volume[up]; gt[i] = w * heat[up];
+            }
+        }
+        for (std::size_t i = 0; i < count; ++i) {
+            if (!c.ocean[i]) continue;
+            const std::size_t x = i % nx;
+            const double west_a = x > 0 ? fa[i - 1] : 0.0, west_v = x > 0 ? fv[i - 1] : 0.0, west_t = x > 0 ? ft[i - 1] : 0.0;
+            const double south_a = i >= nx ? ga[i - nx] : 0.0, south_v = i >= nx ? gv[i - nx] : 0.0, south_t = i >= nx ? gt[i - nx] : 0.0;
+            area[i] = std::max(0.0, area[i] + west_a - fa[i] + south_a - ga[i]);
+            volume[i] = std::max(0.0, volume[i] + west_v - fv[i] + south_v - gv[i]);
+            heat[i] = std::max(0.0, heat[i] + west_t - ft[i] + south_t - gt[i]);
+        }
+    }
+    const double cap = si.physics.maximum_concentration;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (!c.ocean[i]) continue;
+        if (volume[i] <= 0.0 || area[i] <= 0.0) {
+            // Rounding leftovers of ice that drifted away entirely.
+            s.ice_concentration[i] = 0.0; s.ice_thickness_m[i] = 0.0;
+            continue;
+        }
+        const double a = std::min(cap, area[i]);   // ridging: the area is capped, the volume kept
+        s.ice_surface_temperature_k[i] = heat[i] / area[i];
+        s.ice_concentration[i] = a;
+        s.ice_thickness_m[i] = volume[i] / a;
+    }
+}
+
 }  // namespace
 
 OceanState initialize_ocean(const OceanConfig& c) {
@@ -657,7 +757,7 @@ OceanState initialize_ocean(const OceanConfig& c) {
     s.upwelling_field_m_s.assign(count, 0.0);
     s.coastal_store_m.assign(count, 0.0);
     for (auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m, &s.recent_glacial_m}) v->assign(count, 0.0);
-    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s, &s.ice_growth_m_s, &s.ocean_to_ice_heat_w_m2}) v->assign(count, 0.0);
+    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s, &s.ice_growth_m_s, &s.ocean_to_ice_heat_w_m2, &s.ice_drift_east_m_s, &s.ice_drift_north_m_s}) v->assign(count, 0.0);
     s.ice_surface_temperature_k.assign(count, 0.0);
     for (std::size_t i = 0; i < count; ++i) {
         if (!c.ocean[i]) continue;
@@ -725,7 +825,7 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
         if (v->empty()) v->assign(count, 0.0);
         for (double& x : *v) x *= memory;
     }
-    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s, &s.ice_growth_m_s, &s.ocean_to_ice_heat_w_m2}) v->assign(count, 0.0);
+    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s, &s.ice_growth_m_s, &s.ocean_to_ice_heat_w_m2, &s.ice_drift_east_m_s, &s.ice_drift_north_m_s}) v->assign(count, 0.0);
     s.ice_surface_temperature_k.assign(count, 0.0);
     const bool ice = c.sea_ice.enabled;
     const SeaIcePhysics& ip = c.sea_ice.physics;
@@ -1211,6 +1311,9 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             throw std::runtime_error("ocean velocity became non-finite or unphysical (> 20 m/s)");
         }
     }
+
+    // 4b. Sea-ice drift (after the thermodynamics, with the new current).
+    if (ice && c.sea_ice.drift) drift_sea_ice(s, f, c, g, coriolis);
 
     // 5. Diagnostics and budgets.
     s.elapsed_seconds = previous.elapsed_seconds + dt;

@@ -891,7 +891,9 @@
               "ice_extent_km2",
               "ice_volume_km3",
               "ice_water_m3_s",
-              "cumulative_ice_water_m3"
+              "cumulative_ice_water_m3",
+              "ice_drift_east_m_s",
+              "ice_drift_north_m_s"
             ],
             "description": "Sea ice: air_sea fluxes are those of the open fraction, net_heat_w_m2 = shortwave + longwave + sensible + latent - ocean_to_ice_heat_w_m2.",
             "properties": {
@@ -941,6 +943,19 @@
               },
               "cumulative_ice_water_m3": {
                 "type": "number"
+              },
+              "ice_drift_east_m_s": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Free-drift ice velocity at the cell centre (0 without ice)."
+              },
+              "ice_drift_north_m_s": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
               }
             }
           },

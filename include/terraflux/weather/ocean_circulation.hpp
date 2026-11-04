@@ -183,6 +183,19 @@ struct OceanSeaIceConfig {
     double initial_thickness_m{1.5};            // where the initial surface is within initial_band_k of freezing
     double initial_concentration{0.9};
     double initial_band_k{0.5};
+    // Free drift: the ice moves with the upper-ocean current plus a share of the wind (Nansen's rule: about 2 % of
+    // the 10 m wind speed, turned to the right of the wind in the northern hemisphere, to the left in the southern).
+    // Upwind transport of the ice area and volume between sea cells (coasts are walls); where converging ice
+    // would exceed the maximum concentration it ridges (the area is capped, the volume kept, the ice thickens) up to
+    // maximum_ridge_thickness_m.
+    bool drift{true};
+    double wind_drift_factor{0.02};
+    double wind_turning_deg{30.0};
+    double maximum_drift_m_s{1.5};
+    // Free drift has no internal ice stress: against a coast it would pile ice up without limit. Ice stops moving
+    // into a cell that is at the maximum concentration and at least this thick (a cavitating-fluid stand-in for
+    // the ice strength, Flato & Hibler 1992).
+    double maximum_ridge_thickness_m{4.0};
 };
 
 struct OceanConfig {
@@ -290,6 +303,8 @@ struct OceanState {
     std::vector<double> ice_surface_temperature_k;  // top of the sea ice (the water temperature where there is none)
     std::vector<double> ice_growth_m_s;           // change of the ice volume per cell area (negative = melt)
     std::vector<double> ocean_to_ice_heat_w_m2;   // heat the water gives the ice per cell area (net_heat = open-water fluxes - this)
+    std::vector<double> ice_drift_east_m_s;       // free-drift ice velocity at the cell centre (0 without ice)
+    std::vector<double> ice_drift_north_m_s;
     double upwelling_m_s{0.0};                    // basin-mean upwelling rate
     double overturning_m3_s{0.0};                 // total sinking
     double river_input_m3_s{0.0};

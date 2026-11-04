@@ -47,6 +47,12 @@ export function validatePolar(block, frames, terrain) {
     if (ev.overturning_collapsed && ev.overturning_weakened_50pct) check(ev.overturning_weakened_50pct.year <= ev.overturning_collapsed.year, 'Weakening must precede the collapse.')
     if (ev.overturning_weakened_50pct && ev.overturning_weakened_25pct) check(ev.overturning_weakened_25pct.year <= ev.overturning_weakened_50pct.year, 'Weakening order.')
     check(Array.isArray(s.trajectory) && s.trajectory.every(p => Array.isArray(p) && p.length === 2 && p.every(finite)), 'Invalid trajectory.')
+    if (s.early_warning !== undefined) {
+      const w = s.early_warning
+      const tau = v => finite(v) && v >= -1 && v <= 1
+      check(w && Number.isInteger(w.window_years) && w.window_years >= 4 && Number.isInteger(w.until_year) && tau(w.kendall_tau_autocorrelation) && tau(w.kendall_tau_variance) &&
+        Array.isArray(w.autocorrelation) && Array.isArray(w.variance) && w.autocorrelation.length === w.variance.length && w.variance.every(v => finite(v) && v >= 0), `Scenario ${s.name}: invalid early-warning statistics.`)
+    }
     if (s.ensemble) {
       const e = s.ensemble
       check(Array.isArray(e.members) && e.members.length === e.member_count && e.members.every(m => finite(m.salinity_difference_psu) && finite(m.greenland_warming_amplification) && m.events && EVENT_KEYS.every(k => validEvent(m.events[k]))), `Scenario ${s.name}: invalid ensemble members.`)
@@ -116,6 +122,7 @@ export function eventTable(block) {
     row.sea_level_2100_m = i2100 >= 0 ? (s.series.sea_level_rise_vs_control_m ?? s.series.sea_level_rise_m)[i2100] : null
     row.sea_level_end_m = (s.series.sea_level_rise_vs_control_m ?? s.series.sea_level_rise_m)[iEnd]
     row.overturning_2100_sv = i2100 >= 0 ? s.series.overturning_sv[i2100] : null
+    row.early_warning = s.early_warning ? { window: s.early_warning.window_years, until: s.early_warning.until_year, autocorrelation_tau: s.early_warning.kendall_tau_autocorrelation, variance_tau: s.early_warning.kendall_tau_variance } : null
     row.lag_years = s.events.threshold_crossed && s.events.overturning_collapsed ? s.events.overturning_collapsed.year - s.events.threshold_crossed.year : null
     return row
   })

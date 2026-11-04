@@ -140,8 +140,10 @@ struct GreenlandSetup {
     double precipitation_reference_k{263.15};
     double precipitation_per_k{0.07};                    // Clausius-Clapeyron scaling with the surface temperature
     double thermal_forcing_k{2.0};                       // ocean at the fronts above freezing, start climate
-    double thermal_forcing_per_k{0.4};                   // per kelvin of global warming
-    double thermal_forcing_amoc_factor{1.0};             // per kelvin of north-box temperature change
+    double thermal_forcing_per_k{0.0};                   // per kelvin of global warming (beyond the ocean's own warming)
+    double thermal_forcing_per_north_k{0.5};             // per kelvin of north-box (subpolar upper-ocean) temperature change: the
+                                                         // subsurface Atlantic water at the fronts warms about half as much as the
+                                                         // upper 1000 m, and follows the overturning's heat transport
     double spinup_years{3000.0};
     double spinup_step_days{365.25 / 12.0};
     std::size_t substeps{3};                            // the ice sheet steps every n model steps (about monthly for 10-day steps)
@@ -281,13 +283,13 @@ Request parse_request(const Json& j) {
         read_into(cl, "precipitation_per_k", gl.precipitation_per_k);
         read_into(cl, "thermal_forcing_k", gl.thermal_forcing_k);
         read_into(cl, "thermal_forcing_per_k", gl.thermal_forcing_per_k);
-        read_into(cl, "thermal_forcing_amoc_factor", gl.thermal_forcing_amoc_factor);
+        read_into(cl, "thermal_forcing_per_north_k", gl.thermal_forcing_per_north_k);
         read_into(g, "spinup_years", gl.spinup_years);
         if (g.contains("step_every")) gl.substeps = required_positive_size(g, "step_every");
         if (gl.substeps > 12) throw std::invalid_argument("greenland.step_every must lie within 1-12");
         if (gl.south_sea_level_temperature_k < 230.0 || gl.south_sea_level_temperature_k > 300.0 || std::abs(gl.temperature_gradient_k_per_km) > 0.05 || gl.seasonal_amplitude_k < 0.0 || gl.seasonal_amplitude_k > 30.0 ||
             gl.warming_amplification < 0.0 || gl.warming_amplification > 5.0 || gl.precipitation_m_we_yr < 0.0 || gl.precipitation_m_we_yr > 5.0 || gl.precipitation_per_k < 0.0 || gl.precipitation_per_k > 0.2 ||
-            gl.thermal_forcing_k < -2.0 || gl.thermal_forcing_k > 10.0 || gl.thermal_forcing_per_k < 0.0 || gl.thermal_forcing_per_k > 3.0 || gl.thermal_forcing_amoc_factor < 0.0 || gl.thermal_forcing_amoc_factor > 3.0 ||
+            gl.thermal_forcing_k < -2.0 || gl.thermal_forcing_k > 10.0 || gl.thermal_forcing_per_k < 0.0 || gl.thermal_forcing_per_k > 3.0 || gl.thermal_forcing_per_north_k < 0.0 || gl.thermal_forcing_per_north_k > 3.0 ||
             gl.spinup_years < 0.0 || gl.spinup_years > 20000.0) {
             throw std::invalid_argument("greenland climate parameters are outside their supported ranges");
         }
@@ -552,7 +554,7 @@ MemberResult run_member(const Request& r, const Scenario& sc, const Baseline& ba
         // Greenland: every `substeps` model steps, over their combined interval (forced at its middle).
         double g_flux_anomaly = 0.0, thermal_forcing = 0.0;
         if (gl.enabled) {
-            thermal_forcing = gl.thermal_forcing_k + gl.thermal_forcing_per_k * warming + gl.thermal_forcing_amoc_factor * (ob.north_temperature_k - out.north_reference_k);
+            thermal_forcing = gl.thermal_forcing_k + gl.thermal_forcing_per_k * warming + gl.thermal_forcing_per_north_k * (ob.north_temperature_k - out.north_reference_k);
             if (k % static_cast<long long>(gl.substeps) == 0) {
                 const long long n = std::min<long long>(static_cast<long long>(gl.substeps), steps - k);
                 const double span = dt * static_cast<double>(n);

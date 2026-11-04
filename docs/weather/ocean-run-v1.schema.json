@@ -545,7 +545,7 @@
         "sea_ice": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Sea ice (zero-layer Semtner thermodynamics with a concentration): needs thermal_layers and forcing.air_sea. The covered fraction takes the ocean-ice heat flux and has its own surface energy balance; open water below the freezing point forms frazil; freezing rejects brine (ice keeps ice_salinity_psu), melt returns fresh water; ice shelters the water from the wind stress.",
+          "description": "Sea ice (zero-layer Semtner thermodynamics with a concentration): needs thermal_layers and forcing.air_sea. The covered fraction takes the ocean-ice heat flux and has its own surface energy balance; open water below the freezing point forms frazil; freezing rejects brine (ice keeps ice_salinity_psu), melt returns fresh water; ice shelters the water from the wind stress. The ice drifts freely with the upper-ocean current plus a share of the wind (Nansen), is carried upwind between sea cells (coasts are walls) and ridges where it converges, up to maximum_ridge_thickness_m.",
           "properties": {
             "enabled": {
               "type": "boolean",
@@ -626,6 +626,37 @@
               "minimum": 0.5,
               "maximum": 1,
               "default": 0.99
+            },
+            "drift": {
+              "type": "boolean",
+              "default": true
+            },
+            "wind_drift_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.1,
+              "default": 0.02,
+              "description": "Ice speed from the wind as a share of the 10 m wind speed."
+            },
+            "wind_turning_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "default": 30,
+              "description": "Turning of the wind drift to the right of the wind in the northern hemisphere (left in the southern)."
+            },
+            "maximum_drift_m_s": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 5,
+              "default": 1.5
+            },
+            "maximum_ridge_thickness_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 30,
+              "default": 4.0,
+              "description": "Ice stops moving into a cell at the maximum concentration that is at least this thick (a stand-in for the ice strength free drift lacks)."
             }
           }
         }
@@ -1293,7 +1324,7 @@
             "ramp_sv_per_year",
             "max_sv"
           ],
-          "description": "Meltwater hosing: F = min(max_sv, ramp (t - start)) of fresh water at 0 degC spread evenly over the sea cells within the circle (glacial meltwater of the budgets).",
+          "description": "Meltwater hosing: F = min(max_sv, ramp (t - start)) until end_seconds, then down at the same ramp, of fresh water at 0 degC spread evenly over the sea cells within the circle (glacial meltwater of the budgets).",
           "properties": {
             "center_east_m": {
               "type": "number"
@@ -1318,6 +1349,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 5
+            },
+            "end_seconds": {
+              "type": "number",
+              "description": "After this time the hosing ramps down at the same rate to zero (default: never)."
             }
           }
         }
@@ -1396,7 +1431,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 5,
-          "default": 0.35,
+          "default": 0.4,
           "description": "Snowfall at the reference air temperature."
         },
         "precipitation_reference_k": {

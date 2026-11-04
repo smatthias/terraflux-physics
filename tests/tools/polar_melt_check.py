@@ -110,6 +110,12 @@ with tempfile.TemporaryDirectory() as temporary:
     assert shortfall(len(years) - 1) > shortfall(early) + 1.5, f'the north falls short of its warming after the collapse ({shortfall(early):.2f} -> {shortfall(len(years) - 1):.2f} K)'
     before = years.index(1950)
     assert s['heat_transport_pw'][-1] < 0.3 * s['heat_transport_pw'][0], 'the northward heat transport is lost'
+    # The fronts feel the subpolar ocean: thermal forcing = start value + per_north_k x north-box warming (+ per_k x
+    # global warming), so it follows both the climate and the overturning's heat transport and counts neither twice.
+    clim = fast['greenland']['climate']
+    for k in range(len(years)):
+        expected = clim['thermal_forcing_k'] + clim['thermal_forcing_per_north_k'] * s['north_atlantic_temperature_change_k'][k] + clim['thermal_forcing_per_k'] * s['global_warming_k'][k]
+        assert abs(s['ocean_thermal_forcing_k'][k] - expected) < 2e-3 + 1e-3 * abs(expected), f'thermal forcing at the fronts in {years[k]}'
     # Recovery time grows toward the threshold (critical slowing down) and is undefined past it.
     finite = [v for v in s['recovery_time_years'][:before] if v is not None]
     assert finite[-1] > finite[0] and s['recovery_time_years'][-1] is None
@@ -153,6 +159,7 @@ with tempfile.TemporaryDirectory() as temporary:
         ('ensemble', lambda d: d['ensemble'].update(salinity_difference_psu=[0.8, 4.0])),
         ('arctic', lambda d: d['arctic_sea_ice'].update(relative_humidity=2.0)),
         ('no-greenland', lambda d: d.pop('greenland')),
+        ('thermal-forcing', lambda d: d['greenland']['climate'].update(thermal_forcing_per_north_k=5.0)),
     ]
     for name, mutate in mutations:
         invalid = copy.deepcopy(fast)

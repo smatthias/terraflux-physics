@@ -109,14 +109,14 @@ The polar melt suite (`weather.polar_melt`) covers:
   - the recovery time growing towards the threshold and matching the decay of a perturbation;
   - early-warning statistics and Kendall's τ;
 - oxygen solubility reference values;
-- the ocean kernel's sea ice (freezing over with brine rejection, summer melt, melt from below by warm water) and glacial meltwater and icebergs (volume, no salt, latent cooling, a glacier lens), with volume, salt and heat budgets every step;
+- the ocean kernel's sea ice (freezing over with brine rejection, summer melt, melt from below by warm water, free drift with Nansen turning by hemisphere, conservation, packing, ridging to the ridge thickness and melt over warm water) and glacial meltwater and icebergs (volume, no salt, latent cooling, a glacier lens), with volume, salt and heat budgets every step;
 - contract rejections.
 
 Related CTest cases:
 
 - `weather.polar_melt_cli` runs a fast variant of the polar melt CLI with every event, checking contract, identities, physics, schemas and rejections.
 - `weather.polar_ocean_cli` runs one year of the polar ocean example with hosing and warming against a control. It checks budgets with sea-ice and glacial water, map–total identities, the hosing ramp, a weaker next-winter overturning, a glacial lens and rejections.
-- `weather.viewer_polar_melt` and `weather.viewer_polar_ocean` regenerate the two fixtures and compare them. The latter takes about 3.5 minutes and has the label `slow`.
+- `weather.viewer_polar_melt` and `weather.viewer_polar_ocean` regenerate the two fixtures and compare them. The latter takes about 5 minutes and has the label `slow`.
 
 Build and run the registered CTest case with:
 
@@ -124,7 +124,7 @@ Build and run the registered CTest case with:
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
-ctest --test-dir build --output-on-failure -LE slow   # skip the 3.5-minute polar ocean fixture check
+ctest --test-dir build --output-on-failure -LE slow   # skip the 5-minute polar ocean fixture check
 ~~~
 
 Keep expected results and tolerances tied to the model assumptions and numerical resolution. Do not treat a visually plausible result as physical validation.

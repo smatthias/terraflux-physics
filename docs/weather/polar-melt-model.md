@@ -58,7 +58,7 @@ The overturning is a two-box model: a north box (subpolar North Atlantic, 10¹�
 
 ### 1.5 Coupling in Mode B, per 10-day step
 
-1. The warming scenario sets the Greenland air. This includes amplification (1.6× in the example), the seasonal cycle, the latitude gradient and the lapse rate to the ice surface. Snowfall is scaled by 7 %/K. The ocean thermal forcing at the fronts rises with warming and with the north-box temperature. Greenland steps every third model step.
+1. The warming scenario sets the Greenland air. This includes amplification (1.6× in the example), the seasonal cycle, the latitude gradient and the lapse rate to the ice surface. Snowfall is scaled by 7 %/K. The ocean thermal forcing at the fronts rises by half of the north box's warming (`thermal_forcing_per_north_k` 0.5). The subsurface Atlantic water at the fronts follows both the climate and the overturning's heat transport, but warms less than the upper 1000 m. In the high scenario it rises from 2.5 K to 5.5 K by 2100, in line with the 2–4 K increase of the ISMIP6 ocean forcing. Greenland steps every third model step.
 2. The warming sets the Arctic air over the sea-ice column, whose Atlantic-water heat follows the overturning.
 3. The fresh water into the north box is the sum of four terms:
    - the calibrated present forcing;
@@ -74,36 +74,54 @@ Both the ice sheet and the Arctic column are spun up under the start climate: Gr
 - **Present circulation.** The box is calibrated to 17 Sv, T_S − T_N = 15 K and S_S − S_N = 1.0 psu. The calibration derives k and the temperature targets so that this state is steady: k = 9.5·10⁹ m³/s, present F = 0.486 Sv, and F_crit = 0.675 Sv at the start climate, so the start lies 0.19 Sv below the threshold.
   - The salinity contrast is the least constrained parameter, and it sets the distance to the tipping point. A larger contrast means a more salt-limited circulation that sits closer to the threshold. That is why it is the first ensemble axis (0.8 / 1.0 / 1.2 psu).
   - The second axis is Greenland's warming amplification (1.3 / 1.6 / 2.0).
-- **Box volumes and relaxation time.** The volumes, τ = 5 years and the amplifications give a recovery time of 22 years today and an AMOC weakening by 2100 of about −16 % / −24 % / −41 % for the low / intermediate / high scenarios. These lie within the CMIP6 ranges assessed by IPCC AR6: a multi-model mean of 24 % (4–46 %) for SSP1-2.6 and 39 % (17–55 %) for SSP5-8.5.
+- **Box volumes and relaxation time.** The volumes, τ = 5 years and the amplifications give a recovery time of 22 years today and an AMOC weakening by 2100 of about −17 % / −25 % / −44 % for the low / intermediate / high scenarios. These lie within the CMIP6 ranges assessed by IPCC AR6: a multi-model mean of 24 % (4–46 %) for SSP1-2.6 and 39 % (17–55 %) for SSP5-8.5.
 - **Arctic column.** Mean air 255.65 K, seasonal amplitude 17 K, amplification 3, export 12 %/yr and area 7·10⁶ km² give about 5.6 m of ice in March after the spin-up. The first ice-free September comes at about 1.9 K of global warming, close to the CMIP6-based estimates of about 1.5–2 K (SIMIP Community 2020).
-- **Greenland.** The grid is 26 × 56 cells at 50 km on an elliptic island with a 3000 m initial dome, 0.35 m w.e. of snowfall at 263 K and thermal forcing of 2.5 K + 0.4 K/K. The spun-up sheet holds 7.8 m sea-level equivalent (observed: 7.4 m). The surface mass balance turns negative at about 1.8 K of global warming. Published thresholds for Greenland's long-term decline span roughly 1–3 K, for example 0.8–3.2 K in Robinson et al. (2012).
+- **Greenland.** The setup:
+  - an elliptic island on 26 × 56 cells of 50 km with a 3000 m initial dome;
+  - 0.6 m w.e. of snowfall at 263 K;
+  - Glen's rate factor with an enhancement factor of 4 (A = 1.27·10⁻²³ Pa⁻³ s⁻¹, a common choice for shallow-ice models that cannot resolve fast outlet glaciers);
+  - a thermal forcing of 2.5 K plus half the north box's warming.
+
+  The calibration reproduces the size and the mass turnover of the ice sheet:
+  - The spun-up sheet holds 7.40 m of sea-level equivalent (observed: 7.42 m).
+  - Its surface mass balance is 378 Gt/yr, balanced by about the same discharge (calving and frontal melt). Runoff is about 255 Gt/yr of a total freshwater output of 633 Gt/yr.
+  - For comparison, reconstructions of the 1961–1990 reference period give an SMB of about 400 Gt/yr, discharge of 400–450 Gt/yr and runoff of 250–300 Gt/yr.
+  - In 2020 the SMB has fallen to 284 Gt/yr.
+  - It turns negative at about 2.5–2.7 K of global warming (intermediate 2087, high 2058); the low scenario never gets there. Published thresholds are about 1.9–4.6 K (Gregory & Huybrechts 2006) for a negative SMB and 0.8–3.2 K (Robinson et al. 2012) for long-term decline, which includes dynamics.
+  - Greenland's sea-level contribution from 2020 to 2100 is 7 / 10 / 17 cm for the low / intermediate / high scenarios. IPCC AR6 gives 6 (1–10) / 8 (4–13) / 13 (9–18) cm for SSP1-2.6 / SSP2-4.5 / SSP5-8.5, so the model sits in the upper half of the likely ranges.
 
 ## 3. Results of the example (central calibration)
 
 | Scenario (global warming 2100 / 2300) | AMOC 2100 | First ice-free September | Greenland SMB < 0 | Tipping point crossed | Weakened 50 % | Collapsed (< 20 %) | Ensemble: collapsed members (range) | Greenland sea level vs control 2100 / 2300 |
 |---|---|---|---|---|---|---|---|---|
-| low, about SSP1-2.6 (1.8 / 1.5 K) | 14.3 Sv (−16 %) | — | 2056 (1.7 K) | — | — | — | 0 / 9 | 9 cm / 18 cm |
-| intermediate, about SSP2-4.5 (2.7 / 3.5 K) | 12.9 Sv (−24 %) | 2047 (1.9 K) | 2043 (1.8 K) | 2147 (3.0 K) | — | — (slow passage) | 3 / 9 (2190–2205); 6 / 9 cross the threshold | 11 cm / 34 cm |
-| high, about SSP5-8.5 (4.4 / 8.5 K) | 10.0 Sv (−41 %) | 2037 (1.9 K) | 2035 (1.8 K) | 2062 (2.9 K) | 2115 (4.8 K) | **2146 (5.6 K)** | 9 / 9 (2114–2189, median 2146) | 16 cm / 124 cm |
+| low, about SSP1-2.6 (1.8 / 1.5 K) | 14.2 Sv (−17 %) | — | — | — | — | — | 0 / 9 | 10 cm / 21 cm |
+| intermediate, about SSP2-4.5 (2.7 / 3.5 K) | 12.7 Sv (−25 %) | 2046 (1.9 K) | 2087 (2.5 K) | 2121 (2.8 K) | 2274 (3.5 K) | — (slow passage) | 3 / 9 (2178–2195); 6 / 9 cross the threshold | 13 cm / 45 cm |
+| high, about SSP5-8.5 (4.4 / 8.5 K) | 9.6 Sv (−44 %) | 2037 (1.9 K) | 2058 (2.7 K) | 2060 (2.8 K) | 2110 (4.7 K) | **2139 (5.4 K)** | 9 / 9 (2109–2178, median 2139) | 20 cm / 149 cm |
 
 Warming is relative to 1850. Percentages are relative to the 1850 strength. In 2020 the model circulation is already about 8 % weaker than in 1850.
 
 What the table says:
 
-- **When do the currents collapse?** In this model, the tipping point is crossed at about 3 K of global warming, after the summer sea ice is gone and Greenland has started to lose mass at its surface. The collapse follows the crossing with a lag of about 80 years in the high scenario.
+- **When do the currents collapse?** In this model, the tipping point is crossed at about 2.8 K of global warming, after the summer sea ice is gone and at about the time Greenland starts to lose mass at its surface. The collapse follows the crossing with a lag of about 80 years in the high scenario.
   - The lag is *slow passage*: the circulation is already committed but takes decades to run down.
-  - In the intermediate scenario the forcing lingers near the threshold. The central run crosses it in 2147 but has not collapsed by 2300, while a third of the ensemble collapses around 2200.
+  - In the intermediate scenario the forcing lingers near the threshold. The central run crosses it in 2121 and is half as strong by 2274, but has not collapsed by 2300. A third of the ensemble collapses between 2178 and 2195.
   - Read the dates as scenario-relative, not as a forecast. They move by decades with the salinity contrast, the Greenland sensitivity and the box calibration, which is why the ensemble is shown.
-- **Freshwater cap versus warming.** At the crossing in the high scenario (about 2062), only about 0.05 Sv of fresh water has been added: 0.023 Sv from Greenland, 0.028 Sv from the stronger water cycle, and about zero from the Arctic. The Arctic releases stored fresh water as it melts, but thinner ice also exports less. Meanwhile the threshold has fallen by 0.13 Sv, from 0.67 Sv to 0.54 Sv, because warming weakens the thermal drive. It falls to 0.31 Sv at +8.5 K.
+- **Freshwater cap versus warming.** At the crossing in the high scenario (about 2060), only about 0.06 Sv of fresh water has been added: 0.029 Sv from Greenland, 0.028 Sv from the stronger water cycle, and about zero from the Arctic. The Arctic releases stored fresh water as it melts, but thinner ice also exports less. Meanwhile the threshold has fallen by 0.13 Sv, from 0.67 Sv to 0.54 Sv, because warming weakens the thermal drive. It falls to 0.31 Sv at +8.5 K.
   - The 0.19 Sv gap at the start therefore closes about one third through fresh water and two thirds through warming.
-  - Greenland's meltwater alone (0.04 Sv in 2100 in the high scenario) would not tip the circulation of the start climate. It is the combination that does.
-  - Greenland's sensitivity matters less than the present salinity contrast. Raising the amplification from 1.3× to 2.0× moves the crossing by only 4 years in the high scenario (2064 → 2060), but by 35 years in the intermediate one (2162 → 2127). It moves the collapse by 10–20 years.
-  - A present salinity contrast of 1.2 psu instead of 1.0 crosses about 20 years earlier; 0.8 psu crosses about 27 years later.
+  - Greenland's meltwater alone (0.06 Sv in 2100 in the high scenario) would not tip the circulation of the start climate. It is the combination that does.
+  - Greenland's sensitivity matters less than the present salinity contrast. Raising the amplification from 1.3× to 2.0× moves the crossing by only 5 years in the high scenario (2062 → 2057), but by 37 years in the intermediate one (2136 → 2099). It moves the collapse by 13–17 years.
+  - A present salinity contrast of 1.2 psu instead of 1.0 crosses about 20 years earlier; 0.8 psu crosses about 23 years later.
   - Mode A adds the other side of the cap: how a fresh surface layer shuts down convection locally, season by season.
 - **Ocean temperature and the ecosystem.** By 2100 in the high scenario, the tropical and South Atlantic box is 4.6 K warmer and the North Atlantic 6.0 K warmer. By 2300 the figures are 9.0 K and 12.8 K.
   - Oxygen solubility falls by 8 % in the south and 12 % in the north by 2100, and by 14 % / 22 % by 2300.
-  - The central Arctic is ice-free for about 110 days a year in the intermediate scenario by 2100. In the high scenario it is ice-free for 180 days by 2100 and nearly all year by 2300.
+  - The central Arctic is ice-free for about 110 days a year in the intermediate scenario by 2100. In the high scenario it is ice-free for 180 days by 2100 and all year by 2300.
   - These are physical stressors on ecosystems (warming, deoxygenation, habitat loss of sea ice, sea-level rise), not an ecosystem model.
+- **Could the collapse be seen coming?** A test run: the high scenario with 0.03 Sv of annual freshwater noise (`noise_sv`), 20 random seeds, and the control with the same noise. In each record, the trend of the variance and of the lag-1 autocorrelation of the annual overturning was measured over sliding windows (Kendall τ; here τ > 0.5 counts as a warning).
+  - With data until 2025 the warming runs are indistinguishable from the control: 1–2 of 20 warn in both.
+  - With 50-year windows and data until the tipping point (about 2060), the rising variance warns in 14 of 20 warming runs and in 2 of 20 controls. The autocorrelation warns in only 2 of 20.
+  - With 30-year windows nothing is detected.
+  - The statistical warning therefore comes, if at all, around the time the threshold is crossed. It also needs the variance rather than the autocorrelation, because the overturning's recovery time (decades) is long compared with the windows a century-scale record allows.
+  - The viewer lists the early-warning trends of a run made with noise.
 
 ## 4. Output (Mode B)
 
@@ -126,7 +144,7 @@ The timeline frames carry the Greenland maps of the `map_scenario` every `output
 - Greenland's ice in relief. Bed plus ice, with a 25× extra vertical scale so that a 3 km dome on a 2800 km island is visible.
 - Colour options: ice thickness, surface mass balance (red melt ↔ blue snow), melt, or the annual air temperature. Field layers show ice thickness, SMB and melt.
 - A metrics strip for the scenario in focus: overturning and its change, fresh water against the tipping point and its parts, recovery time, Greenland sea-level equivalent and rise vs control, SMB, Arctic March/September ice, ocean temperature and oxygen changes.
-- The **"When do the currents collapse?"** table: per scenario, the year and warming of each event, the ensemble range and the sea level in 2100 and at the end.
+- The **"When do the currents collapse?"** table: per scenario, the year and warming of each event, the ensemble range and the sea level in 2100 and at the end. For a run made with `noise_sv`, it also lists each scenario's early-warning trends (variance and autocorrelation, Kendall τ).
 - Scenario charts: overturning, sea level vs control, September ice, North Atlantic temperature, oxygen, and fresh water against the threshold.
 - The equilibrium diagram of the overturning: stable, unstable and reversed branches at the start and at the warmest climate, with the focused scenario's trajectory.
 - The playback line gives the year, the scenario and its warming.
@@ -137,7 +155,7 @@ Mode A is shown in the **Ocean streams** view ([ocean-circulation-model.md](ocea
 
 ## 6. Verification
 
-`tests/weather/polar_melt_test.cpp` (`weather.polar_melt`, about 1.4 s) covers:
+`tests/weather/polar_melt_test.cpp` (`weather.polar_melt`, about 3 s) covers:
 
 - **Positive degree days.** Limits and quadrature.
 - **Domes and routing.** Vialov and elliptic domes, and routing to the nearest sea cell.
@@ -158,7 +176,7 @@ The suite was mutation-checked: deliberately broken terms make it fail.
 
 Other checks:
 
-- `tests/tools/polar_melt_check.py` (`weather.polar_melt_cli`) runs a fast variant with every event happening. It checks the contract, the identities and the physics from the file alone, plus schema validity and request rejections.
+- `tests/tools/polar_melt_check.py` (`weather.polar_melt_cli`) runs a fast variant with every event happening. It checks the contract, the identities and the physics from the file alone, including the thermal forcing at the fronts following the north box and the early-warning statistics of a noisy run. It also checks schema validity and request rejections.
 - `weather.viewer_polar_melt` regenerates the example fixture (about 35 s) and compares.
 - Mode A checks are listed in [ocean-circulation-model.md](ocean-circulation-model.md) §8.5.
 
@@ -169,8 +187,8 @@ Other checks:
   - A synthetic elliptic island on a 50 km grid. Degree-day melt, not an energy balance.
   - Shallow-ice flow with no sliding, ice streams, ice shelves or isostasy. Outlet glaciers are represented by the Rignot frontal melt on a share of the margin.
   - The 3000-year spin-up leaves a small drift, which is removed with the control run.
-  - The surface mass balance of the spun-up sheet (about 130 Gt/yr) is lower than the observed 1961–1990 value (about 400 Gt/yr), with less discharge in compensation. The totals are right, the split is not.
+  - The calibration matches the volume and the mass turnover (SMB, discharge, runoff) of the reference period. Its discharge does not decline as fronts retreat out of the water, which may explain why the sea-level contribution sits in the upper half of the AR6 ranges.
 - **Arctic.** One column stands for the whole Arctic Ocean. There is no ice drift except a fixed export share and no ice-thickness distribution. The liquid freshwater reservoir is a linear store.
-- **Early warnings.** Early-warning statistics need long, noisy records. For a circulation that recovers in decades to centuries, one or two centuries of annual data cannot show the slowing down reliably; the deterministic recovery time shows it noise-free.
+- **Early warnings.** Early-warning statistics need long, noisy records, and they come late (§3). The deterministic recovery time shows the slowing down noise-free.
 - **Ecosystem indicators.** These are physical stressors only: temperature, oxygen solubility, sea ice and sea level. There is no biology, no carbon chemistry (acidification) and no oxygen consumption.
-- **Mode A** is a process demonstration in a synthetic basin over a decade, with prescribed, fast warming and hosing. Its overturning is a parametrised sinking and does not tip like the box model (see [ocean-circulation-model.md](ocean-circulation-model.md) §8.6).
+- **Mode A** is a process demonstration in a synthetic basin over a decade, with prescribed, fast warming and hosing. Its overturning is a parametrised sinking. In the recovery experiment it weakens to a quarter under 0.5 Sv of hosing and recovers to about 90 % within a decade after the hosing stops. It does not tip like the box model (see [ocean-circulation-model.md](ocean-circulation-model.md) §8.6).

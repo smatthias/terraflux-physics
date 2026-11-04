@@ -180,8 +180,9 @@ test('polar ocean fixture validates: seasonal sea ice, a melting ice sheet and h
   const winter = frames.map((f, k) => k).filter(k => Math.abs((frames[k].forecast.elapsed_seconds % YEAR) - 0.25 * YEAR) < 86400 * 3)
   const autumn = frames.map((f, k) => k).filter(k => Math.abs((frames[k].forecast.elapsed_seconds % YEAR) - 0.75 * YEAR) < 86400 * 3)
   assert.equal(winter.length, 10)
-  assert.ok(winter.every(k => m[k].sea_ice_area_mkm2 > 1), 'sea ice every spring')
-  assert.ok(autumn.slice(1).every(k => m[k].sea_ice_area_mkm2 < 0.05), 'no sea ice left at the end of the summer')
+  assert.ok(winter.every(k => m[k].sea_ice_area_mkm2 > 0.5), 'sea ice every spring')
+  assert.ok(autumn.every(k => m[k].sea_ice_area_mkm2 < 0.5 * m[winter[autumn.indexOf(k)]].sea_ice_area_mkm2), 'far less ice at the end of the summer')
+  assert.ok(m[autumn[0]].sea_ice_area_mkm2 > 0.2 && m[autumn.at(-1)].sea_ice_area_mkm2 === 0, 'ridged coastal ice survives the first summers, not the warmer ones')
   assert.ok(m[autumn[0]].overturning_sv < 0.3 * m[0].overturning_sv, 'the sinking is a winter process')
   // Warming and hosing: the same season a decade later.
   assert.ok(m.at(-1).hosing_sv > 0.49 && m.at(-1).glacial_sv >= m.at(-1).hosing_sv, 'glacial water = hosing + the ice sheet')
@@ -199,7 +200,7 @@ test('polar ocean fixture validates: seasonal sea ice, a melting ice sheet and h
   assert.ok(years.at(-1).greenland_smb_gt_yr < years[0].greenland_smb_gt_yr, 'the surface mass balance falls with warming')
   const events = overturningEvents(years)
   assert.ok(events.weakened_25pct !== null && events.weakened_50pct !== null && events.weakened_25pct <= events.weakened_50pct, 'weakened by 25 % then 50 %')
-  assert.ok(events.ice_free_summer !== null && events.ice_free_summer <= events.weakened_25pct, 'the summer sea ice goes first')
+  assert.ok(events.ice_free_summer !== null && events.ice_free_summer > events.weakened_50pct, 'the last (ridged) summer ice goes after the overturning has halved')
   assert.ok(events.last_pct > 0 && events.last_pct < 50)
   assert.equal(overturningEvents([]), null)
   // Same season across the years.
@@ -208,6 +209,7 @@ test('polar ocean fixture validates: seasonal sea ice, a melting ice sheet and h
   const series = polarOceanSeries(frames)
   assert.equal(series.length, 41)
   assert.ok(series.every(p => p.sea_ice_area_mkm2 >= 0 && p.mean_oxygen_umol_kg > 200))
+  assert.ok(series.some(p => p.sea_ice_max_drift_m_s > 0.03) && series.every(p => p.sea_ice_max_drift_m_s <= 1.5), 'the ice drifts at centimetres to decimetres per second')
 })
 
 test('non-polar fixtures carry no polar metrics', () => {
@@ -247,6 +249,8 @@ test('polar ocean contract rejects inconsistent blocks', () => {
   mutate(o => { o.frames[4].glacial.meltwater_m3_s = -1 }, 'Invalid glacial fresh water')
   mutate(o => { o.frames[4].hosing_sv = -0.1 }, 'Invalid hosing rate')
   mutate(o => { o.frames[4].thermal.surface_oxygen_umol_kg[land] = 300 }, 'Invalid surface oxygen')
+  mutate(o => { o.frames[4].sea_ice.ice_drift_east_m_s[land] = 0.1 }, 'Sea-ice drift must stay on the sea')
+  mutate(o => { o.frames[4].sea_ice.ice_drift_north_m_s[iced] = 3 }, 'below its cap')
 })
 
 test('polar colour helpers', () => {

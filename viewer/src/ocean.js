@@ -195,7 +195,9 @@ function validatePolarOcean(b, f, index, grid, processes, layered) {
   }
   if (processes.includes('sea_ice')) {
     const s = f.sea_ice
-    check(s && ['ice_thickness_m', 'ice_concentration', 'ice_surface_temperature_k', 'ocean_to_ice_heat_w_m2'].every(k => cellArray(s[k], count)), 'Invalid sea-ice arrays.')
+    check(s && ['ice_thickness_m', 'ice_concentration', 'ice_surface_temperature_k', 'ocean_to_ice_heat_w_m2', 'ice_drift_east_m_s', 'ice_drift_north_m_s'].every(k => cellArray(s[k], count)), 'Invalid sea-ice arrays.')
+    const cap = b.request.physics.sea_ice?.maximum_drift_m_s ?? 5
+    check(s.ice_drift_east_m_s.every((u, j) => mask[j] ? Math.hypot(u, s.ice_drift_north_m_s[j]) <= cap * 1.001 : u === 0 && s.ice_drift_north_m_s[j] === 0), 'Sea-ice drift must stay on the sea and below its cap.')
     check(['ice_area_km2', 'ice_extent_km2', 'ice_volume_km3', 'ice_water_m3_s', 'cumulative_ice_water_m3'].every(k => finite(s[k])) && s.ice_area_km2 >= 0 && s.ice_extent_km2 >= 0 && s.ice_volume_km3 >= 0, 'Invalid sea-ice totals.')
     check(close(s.cumulative_ice_water_m3, c.ice_water, 1e-9, 1e-3), 'Sea-ice water disagrees with the cumulative budget.')
     let iceArea = 0, iceVolume = 0, extent = 0
@@ -211,7 +213,7 @@ function validatePolarOcean(b, f, index, grid, processes, layered) {
     check(close(s.ice_volume_km3 * 1e9, iceVolume, 2e-3, area * 1e-2), 'Sea-ice volume disagrees with the thickness and concentration maps.')
     check(close(s.ice_extent_km2 * 1e6, extent, 1e-3, 1), 'Sea-ice extent disagrees with the 15 % concentration contour.')
     out.seaIce = {
-      thickness: s.ice_thickness_m, concentration: s.ice_concentration, surfaceTemperature: s.ice_surface_temperature_k, toIce: s.ocean_to_ice_heat_w_m2,
+      thickness: s.ice_thickness_m, concentration: s.ice_concentration, surfaceTemperature: s.ice_surface_temperature_k, toIce: s.ocean_to_ice_heat_w_m2, driftEast: s.ice_drift_east_m_s, driftNorth: s.ice_drift_north_m_s,
       area: s.ice_area_km2, extent: s.ice_extent_km2, volume: s.ice_volume_km3, water: s.ice_water_m3_s, cumulativeWater: s.cumulative_ice_water_m3,
     }
   }
@@ -258,6 +260,7 @@ export function summarizePolarOcean(frame) {
     glacial_m3_s: o.glacial.total, glacial_sv: o.glacial.total / 1e6, glacial_meltwater_m3_s: o.glacial.meltwater, glacial_ice_m3_s: o.glacial.ice, cumulative_glacial_km3: o.glacial.cumulative / 1e9,
     sea_ice_area_mkm2: o.seaIce ? o.seaIce.area / 1e6 : null, sea_ice_extent_mkm2: o.seaIce ? o.seaIce.extent / 1e6 : null, sea_ice_volume_km3: o.seaIce ? o.seaIce.volume : null,
     sea_ice_water_m3_s: o.seaIce ? o.seaIce.water : null,
+    sea_ice_max_drift_m_s: o.seaIce ? Math.max(0, ...o.seaIce.driftEast.map((u, i) => Math.hypot(u, o.seaIce.driftNorth[i]))) : null,
     greenland_sle_m: o.iceSheet ? o.iceSheet.sle : null, greenland_sea_level_rise_mm: o.iceSheet ? o.iceSheet.seaLevelRise * 1000 : null, greenland_smb_gt_yr: o.iceSheet ? o.iceSheet.smbGt : null,
     greenland_runoff_m3_s: o.iceSheet ? o.iceSheet.runoff : null, greenland_discharge_m3_s: o.iceSheet ? o.iceSheet.calving + o.iceSheet.frontal : null,
     greenland_thermal_forcing_k: o.iceSheet ? o.iceSheet.thermalForcing : null,
