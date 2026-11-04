@@ -25,29 +25,22 @@ void require_finite(double value, const char* field) {
 
 }  // namespace
 
-void validate_dry_transport_config(const DryTransportConfig& config) {
-    (void)cell_count(config.grid);
-    if (config.start_time_utc.empty() || config.start_time_utc.back() != 'Z') {
-        throw std::invalid_argument("start_time_utc must be a UTC timestamp ending in Z");
-    }
-    if (config.boundary_condition != "periodic") {
-        throw std::invalid_argument("v1 dry transport supports periodic boundaries only");
-    }
-
-    require_finite(config.grid.origin_east_m, "grid east origin must be finite");
-    require_finite(config.grid.origin_north_m, "grid north origin must be finite");
-    require_finite(config.grid.spacing_east_m, "east grid spacing must be finite");
-    require_finite(config.grid.spacing_north_m, "north grid spacing must be finite");
-    if (config.grid.spacing_east_m <= 0.0 || config.grid.spacing_north_m <= 0.0) {
+void validate_transport_grid(const TransportGrid2D& grid) {
+    (void)cell_count(grid);
+    require_finite(grid.origin_east_m, "grid east origin must be finite");
+    require_finite(grid.origin_north_m, "grid north origin must be finite");
+    require_finite(grid.spacing_east_m, "east grid spacing must be finite");
+    require_finite(grid.spacing_north_m, "north grid spacing must be finite");
+    if (grid.spacing_east_m <= 0.0 || grid.spacing_north_m <= 0.0) {
         throw std::invalid_argument("grid spacing must be positive");
     }
 
     const long double east_extent =
-        static_cast<long double>(config.grid.origin_east_m) +
-        static_cast<long double>(config.grid.nx) * config.grid.spacing_east_m;
+        static_cast<long double>(grid.origin_east_m) +
+        static_cast<long double>(grid.nx) * grid.spacing_east_m;
     const long double north_extent =
-        static_cast<long double>(config.grid.origin_north_m) +
-        static_cast<long double>(config.grid.ny) * config.grid.spacing_north_m;
+        static_cast<long double>(grid.origin_north_m) +
+        static_cast<long double>(grid.ny) * grid.spacing_north_m;
     if (!std::isfinite(east_extent) || !std::isfinite(north_extent) ||
         std::abs(east_extent) > std::numeric_limits<double>::max() ||
         std::abs(north_extent) > std::numeric_limits<double>::max()) {
@@ -55,16 +48,26 @@ void validate_dry_transport_config(const DryTransportConfig& config) {
     }
 
     require_finite(
-        config.grid.geographic_anchor_longitude_deg,
+        grid.geographic_anchor_longitude_deg,
         "geographic anchor longitude must be finite");
     require_finite(
-        config.grid.geographic_anchor_latitude_deg,
+        grid.geographic_anchor_latitude_deg,
         "geographic anchor latitude must be finite");
-    if (config.grid.geographic_anchor_longitude_deg < -180.0 ||
-        config.grid.geographic_anchor_longitude_deg > 180.0 ||
-        config.grid.geographic_anchor_latitude_deg < -90.0 ||
-        config.grid.geographic_anchor_latitude_deg > 90.0) {
+    if (grid.geographic_anchor_longitude_deg < -180.0 ||
+        grid.geographic_anchor_longitude_deg > 180.0 ||
+        grid.geographic_anchor_latitude_deg < -90.0 ||
+        grid.geographic_anchor_latitude_deg > 90.0) {
         throw std::invalid_argument("geographic projection anchor is outside longitude/latitude bounds");
+    }
+}
+
+void validate_dry_transport_config(const DryTransportConfig& config) {
+    validate_transport_grid(config.grid);
+    if (config.start_time_utc.empty() || config.start_time_utc.back() != 'Z') {
+        throw std::invalid_argument("start_time_utc must be a UTC timestamp ending in Z");
+    }
+    if (config.boundary_condition != "periodic") {
+        throw std::invalid_argument("v1 dry transport supports periodic boundaries only");
     }
 
     require_finite(config.timestep_seconds, "timestep must be finite");

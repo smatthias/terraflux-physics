@@ -1,0 +1,142 @@
+{
+  "schema_version": "terraflux.ocean.circulation-run/v1",
+  "time": {
+    "start_time_utc": "2026-01-01T00:00:00Z",
+    "timestep_seconds": 1800.0,
+    "steps": 35040,
+    "spinup_steps": 70080
+  },
+  "grid": {
+    "nx": 50,
+    "ny": 40,
+    "origin_east_m": 0.0,
+    "origin_north_m": 0.0,
+    "spacing_east_m": 60000.0,
+    "spacing_north_m": 60000.0,
+    "geographic_anchor_longitude_deg": -45.0,
+    "geographic_anchor_latitude_deg": 38.0
+  },
+  "basin": {
+    "sea_level_m": 0.0,
+    "terrain": {
+      "base_elevation_m": -4000.0,
+      "ridges": [
+        {
+          "orientation_deg": 0.0,
+          "center_east_m": -200000.0,
+          "center_north_m": 1200000.0,
+          "height_m": 9000.0,
+          "half_width_m": 450000.0,
+          "length_m": 6000000.0
+        },
+        {
+          "orientation_deg": 0.0,
+          "center_east_m": 3200000.0,
+          "center_north_m": 1200000.0,
+          "height_m": 9000.0,
+          "half_width_m": 450000.0,
+          "length_m": 6000000.0
+        },
+        {
+          "orientation_deg": 60.0,
+          "center_east_m": 330000.0,
+          "center_north_m": 1000000.0,
+          "height_m": 5000.0,
+          "half_width_m": 80000.0,
+          "length_m": 500000.0
+        },
+        {
+          "orientation_deg": 90.0,
+          "center_east_m": 2300000.0,
+          "center_north_m": 2350000.0,
+          "height_m": 6000.0,
+          "half_width_m": 180000.0,
+          "length_m": 1300000.0
+        }
+      ]
+    },
+    "sponge": {
+      "south_rows": 4,
+      "time_scale_s": 432000.0
+    }
+  },
+  "ocean": {
+    "initial_thickness_m": 600.0,
+    "initial_salinity_psu": 35.0,
+    "initial_temperature_k": 289.15
+  },
+  "physics": {
+    "coriolis_mode": "beta_plane",
+    "linear_friction_s": 1e-06,
+    "lateral_viscosity_m2_s": 300.0,
+    "tracer_diffusivity_m2_s": 500.0,
+    "stream_speed_threshold_m_s": 0.15,
+    "plume_salinity_deficit_psu": 0.5,
+    "convection_time_scale_s": 12600000.0,
+    "sponge_time_scale_s": 432000.0
+  },
+  "forcing": {
+    "wind": {
+      "kind": "gyre",
+      "stress_amplitude_pa": 0.25,
+      "gyres": 2,
+      "south_margin_m": 200000.0
+    },
+    "surface_temperature": {
+      "south_k": 290.15,
+      "north_k": 285.15,
+      "cold_patches": [
+        {
+          "east_m": 700000.0,
+          "north_m": 2100000.0,
+          "radius_m": 380000.0,
+          "temperature_k": 277.15
+        }
+      ]
+    },
+    "net_precipitation": {
+      "south_m_s": -1e-08,
+      "north_m_s": 5e-09
+    },
+    "rivers": [
+      {
+        "name": "Great southern river",
+        "east_m": 260000.0,
+        "north_m": 700000.0,
+        "discharge_m3_s": 18000.0,
+        "temperature_k": 288.15
+      },
+      {
+        "name": "Northern river",
+        "east_m": 260000.0,
+        "north_m": 1700000.0,
+        "discharge_m3_s": 12000.0,
+        "temperature_k": 281.15
+      },
+      {
+        "name": "Alpine river (catchment run x200)",
+        "east_m": 260000.0,
+        "north_m": 1250000.0,
+        "discharge_m3_s": 0.0,
+        "temperature_k": 283.15,
+        "catchment_timeline_path": "viewer/public/flood/engine-timeline.json",
+        "catchment_scale": 200.0
+      },
+      {
+        "name": "Meltwater pulse",
+        "east_m": 1500000.0,
+        "north_m": 2300000.0,
+        "discharge_m3_s": 0.0,
+        "temperature_k": 274.15,
+        "events": [
+          {
+            "start_seconds": 31536000.0,
+            "duration_seconds": 31536000.0,
+            "discharge_m3_s": 300000.0
+          }
+        ]
+      }
+    ]
+  },
+  "snapshot_every_steps": 1728
+}

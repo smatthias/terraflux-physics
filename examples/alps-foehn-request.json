@@ -1,0 +1,103 @@
+{
+  "schema_version": "terraflux.weather.coupled-wind-run/v1",
+  "time": {
+    "start_time_utc": "2026-03-15T18:00:00Z",
+    "timestep_seconds": 300.0,
+    "steps": 432
+  },
+  "grid": {
+    "nx": 24,
+    "ny": 20,
+    "origin_east_m": -480000.0,
+    "origin_north_m": -400000.0,
+    "spacing_east_m": 40000.0,
+    "spacing_north_m": 40000.0,
+    "geographic_anchor_longitude_deg": 10.5,
+    "geographic_anchor_latitude_deg": 46.8
+  },
+  "atmosphere": {
+    "air_density_kg_m3": 1.2,
+    "surface_friction_coefficient_s": 2e-05,
+    "coriolis_mode": "f_plane"
+  },
+  "diffusion": {
+    "temperature_m2_s": 2000.0,
+    "humidity_m2_s": 2000.0,
+    "momentum_m2_s": 2000.0
+  },
+  "pressure_gradient_boundary": "one_sided",
+  "scalar_boundary": "zero_gradient",
+  "density_mode": "constant",
+  "pressure": {
+    "pressure_systems": {
+      "background_pressure_pa": 101000.0,
+      "centers": [
+        {
+          "kind": "low",
+          "east_m": -1500000.0,
+          "north_m": 0.0,
+          "pressure_anomaly_pa": -3000.0,
+          "radius_m": 1500000.0
+        }
+      ]
+    }
+  },
+  "initial_fields": {
+    "air_temperature_k": {
+      "background": 288.0,
+      "anomalies": [
+        {
+          "east_m": -1500000.0,
+          "north_m": 0.0,
+          "radius_m": 1500000.0,
+          "amplitude": 0.0
+        }
+      ]
+    },
+    "specific_humidity_kg_kg": {
+      "background": 0.0085,
+      "anomalies": [
+        {
+          "east_m": -1500000.0,
+          "north_m": 0.0,
+          "radius_m": 1500000.0,
+          "amplitude": 0.0
+        }
+      ]
+    }
+  },
+  "orography": {
+    "terrain": {
+      "base_elevation_m": 400.0,
+      "ridges": [
+        {
+          "orientation_deg": 90.0,
+          "center_east_m": 0.0,
+          "center_north_m": -40000.0,
+          "height_m": 2400.0,
+          "half_width_m": 70000.0,
+          "length_m": 700000.0
+        }
+      ],
+      "basins": [
+        {
+          "center_east_m": 60000.0,
+          "center_north_m": 140000.0,
+          "depth_m": 250.0,
+          "radius_m": 55000.0
+        }
+      ]
+    },
+    "blocking_time_scale_s": 1800.0,
+    "obstacle_radius_m": 200000.0,
+    "influence_radius_m": 100000.0,
+    "brunt_vaisala_s": 0.01,
+    "boundary_layer_depth_m": 1500.0,
+    "daytime_heating_k_per_s": 0.0001388888888888889,
+    "nocturnal_cooling_k_per_s": 0.00011111111111111112,
+    "diurnal_phase_seconds": -43200.0,
+    "valley_pooling_per_km": 1.5,
+    "initial_lapse_rate_k_m": 0.0065
+  },
+  "snapshot_every_steps": 72
+}

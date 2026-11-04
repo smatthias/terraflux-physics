@@ -1,0 +1,142 @@
+{
+  "schema_version": "terraflux.weather.coupled-wind-run/v1",
+  "time": {
+    "start_time_utc": "2026-08-10T00:00:00Z",
+    "timestep_seconds": 300.0,
+    "steps": 864
+  },
+  "grid": {
+    "nx": 16,
+    "ny": 12,
+    "origin_east_m": -480000.0,
+    "origin_north_m": -360000.0,
+    "spacing_east_m": 60000.0,
+    "spacing_north_m": 60000.0,
+    "geographic_anchor_longitude_deg": -75.0,
+    "geographic_anchor_latitude_deg": 15.0
+  },
+  "atmosphere": {
+    "air_density_kg_m3": 1.15,
+    "surface_friction_coefficient_s": 2e-05,
+    "coriolis_mode": "f_plane"
+  },
+  "diffusion": {
+    "temperature_m2_s": 5000.0,
+    "humidity_m2_s": 5000.0,
+    "momentum_m2_s": 5000.0
+  },
+  "pressure_gradient_boundary": "one_sided",
+  "scalar_boundary": "zero_gradient",
+  "density_mode": "diagnosed",
+  "pressure": {
+    "pressure_systems": {
+      "background_pressure_pa": 101000.0,
+      "centers": [
+        {
+          "kind": "high",
+          "east_m": 300000.0,
+          "north_m": 900000.0,
+          "pressure_anomaly_pa": 700.0,
+          "radius_m": 900000.0
+        }
+      ]
+    }
+  },
+  "initial_fields": {
+    "air_temperature_k": {
+      "background": 300.0,
+      "anomalies": [
+        {
+          "east_m": 300000.0,
+          "north_m": 900000.0,
+          "radius_m": 900000.0,
+          "amplitude": 0.0
+        }
+      ]
+    },
+    "specific_humidity_kg_kg": {
+      "background": 0.018,
+      "anomalies": [
+        {
+          "east_m": 300000.0,
+          "north_m": 900000.0,
+          "radius_m": 900000.0,
+          "amplitude": 0.0
+        }
+      ]
+    }
+  },
+  "column": {
+    "layer_count": 32,
+    "layer_thickness_m": 500.0,
+    "environment_lapse_rate_k_m": 0.0065,
+    "tropopause_height_m": 15000.0,
+    "humidity_scale_height_m": 2500.0,
+    "parcel_step_m": 50.0
+  },
+  "cloud_formation": {
+    "frontal_gradient_threshold_k_m": 2e-05,
+    "advection_threshold_k_s": 2.777777777777778e-05,
+    "boundary_layer_depth_m": 1500.0,
+    "lifting_time_scale_s": 21600.0,
+    "mixed_layer_growth_m_per_k": 300.0,
+    "warm_front_slope": 0.005,
+    "cold_front_slope": 0.013333333333333334,
+    "warm_front_reach_m": 800000.0,
+    "cold_front_reach_m": 200000.0,
+    "frontal_band_width_m": 150000.0,
+    "cin_trigger_j_kg": 20.0,
+    "cape_threshold_j_kg": 100.0,
+    "max_cloud_top_m": 15000.0,
+    "surface_heating": {
+      "amplitude_k": 3.0,
+      "phase_seconds": 0.0
+    }
+  },
+  "precipitation": {
+    "stratiform_efficiency": 0.7,
+    "convective_efficiency": 0.4,
+    "convective_updraft_fraction": 0.08,
+    "updraft_parcel_factor": 0.5,
+    "interval_seconds": 64800.0,
+    "snow_wet_bulb_k": 273.65,
+    "sleet_wet_bulb_k": 275.15,
+    "lightning_top_temperature_k": 253.15,
+    "hail_min_diameter_cm": 0.5,
+    "hail_melting_cm_per_km": 0.3,
+    "hail_max_diameter_cm": 10.0,
+    "drizzle_max_rate_mm_h": 0.5,
+    "virga_surface_rh": 0.4,
+    "virga_max_rate_mm_h": 1.0,
+    "virga_min_base_m": 2000.0,
+    "minimum_rate_mm_h": 0.05
+  },
+  "surface": {
+    "land": {
+      "coast_east_m": -200000.0,
+      "land_side": "west"
+    },
+    "sea_surface_temperature_k": {
+      "background": 302.5,
+      "gradient_north_k_per_m": 0.0
+    }
+  },
+  "storms": {
+    "seeds": [
+      {
+        "east_m": 300000.0,
+        "north_m": -40000.0,
+        "max_wind_m_s": 22.0,
+        "radius_max_wind_m": 40000.0
+      },
+      {
+        "east_m": 170000.0,
+        "north_m": 70000.0,
+        "max_wind_m_s": 18.0,
+        "radius_max_wind_m": 40000.0
+      }
+    ]
+  },
+  "severe": {},
+  "snapshot_every_steps": 216
+}

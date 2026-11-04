@@ -16,6 +16,21 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/observation-grid.md` — georeferenced observation projection, cell assignment, and quality preservation
 - `docs/weather/dry-transport-config-v1.schema.json` — dry transport configuration schema
 - `docs/weather/dry-transport-state-v1.schema.json` — dry transport state schema
+- `docs/weather/pressure-wind-model.md` — pressure-gradient wind with Coriolis deflection and surface friction: equations, balances, time stepping, configuration
+- `docs/weather/pressure-wind-run-v1.schema.json` and `pressure-wind-forecast-v1.schema.json` — pressure-wind run request and output schemas
+- `docs/weather/moist-air-relations.md` — estimated dependence between temperature, air density and humidity (ideal gas, Magnus form, sensitivities)
+- `docs/weather/coupled-wind-model.md` — coupled wind / moist-layer model: density feedback, scalar transport, configurable diffusion
+- `docs/weather/coupled-wind-run-v1.schema.json` and `coupled-atmosphere-v1.schema.json` — coupled run request and viewer timeline extension schemas
+- `docs/weather/atmospheric-column-model.md` — vertical layers: hydrostatic thinning, convective adjustment, surface-parcel ascent (LCL, LFC, EL, CAPE, CIN)
+- `docs/weather/column-run-v1.schema.json` and `column-profile-v1.schema.json` — column run request and profile output schemas
+- `docs/weather/coriolis-verification.md` — review of Coriolis direction and pressure-gradient acceleration conventions with the verification cases
+- `docs/weather/cloud-formation-model.md` and `cloud-formation-v1.schema.json` — fronts (cold/warm/stationary), frontal and convective cloud, thunderstorms; the documented output format accepted from the engine or from mocks
+- `docs/weather/storm-systems-model.md`, `storm-systems-v1.schema.json` and `surface-v1.schema.json` — tropical cyclones: potential intensity from humid air over a warm sea, genesis index, Fujiwhara interaction and mergers, landfall with surge and inland decay
+- `docs/weather/severe-convection-model.md` and `severe-convection-v1.schema.json` — capping temperature inversions, low-level shear and helicity, the Significant Tornado Parameter
+- `docs/weather/orography-model.md` and `orography-v1.schema.json` — mountains and valleys: ridge orientation as a weather border, Froude blocking and barrier jets, foehn (moist ascent ~0.6 K/100 m, dry descent ~1 K/100 m), orographic precipitation, valley cold-air pools
+- `docs/weather/catchment-hydrology-model.md`, `catchment-run-v1.schema.json` and `catchment-hydrology-v1.schema.json` — where the rain goes: depression-filled D8 drainage network with lakes, basins and ocean/edge outlets, snow → surface → soil → groundwater stores with Darcy flow and baseflow, kinematic overland/channel routing with bankfull overflow, and the hazard layer (flood depth × velocity classes, stream-power erosion/deposition, infinite-slope landslides with runout, rainfall intensity–duration warnings)
+- `docs/weather/ocean-circulation-model.md`, `ocean-run-v1.schema.json` and `ocean-circulation-v1.schema.json` — rain on the sea and the coast, evaporation, the air–sea heat exchange and the layered temperature/salinity column (§7), and the ocean streams: a reduced-gravity upper layer on a β-plane (Sverdrup interior, Stommel western boundary current, separation and extension, subpolar gyre), salinity and temperature with density feedback, river exchange points with surface plumes and mixing fronts, deep-water formation and the overturning that fresh water weakens
+- `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
@@ -33,6 +48,9 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
+- `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
+- `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline, optionally with per-cell vertical column diagnostics
+- `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
 ## Working principles
@@ -42,6 +60,48 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - Keep map parsing and physical calculations independent of rendering, networking, and user interface code.
 - State model assumptions, spatial and temporal scales, and boundary conditions.
 - Validate simple cases before combining processes.
+
+### Wind between high- and low-pressure systems
+
+The pressure-gradient wind module (`include/terraflux/weather/pressure_wind.hpp`) accelerates a single dry layer down the gradient of a prescribed pressure field, deflects it with the Coriolis force, and slows it with linear surface friction. Air therefore does not flow straight from high to low pressure: without friction it settles into the geostrophic wind along the isobars (low on the left in the Northern Hemisphere, on the right in the Southern Hemisphere), and with friction it crosses the isobars toward low pressure by `atan(k/|f|)`. Configuration is split into `time` (start, timestep, steps), `grid` (the shared transport grid and its anchor latitude), and `atmosphere` (density, friction coefficient, Coriolis mode: `none`, `f_plane`, `beta_plane`, or `prescribed`). Pressure is given per cell or built from Gaussian high/low centers.
+
+```sh
+./build/terraflux-run-pressure-wind examples/pressure-wind-request.json pressure-wind.json
+```
+
+The output includes the analytic geostrophic and friction-balanced winds as diagnostics. With periodic gradients on an f-plane the geostrophic wind is discretely divergence-free and can be supplied as the prescribed wind of the dry transport model. See [the model contract](docs/weather/pressure-wind-model.md).
+
+### Coupled wind, temperature, density and humidity
+
+`terraflux-run-coupled-wind` extends the pressure-driven wind with the fields that move with it: temperature and specific humidity are transported by the wind, air density is diagnosed from pressure, temperature and humidity (`ρ = p / (R_d T (1 + 0.608 q))`) and feeds back into the pressure-gradient acceleration, and relative humidity is reported as a diagnostic. The `diffusion` section configures separate temperature, humidity and momentum diffusivities that smooth the fields between the high and the low. The estimated dependence between the three values (about −0.35 % density per K, −0.6 % per 10 g/kg, RH falling ~4.9 points per K at fixed moisture) is documented in [moist-air relations](docs/weather/moist-air-relations.md); the model contract is [coupled wind model](docs/weather/coupled-wind-model.md).
+
+```sh
+./build/terraflux-run-coupled-wind examples/coupled-wind-request.json coupled-timeline.json
+```
+
+The output is a viewer timeline with a `coupled_atmosphere` extension. Pressure is prescribed and static; there is no condensation or latent heating in the horizontal layer.
+
+### Vertical layers, thinning and convection
+
+The atmospheric column module builds hydrostatic layers above each cell from its surface pressure, temperature and humidity: pressure and density thin with height (`dp/dz = −ρg` with moist-air density; the dry ISA profile is reproduced to 10⁻⁹). Two exchange processes connect the ground to higher altitudes: dry convective adjustment with saturation adjustment (mixing unstable layers, condensing supersaturated ones with latent heating, conserving enthalpy and water) and a lifted surface parcel that gives the lifting condensation level (cloud base), level of free convection, equilibrium level (cloud top), CAPE and CIN — the basis for cumulus cloud and thunderstorm potential. Add a `column` section to a coupled request to get these per cell and frame, or run one column in detail:
+
+```sh
+./build/terraflux-run-atmospheric-column examples/column-request.json profile.json
+```
+
+See [the column model contract](docs/weather/atmospheric-column-model.md). The Coriolis and pressure-gradient conventions were reviewed against the exact solution, a direction matrix over both hemispheres and textbook magnitudes: [coriolis-verification.md](docs/weather/coriolis-verification.md).
+
+### Cloud formation: fronts, convection and thunderstorms
+
+With a `cloud_formation` section the coupled CLI diagnoses cloud per cell and frame from two lifting mechanisms. Where warm, humid air meets colder air horizontally, the temperature gradient marks a frontal zone and the temperature advection decides whether cold air is advancing (cold front) or warm air (warm front); boundary-layer convergence lifts air at the front, warm air overruns the frontal wedge on the cold side, and layered cloud forms (nimbostratus → altostratus → cirrostratus with distance ahead of a warm front). Where the ground heats the surface parcel, it rises, cools and condenses: cumulus, towering cumulus and, with enough heating, cumulonimbus (summer thunderstorms). Both combine where frontal lifting releases convective energy. Output types, mechanisms, triggers, bases, tops and front fields follow the documented [cloud formation format](docs/weather/cloud-formation-model.md#output-format-documented-engine-or-mock); mocks in the same format are accepted when labelled `synthetic`.
+
+```sh
+./build/terraflux-run-coupled-wind examples/cloud-formation-request.json clouds.json
+```
+
+### Precipitation outcomes and the weather map
+
+A `precipitation` section turns every diagnosed cloud into its weather at the ground. Harmless genera (cirrus, cirrostratus, altocumulus, cumulus) deliver nothing; stratus drizzles; altostratus and stratocumulus give intermittent light precipitation or virga; nimbostratus gives prolonged moderate rain or snow; towering cumulus gives showers; cumulonimbus gives heavy showers, lightning (top colder than −20 °C across the freezing level) and hail sized by the updraft. The rate comes from condensation in the lifted air, the phase from the surface wet-bulb temperature (snow ≤ 0.5 °C, sleet ≤ 2 °C), intensity from WMO classes, and accumulation from genus-typical duration fractions. See [precipitation outcomes](docs/weather/precipitation-outcomes-model.md). The viewer's **Weather map** view composes switchable layers — base field, isobars, fronts, cloud genus, cloud volumes, precipitation shading, symbols, thunderstorm/hail markers, wind — over any loaded coupled timeline (engine fixture or labelled mock).
 
 ### Combined weather response
 
@@ -71,6 +131,68 @@ python3 tools/build_viewer_example.py --build-dir build --check
 ```
 
 CTest runs the regeneration check. The comparison allows relative floating-point differences of 1e-9 across platforms. The snapshot file contains the final state after 260 × 30-second dry-transport steps. The companion timeline contains 14 snapshots at ten-minute intervals, with static prescribed wind. Each positive-time frame includes radar-derived rainfall accumulated from the start up to that frame.
+
+### Coupled wind example and request editor
+
+**Load coupled wind example** opens the committed 24 × 18 output of `terraflux-run-coupled-wind` (7 snapshots over 48 h). Pressure, relative humidity, air density and specific humidity become selectable layers, and the cell inspector shows the coupled values. The **Coupled wind request** panel edits time steps, grid, atmosphere, the three diffusivities, boundaries, density mode and the high/low systems with their temperature and humidity anomalies. It reports the solver bounds (Coriolis/friction, momentum diffusion, an estimate of the scalar stability number at the spin-up peak) and the implicit upwind numerical diffusion, then downloads a request JSON to run with the C++ CLI. **Use loaded run's settings** fills the editor from an opened coupled timeline. With column diagnostics present, **Convective energy (CAPE)**, **Cloud base (LCL)** and **Equilibrium level** are additional layers and the inspector lists LCL, LFC, EL, CAPE, CIN and the potential class per cell; the editor's column fields configure layers, lapse rate, tropopause and humidity scale height. No physics is solved in the browser.
+
+### Cloud formation view
+
+**Load cloud formation example** opens the engine fixture (20 × 15 cells, 48 h, 8-hourly frames); **Cloud formation mock (synthetic)** builds a labelled mock in the same format. The **Cloud formation** layer colours cells by cloud genus, raises the ground by cloud fraction, draws translucent cloud volumes from base to top with thunderstorm markers, and overlays cold (blue), warm (red) and stationary (purple) frontal cells; the inspector lists genus, base/top, mechanism, trigger, front analysis and heated CAPE/CIN, and the metrics strip shows cover, thunderstorm and front counts. The request editor carries the full cloud configuration, the diurnal heating, and free air masses (warm sector / cold pool).
+
+### Weather map view
+
+**Weather map** (scene header) switches from the field explorer to a flat map with layers that can be toggled independently in **01b / Weather map layers**: base field (temperature / surface pressure / none), isobars at 1, 2 or 4 hPa with labels, fronts, cloud cover by genus, 3D cloud volumes, precipitation rate shading, precipitation symbols, ⚡/◆ hazard markers and wind vectors. The legend follows the active layers. It works for any coupled timeline; cloud and precipitation layers need the cloud formation example or mock.
+
+### Hurricanes, mergers, landfall and tornadoes
+
+With `surface` (coastline, sea-surface temperature) and `storms` sections the coupled CLI tracks tropical cyclones as objects: their energy is Emanuel's potential intensity from the enthalpy of saturated air at the sea surface versus the boundary layer; genesis follows the Emanuel–Nolan index (vorticity, mid-level humidity, potential intensity, shear); storms move with the steering flow and beta drift, rotate around each other through their induced winds (Fujiwhara) and merge when their cores overlap; at landfall the wind drops, a surge estimate is recorded and the storm decays by Kaplan–DeMaria. A `severe` section with a `column` inversion adds tornado potential: the capping inversion stores CAPE until heating breaks it, the Ekman turning of the surface wind supplies low-level helicity, and the Significant Tornado Parameter classifies the environment. See [storm systems](docs/weather/storm-systems-model.md) and [severe convection](docs/weather/severe-convection-model.md).
+
+```sh
+./build/terraflux-run-coupled-wind examples/hurricane-landfall-request.json hurricane.json
+./build/terraflux-run-coupled-wind examples/tornado-outbreak-request.json tornado.json
+```
+
+**Load hurricane landfall example** opens the committed run on the weather map with cyclone centres, category colours, tracks, landfall/merger/genesis markers, the storm wind field, coastal surge and land/sea as switchable layers; the field explorer adds storm wind, potential intensity, genesis index, surge, tornado parameter and helicity layers, and the request editor has the coastline, sea temperature, storm seeds, severe toggle and inversion fields.
+
+### Mountains: orientation, foehn and cold-air pools
+
+An `orography` section gives the coupled layer terrain (per cell, or synthetic ridges with an explicit axis orientation plus basins). Air moving along slopes changes temperature at the adiabatic rates — saturated ascent at the moist rate (about 0.6 K/100 m for cool air, computed from the thermodynamics), descent at the dry rate (about 1 K/100 m) — so a ridge crossing produces orographic precipitation on the windward side and the **foehn** (warm, dry) on the lee. Flow that cannot climb a range is blocked according to the cross-barrier Froude number and deflected along it, so a north–south range (Rockies) blocks zonal flow while an east–west range (Alps) blocks the north–south exchange; flow parallel to a ridge is untouched. A diurnal surface cycle enhanced in valleys lets cold air pool in basins at night. See [orography](docs/weather/orography-model.md).
+
+```sh
+./build/terraflux-run-coupled-wind examples/alps-foehn-request.json alps.json
+./build/terraflux-run-coupled-wind examples/rockies-barrier-request.json rockies.json
+```
+
+**Load Alps foehn example** opens the weather map on a hillshaded 3D relief with lifting, foehn, cold-pool, orographic-precipitation and blocking layers; the editor builds ridges by orientation.
+
+### Where the rain goes: rivers, lakes, groundwater — and floods, erosion, landslides
+
+`terraflux-run-catchment-hydrology` takes a terrain (per cell or the shared synthetic ridges/basins builder with tilt and roughness), its own time stepping (hydrology step, spin-up, snapshot cadence), the grid, soil / groundwater / channel / snow / hazard parameters and a forcing (rainfall events with optional Gaussian footprint and orographic enhancement, a lapse-rate diurnal air temperature, and/or the precipitation and temperature of a coupled-wind timeline). It fills depressions into lakes, derives the D8 river network, basins and outlets, and routes every drop through snow, surface, soil and aquifer stores to the rivers, the lakes and the sea while closing the water budget in every frame. The hazard layer classifies flooding by depth × velocity, bookkeeps stream-power erosion and deposition with a sediment yield, and fails saturated slopes with the infinite-slope factor of safety, running the debris downslope. See [catchment-hydrology-model.md](docs/weather/catchment-hydrology-model.md).
+
+```sh
+./build/terraflux-run-catchment-hydrology examples/alpine-flood-request.json flood.json
+```
+
+`terraflux-run-ocean-circulation` takes a basin (continents from the synthetic terrain builder or a mask, optional sponge rows as an open-boundary proxy), the ocean layer and physics parameters, and a forcing (gyre, uniform or coupled-wind wind stress; surface-temperature targets with cold formation patches; net precipitation; rivers with constant, event-driven or catchment-fed discharge). It runs the reduced-gravity layer — the wind-stress curl drives a Sverdrup interior whose return is the western boundary current, density gradients and deep-water formation drive the overturning — and reports the streams (core streamlines, speed, transport in Sverdrups), the salinity at the surface and in the layer, the exchange points with their plumes, the mixing fronts and the formation sites, with closed volume and salt budgets. See [ocean-circulation-model.md](docs/weather/ocean-circulation-model.md).
+
+```sh
+./build/terraflux-run-ocean-circulation examples/atlantic-streams-request.json ocean.json
+```
+
+**Rain over the sea and the coast, evaporation and a layered ocean.** `forcing.rain` lets rain fall on the sea (fresh water at its own temperature into the surface: a buoyant rain lens that cools the surface and caps convection until the wind erodes it) and on the land, where the coastal band drains directly to the nearest sea cell through a linear reservoir while land farther inland is left to the rivers and the catchment model; rain comes from events, moving storms or the cell-mean precipitation of a coupled-wind run. `forcing.air_sea` computes evaporation and the air–sea heat exchange by bulk formulae (Dalton evaporation and latent heat, sensible heat, Berliand longwave, Zillman/Reed shortwave from the sun's position), solved implicitly at the surface, from an analytic atmosphere with diurnal cycle and moving air masses (e.g. a cold, dry outbreak) or from a coupled run including its storm winds. `physics.thermal_layers` splits the upper ocean into a temperature and salinity column (sigma layers moving with the currents, shortwave penetration, convective adjustment, Kraus–Turner wind mixing, bulk-Richardson shear mixing, diffusion) with mixed-layer, isothermal-layer and barrier-layer diagnostics. Volume, salt, heat and the coastal land water close every step; without these sections the slab model and its output are unchanged. See [ocean-circulation-model.md §7](docs/weather/ocean-circulation-model.md#7-rain-over-the-sea-and-the-coast-evaporation-airsea-heat-and-the-layered-column).
+
+```sh
+./build/terraflux-run-ocean-circulation examples/ocean-heat-rain-request.json ocean-heat.json
+python3 tools/build_ocean_example.py --build-dir build            # regenerate viewer/public/ocean-heat
+python3 tools/build_ocean_example.py --build-dir build --check    # compare with the committed fixture
+```
+
+**Load ocean heat & rain example** opens the Ocean streams view on a late-summer subtropical basin: a tropical rain band crosses the sea and makes landfall, a storm floods the coastal plain, a cold dry outbreak draws heat and water out of the sea and the sun drives a daily warm layer. Colour the water by sea-surface temperature, mixed-layer depth, net heat flux or evaporation; overlays show rain on sea and land, the coastal band, runoff arrows to the sea and the surface lenses by source; the inspector decomposes the heat flux of a cell and tells where the rain on a land cell goes; the metrics strip, time series and a water-column panel (profile and time–depth section) show what happens.
+
+**Load Atlantic streams example** opens the **Ocean streams** view: water coloured by surface salinity (or speed, temperature, thermocline depth, freshwater fraction), streams sized by transport and coloured by speed with labels, current arrows, river mouths ⊕ with discharge and plume salinity, fronts, formation sites ⇩, and time series of the overturning, the main stream and the river input — the example's meltwater pulse collapses the overturning.
+
+**Load alpine flood example** opens the **Catchment** view (rivers sized by upstream area and coloured by discharge, lakes at their level, overland water, snow, rain; click a cell to trace its water to the outlet) and the **Hazards** view (flood classes, reaches above bankfull, erosion/deposition, landslides with runout, rainfall-threshold warnings); the field explorer adds discharge, soil saturation, water-table depth, snowpack, erosion, deposition, factor of safety and flood class, and the metrics panel shows the budget and a hydrograph at the peak or selected reach.
 
 ### Timeline playback
 
