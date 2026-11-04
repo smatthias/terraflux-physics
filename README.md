@@ -24,6 +24,8 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/atmospheric-column-model.md` — vertical layers: hydrostatic thinning, convective adjustment, surface-parcel ascent (LCL, LFC, EL, CAPE, CIN)
 - `docs/weather/column-run-v1.schema.json` and `column-profile-v1.schema.json` — column run request and profile output schemas
 - `docs/weather/coriolis-verification.md` — review of Coriolis direction and pressure-gradient acceleration conventions with the verification cases
+- `docs/weather/cloud-formation-model.md` and `cloud-formation-v1.schema.json` — fronts (cold/warm/stationary), frontal and convective cloud, thunderstorms; the documented output format accepted from the engine or from mocks
+- `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
 - `docs/weather/noaa-mrms.md` — NOAA MRMS acquisition, bounded GRIB2 decoding, and attribution
@@ -84,6 +86,18 @@ The atmospheric column module builds hydrostatic layers above each cell from its
 
 See [the column model contract](docs/weather/atmospheric-column-model.md). The Coriolis and pressure-gradient conventions were reviewed against the exact solution, a direction matrix over both hemispheres and textbook magnitudes: [coriolis-verification.md](docs/weather/coriolis-verification.md).
 
+### Cloud formation: fronts, convection and thunderstorms
+
+With a `cloud_formation` section the coupled CLI diagnoses cloud per cell and frame from two lifting mechanisms. Where warm, humid air meets colder air horizontally, the temperature gradient marks a frontal zone and the temperature advection decides whether cold air is advancing (cold front) or warm air (warm front); boundary-layer convergence lifts air at the front, warm air overruns the frontal wedge on the cold side, and layered cloud forms (nimbostratus → altostratus → cirrostratus with distance ahead of a warm front). Where the ground heats the surface parcel, it rises, cools and condenses: cumulus, towering cumulus and, with enough heating, cumulonimbus (summer thunderstorms). Both combine where frontal lifting releases convective energy. Output types, mechanisms, triggers, bases, tops and front fields follow the documented [cloud formation format](docs/weather/cloud-formation-model.md#output-format-documented-engine-or-mock); mocks in the same format are accepted when labelled `synthetic`.
+
+```sh
+./build/terraflux-run-coupled-wind examples/cloud-formation-request.json clouds.json
+```
+
+### Precipitation outcomes and the weather map
+
+A `precipitation` section turns every diagnosed cloud into its weather at the ground. Harmless genera (cirrus, cirrostratus, altocumulus, cumulus) deliver nothing; stratus drizzles; altostratus and stratocumulus give intermittent light precipitation or virga; nimbostratus gives prolonged moderate rain or snow; towering cumulus gives showers; cumulonimbus gives heavy showers, lightning (top colder than −20 °C across the freezing level) and hail sized by the updraft. The rate comes from condensation in the lifted air, the phase from the surface wet-bulb temperature (snow ≤ 0.5 °C, sleet ≤ 2 °C), intensity from WMO classes, and accumulation from genus-typical duration fractions. See [precipitation outcomes](docs/weather/precipitation-outcomes-model.md). The viewer's **Weather map** view composes switchable layers — base field, isobars, fronts, cloud genus, cloud volumes, precipitation shading, symbols, thunderstorm/hail markers, wind — over any loaded coupled timeline (engine fixture or labelled mock).
+
 ### Combined weather response
 
 `tools/compose_mobile_weather.py` composes forecast and explicitly gridded rainfall files with spatial, interval, and missing-data checks. See [the input contract and commands](docs/weather/mobile-weather-response-v1.md#file-composer). The `terraflux-grid-rainfall` CLI maps geographic accumulation observations onto the forecast grid before composition.
@@ -116,6 +130,14 @@ CTest runs the regeneration check. The comparison allows relative floating-point
 ### Coupled wind example and request editor
 
 **Load coupled wind example** opens the committed 24 × 18 output of `terraflux-run-coupled-wind` (7 snapshots over 48 h). Pressure, relative humidity, air density and specific humidity become selectable layers, and the cell inspector shows the coupled values. The **Coupled wind request** panel edits time steps, grid, atmosphere, the three diffusivities, boundaries, density mode and the high/low systems with their temperature and humidity anomalies. It reports the solver bounds (Coriolis/friction, momentum diffusion, an estimate of the scalar stability number at the spin-up peak) and the implicit upwind numerical diffusion, then downloads a request JSON to run with the C++ CLI. **Use loaded run's settings** fills the editor from an opened coupled timeline. With column diagnostics present, **Convective energy (CAPE)**, **Cloud base (LCL)** and **Equilibrium level** are additional layers and the inspector lists LCL, LFC, EL, CAPE, CIN and the potential class per cell; the editor's column fields configure layers, lapse rate, tropopause and humidity scale height. No physics is solved in the browser.
+
+### Cloud formation view
+
+**Load cloud formation example** opens the engine fixture (20 × 15 cells, 48 h, 8-hourly frames); **Cloud formation mock (synthetic)** builds a labelled mock in the same format. The **Cloud formation** layer colours cells by cloud genus, raises the ground by cloud fraction, draws translucent cloud volumes from base to top with thunderstorm markers, and overlays cold (blue), warm (red) and stationary (purple) frontal cells; the inspector lists genus, base/top, mechanism, trigger, front analysis and heated CAPE/CIN, and the metrics strip shows cover, thunderstorm and front counts. The request editor carries the full cloud configuration, the diurnal heating, and free air masses (warm sector / cold pool).
+
+### Weather map view
+
+**Weather map** (scene header) switches from the field explorer to a flat map with layers that can be toggled independently in **01b / Weather map layers**: base field (temperature / surface pressure / none), isobars at 1, 2 or 4 hPa with labels, fronts, cloud cover by genus, 3D cloud volumes, precipitation rate shading, precipitation symbols, ⚡/◆ hazard markers and wind vectors. The legend follows the active layers. It works for any coupled timeline; cloud and precipitation layers need the cloud formation example or mock.
 
 ### Timeline playback
 

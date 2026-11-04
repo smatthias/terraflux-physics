@@ -20,6 +20,8 @@ add_library(terraflux_weather_map
     src/weather/coupled_wind_contract.cpp
     src/weather/coupled_wind.cpp
     src/weather/atmospheric_column.cpp
+    src/weather/cloud_formation.cpp
+    src/weather/precipitation_outcomes.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -153,6 +155,14 @@ if(BUILD_TESTING)
     add_test(NAME weather.atmospheric_column COMMAND terraflux-atmospheric-column-test)
     add_test(NAME weather.atmospheric_column_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/column_check.py $<TARGET_FILE:terraflux-run-atmospheric-column>)
+    add_executable(terraflux-cloud-formation-test tests/weather/cloud_formation_test.cpp)
+    target_link_libraries(terraflux-cloud-formation-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.cloud_formation COMMAND terraflux-cloud-formation-test)
+    add_test(NAME weather.cloud_formation_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/cloud_formation_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-precipitation-outcomes-test tests/weather/precipitation_outcomes_test.cpp)
+    target_link_libraries(terraflux-precipitation-outcomes-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.precipitation_outcomes COMMAND terraflux-precipitation-outcomes-test)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -195,6 +205,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-moist-air-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-coupled-wind-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-atmospheric-column-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-cloud-formation-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-precipitation-outcomes-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

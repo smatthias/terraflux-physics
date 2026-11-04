@@ -29,7 +29,10 @@
       "const": "coupled_wind_moist_layer_v1"
     },
     "source_kind": {
-      "const": "engine_output"
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
     },
     "request": {
       "type": "object",
@@ -484,6 +487,12 @@
         }
       },
       "description": "Per-cell vertical column diagnostics for every frame. Heights are metres above the cell surface; null means the level does not exist (no LCL within the column, or no positive buoyancy area). CAPE and CIN in J/kg from the surface parcel; convective_potential is a CAPE rule-of-thumb class, not a forecast."
+    },
+    "clouds": {
+      "$ref": "https://terraflux.example/schemas/weather/cloud-formation-v1.json"
+    },
+    "precipitation": {
+      "$ref": "https://terraflux.example/schemas/weather/precipitation-outcomes-v1.json"
     }
   }
 }

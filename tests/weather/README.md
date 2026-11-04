@@ -57,6 +57,29 @@ The atmospheric column suite (`weather.atmospheric_column`, plus the CLI check `
 - convective adjustment mixing and condensing with enthalpy and water conserved to 10⁻⁹, stable/unsaturated results, idempotence, untouched stable columns
 - per-cell field diagnostics with missing levels and configuration/state rejections
 
+The cloud formation suite (`weather.cloud_formation`, plus the CLI and fixture check `weather.cloud_formation_cli`) covers:
+
+- the cloud-genus classification table and per-genus fractions
+- the diurnal heating cycle
+- cold, warm and stationary fronts from the temperature gradient and advection, with sides and distances; no front below the gradient threshold
+- boundary-layer convergence lifting `w = −H ∇·V`
+- heating driving the surface parcel from clear through cumulus and towering cumulus to cumulonimbus, with CAPE rising and CIN falling; dry air giving at most fair-weather cumulus
+- frontal lifting releasing inhibited convection (combined mechanism), absent without lifting
+- overrunning ahead of a warm front with cloud base rising along the wedge (nimbostratus → altostratus)
+- a pinned regression scenario (12 × 10 baroclinic case, 8 h through the coupled model, diagnosed at 6 K and 0 K heating): front, genus, mechanism and trigger counts plus selected cell values
+- configuration and input rejections
+
+The precipitation outcomes suite (`weather.precipitation_outcomes`, plus the precipitation block of `weather.cloud_formation_cli`) covers:
+
+- wet-bulb temperature against the psychrometric table, hail terminal velocities, WMO intensity classes and the genus → character table
+- harmless genera delivering nothing while still reporting cloud temperatures
+- nimbostratus prolonged moderate rain with the rate formula re-evaluated independently
+- cumulonimbus heavy/violent showers with lightning, updraft-sized hail and melting; a weak storm with lightning but no hail; towering-cumulus showers
+- phase by surface wet-bulb: snow, sleet, rain, dry cold air snowing, warm stratus drizzling at the cap
+- virga from altostratus over dry air
+- a pinned regression (12 × 10 baroclinic scenario at 6 K and 0 K heating): type and intensity counts, totals and selected cell values
+- configuration and input rejections
+
 Build and run the registered CTest case with:
 
 ~~~sh

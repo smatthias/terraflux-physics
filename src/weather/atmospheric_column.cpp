@@ -307,16 +307,75 @@ void rediagnose_column(AtmosphericColumn& c) {
     }
 }
 
+double column_pressure_at_height_pa(const AtmosphericColumn& c, double height_m) {
+    validate_column(c);
+    return PressureTable(c).at(height_m);
+}
+
+double column_temperature_at_height_k(const AtmosphericColumn& c, double height_m) {
+    validate_column(c);
+    return interpolate(c.height_m, c.air_temperature_k, height_m);
+}
+
+double column_humidity_at_height_kg_kg(const AtmosphericColumn& c, double height_m) {
+    validate_column(c);
+    return std::max(0.0, interpolate(c.height_m, c.specific_humidity_kg_kg, height_m));
+}
+
+std::optional<double> column_freezing_level_m(const AtmosphericColumn& c) {
+    validate_column(c);
+    const double t0 = moist_air::kCelsiusOffsetK;
+    // Surface value from the first two mid-levels (linear extrapolation).
+    const double surface = interpolate(c.height_m, c.air_temperature_k, c.interface_height_m.front());
+    if (surface <= t0) {
+        return c.air_temperature_k.front() <= t0 || surface <= t0 ? std::optional<double>(0.0) : std::nullopt;
+    }
+    double previous_z = c.interface_height_m.front(), previous_t = surface;
+    for (std::size_t k = 0; k < c.height_m.size(); ++k) {
+        const double t = c.air_temperature_k[k];
+        if (t <= t0) {
+            const double w = (previous_t - t0) / (previous_t - t);
+            return previous_z + w * (c.height_m[k] - previous_z);
+        }
+        previous_z = c.height_m[k];
+        previous_t = t;
+    }
+    return std::nullopt;
+}
+
+double column_precipitable_water_mm(const AtmosphericColumn& c) {
+    validate_column(c);
+    double total = 0.0;
+    for (std::size_t k = 0; k < c.height_m.size(); ++k) {
+        total += c.specific_humidity_kg_kg[k] * c.layer_mass_kg_m2[k];
+    }
+    return total;
+}
+
 ParcelAscent lift_surface_parcel(const AtmosphericColumn& c, const ColumnConfig& config) {
+    validate_column(c);
+    return lift_parcel(c, config, c.air_temperature_k[0], c.specific_humidity_kg_kg[0]);
+}
+
+ParcelAscent lift_parcel(
+    const AtmosphericColumn& c,
+    const ColumnConfig& config,
+    double parcel_temperature_k,
+    double parcel_specific_humidity_kg_kg) {
     validate_column_config(config);
     validate_column(c);
+    if (!std::isfinite(parcel_temperature_k) || parcel_temperature_k <= 0.0 ||
+        !std::isfinite(parcel_specific_humidity_kg_kg) || parcel_specific_humidity_kg_kg < 0.0 ||
+        parcel_specific_humidity_kg_kg >= 1.0) {
+        throw std::invalid_argument("parcel temperature must be positive and humidity within [0, 1)");
+    }
     ParcelAscent a;
     const double z0 = c.height_m[0];
     const double top = c.interface_height_m.back();
     const PressureTable table(c);
     const auto pressure_at = [&](const AtmosphericColumn&, double z) { return table.at(z); };
-    const double q0 = c.specific_humidity_kg_kg[0];
-    const double theta0 = potential_temperature_k(c.air_temperature_k[0], c.pressure_pa[0]);
+    const double q0 = parcel_specific_humidity_kg_kg;
+    const double theta0 = potential_temperature_k(parcel_temperature_k, c.pressure_pa[0]);
     const auto dry_temperature = [&](double z) { return theta0 * exner(pressure_at(c, z)); };
     // The pseudo-adiabat is dT/dp = Gamma_m R_d T / (g p). The parcel sits at
     // the environment pressure p(z), whose hydrostatic slope uses the
@@ -342,12 +401,12 @@ ParcelAscent lift_surface_parcel(const AtmosphericColumn& c, const ColumnConfig&
         return t;
     };
 
-    bool saturated = q0 >= saturation_specific_humidity_kg_kg(c.air_temperature_k[0], c.pressure_pa[0]);
+    bool saturated = q0 >= saturation_specific_humidity_kg_kg(parcel_temperature_k, c.pressure_pa[0]);
     if (saturated) {
         a.lcl_height_m = z0;
     }
     double z = z0;
-    double t = c.air_temperature_k[0];
+    double t = parcel_temperature_k;
     const auto record = [&](double height, double temperature) {
         const double p = pressure_at(c, height);
         const double q_parcel = saturated ? std::min(q0, saturation_specific_humidity_kg_kg(temperature, p)) : q0;
@@ -502,8 +561,12 @@ ColumnFieldDiagnostics diagnose_column_field(
     const std::vector<double>& surface_pressure_pa,
     const std::vector<double>& surface_temperature_k,
     const std::vector<double>& surface_specific_humidity_kg_kg,
-    const ColumnConfig& config) {
+    const ColumnConfig& config,
+    double parcel_heating_k) {
     validate_column_config(config);
+    if (!std::isfinite(parcel_heating_k) || parcel_heating_k < 0.0) {
+        throw std::invalid_argument("parcel heating must be finite and non-negative");
+    }
     const std::size_t count = surface_pressure_pa.size();
     if (surface_temperature_k.size() != count || surface_specific_humidity_kg_kg.size() != count) {
         throw std::invalid_argument("column field inputs must have the same cell count");
@@ -522,7 +585,8 @@ ColumnFieldDiagnostics diagnose_column_field(
         auto column = build_hydrostatic_column(
             surface_pressure_pa[i], surface_temperature_k[i], surface_specific_humidity_kg_kg[i], config);
         const auto report = adjust_column_convection(column);
-        const auto ascent = lift_surface_parcel(column, config);
+        const auto ascent = lift_parcel(
+            column, config, column.air_temperature_k[0] + parcel_heating_k, column.specific_humidity_kg_kg[0]);
         if (ascent.lcl_height_m) d.lcl_height_m[i] = *ascent.lcl_height_m;
         if (ascent.lfc_height_m) d.lfc_height_m[i] = *ascent.lfc_height_m;
         if (ascent.equilibrium_level_m) d.equilibrium_level_m[i] = *ascent.equilibrium_level_m;

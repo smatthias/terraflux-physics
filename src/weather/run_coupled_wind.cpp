@@ -1,4 +1,6 @@
 #include "terraflux/weather/atmospheric_column.hpp"
+#include "terraflux/weather/cloud_formation.hpp"
+#include "terraflux/weather/precipitation_outcomes.hpp"
 #include "terraflux/weather/coupled_wind.hpp"
 #include "terraflux/weather/pressure_wind.hpp"
 
@@ -114,6 +116,123 @@ std::optional<terraflux::weather::ColumnConfig> parse_column(const Json& request
     config.parcel_step_m = optional_number(column, "parcel_step_m", defaults.parcel_step_m);
     terraflux::weather::validate_column_config(config);
     return config;
+}
+
+// Optional cloud formation (fronts + convection) diagnostics; needs a column.
+struct CloudRequest {
+    terraflux::weather::CloudFormationConfig config;
+    double heating_amplitude_k{0.0};
+    double heating_phase_seconds{0.0};
+};
+
+std::optional<CloudRequest> parse_cloud_formation(
+    const Json& request, const std::optional<terraflux::weather::ColumnConfig>& column) {
+    if (!request.contains("cloud_formation")) {
+        return std::nullopt;
+    }
+    if (!column) {
+        throw std::invalid_argument("cloud_formation requires a column section");
+    }
+    const Json& c = required(request, "cloud_formation");
+    CloudRequest result;
+    terraflux::weather::CloudFormationConfig defaults;
+    auto& cfg = result.config;
+    cfg.column = *column;
+    cfg.frontal_gradient_threshold_k_m = optional_number(c, "frontal_gradient_threshold_k_m", defaults.frontal_gradient_threshold_k_m);
+    cfg.advection_threshold_k_s = optional_number(c, "advection_threshold_k_s", defaults.advection_threshold_k_s);
+    cfg.boundary_layer_depth_m = optional_number(c, "boundary_layer_depth_m", defaults.boundary_layer_depth_m);
+    cfg.lifting_time_scale_s = optional_number(c, "lifting_time_scale_s", defaults.lifting_time_scale_s);
+    cfg.mixed_layer_growth_m_per_k = optional_number(c, "mixed_layer_growth_m_per_k", defaults.mixed_layer_growth_m_per_k);
+    cfg.warm_front_slope = optional_number(c, "warm_front_slope", defaults.warm_front_slope);
+    cfg.cold_front_slope = optional_number(c, "cold_front_slope", defaults.cold_front_slope);
+    cfg.warm_front_reach_m = optional_number(c, "warm_front_reach_m", defaults.warm_front_reach_m);
+    cfg.cold_front_reach_m = optional_number(c, "cold_front_reach_m", defaults.cold_front_reach_m);
+    cfg.frontal_band_width_m = optional_number(c, "frontal_band_width_m", defaults.frontal_band_width_m);
+    cfg.cin_trigger_j_kg = optional_number(c, "cin_trigger_j_kg", defaults.cin_trigger_j_kg);
+    cfg.cape_threshold_j_kg = optional_number(c, "cape_threshold_j_kg", defaults.cape_threshold_j_kg);
+    cfg.max_cloud_top_m = optional_number(c, "max_cloud_top_m", defaults.max_cloud_top_m);
+    if (c.contains("surface_heating")) {
+        const Json& heating = required(c, "surface_heating");
+        result.heating_amplitude_k = required_number(heating, "amplitude_k");
+        result.heating_phase_seconds = optional_number(heating, "phase_seconds", 0.0);
+    }
+    terraflux::weather::validate_cloud_formation_config(cfg);
+    (void)terraflux::weather::diurnal_surface_heating_k(0.0, result.heating_amplitude_k, result.heating_phase_seconds);
+    return result;
+}
+
+// Optional precipitation outcomes; needs cloud formation. The accumulation
+// interval defaults to the snapshot interval.
+std::optional<terraflux::weather::PrecipitationConfig> parse_precipitation(
+    const Json& request, bool has_clouds, double snapshot_interval_seconds) {
+    if (!request.contains("precipitation")) {
+        return std::nullopt;
+    }
+    if (!has_clouds) {
+        throw std::invalid_argument("precipitation requires a cloud_formation section");
+    }
+    const Json& p = required(request, "precipitation");
+    terraflux::weather::PrecipitationConfig defaults;
+    terraflux::weather::PrecipitationConfig config;
+    config.stratiform_efficiency = optional_number(p, "stratiform_efficiency", defaults.stratiform_efficiency);
+    config.convective_efficiency = optional_number(p, "convective_efficiency", defaults.convective_efficiency);
+    config.convective_updraft_fraction = optional_number(p, "convective_updraft_fraction", defaults.convective_updraft_fraction);
+    config.updraft_parcel_factor = optional_number(p, "updraft_parcel_factor", defaults.updraft_parcel_factor);
+    config.interval_seconds = optional_number(p, "interval_seconds", snapshot_interval_seconds);
+    config.snow_wet_bulb_k = optional_number(p, "snow_wet_bulb_k", defaults.snow_wet_bulb_k);
+    config.sleet_wet_bulb_k = optional_number(p, "sleet_wet_bulb_k", defaults.sleet_wet_bulb_k);
+    config.lightning_top_temperature_k = optional_number(p, "lightning_top_temperature_k", defaults.lightning_top_temperature_k);
+    config.hail_min_diameter_cm = optional_number(p, "hail_min_diameter_cm", defaults.hail_min_diameter_cm);
+    config.hail_melting_cm_per_km = optional_number(p, "hail_melting_cm_per_km", defaults.hail_melting_cm_per_km);
+    config.hail_max_diameter_cm = optional_number(p, "hail_max_diameter_cm", defaults.hail_max_diameter_cm);
+    config.drizzle_max_rate_mm_h = optional_number(p, "drizzle_max_rate_mm_h", defaults.drizzle_max_rate_mm_h);
+    config.virga_surface_rh = optional_number(p, "virga_surface_rh", defaults.virga_surface_rh);
+    config.virga_max_rate_mm_h = optional_number(p, "virga_max_rate_mm_h", defaults.virga_max_rate_mm_h);
+    config.virga_min_base_m = optional_number(p, "virga_min_base_m", defaults.virga_min_base_m);
+    config.minimum_rate_mm_h = optional_number(p, "minimum_rate_mm_h", defaults.minimum_rate_mm_h);
+    terraflux::weather::validate_precipitation_config(config);
+    return config;
+}
+
+Json precipitation_config_json(const terraflux::weather::PrecipitationConfig& c) {
+    return {
+        {"stratiform_efficiency", c.stratiform_efficiency},
+        {"convective_efficiency", c.convective_efficiency},
+        {"convective_updraft_fraction", c.convective_updraft_fraction},
+        {"updraft_parcel_factor", c.updraft_parcel_factor},
+        {"interval_seconds", c.interval_seconds},
+        {"snow_wet_bulb_k", c.snow_wet_bulb_k},
+        {"sleet_wet_bulb_k", c.sleet_wet_bulb_k},
+        {"lightning_top_temperature_k", c.lightning_top_temperature_k},
+        {"hail_min_diameter_cm", c.hail_min_diameter_cm},
+        {"hail_melting_cm_per_km", c.hail_melting_cm_per_km},
+        {"hail_max_diameter_cm", c.hail_max_diameter_cm},
+        {"drizzle_max_rate_mm_h", c.drizzle_max_rate_mm_h},
+        {"virga_surface_rh", c.virga_surface_rh},
+        {"virga_max_rate_mm_h", c.virga_max_rate_mm_h},
+        {"virga_min_base_m", c.virga_min_base_m},
+        {"minimum_rate_mm_h", c.minimum_rate_mm_h},
+    };
+}
+
+Json cloud_config_json(const CloudRequest& r) {
+    const auto& c = r.config;
+    return {
+        {"frontal_gradient_threshold_k_m", c.frontal_gradient_threshold_k_m},
+        {"advection_threshold_k_s", c.advection_threshold_k_s},
+        {"boundary_layer_depth_m", c.boundary_layer_depth_m},
+        {"lifting_time_scale_s", c.lifting_time_scale_s},
+        {"mixed_layer_growth_m_per_k", c.mixed_layer_growth_m_per_k},
+        {"warm_front_slope", c.warm_front_slope},
+        {"cold_front_slope", c.cold_front_slope},
+        {"warm_front_reach_m", c.warm_front_reach_m},
+        {"cold_front_reach_m", c.cold_front_reach_m},
+        {"frontal_band_width_m", c.frontal_band_width_m},
+        {"cin_trigger_j_kg", c.cin_trigger_j_kg},
+        {"cape_threshold_j_kg", c.cape_threshold_j_kg},
+        {"max_cloud_top_m", c.max_cloud_top_m},
+        {"surface_heating", {{"amplitude_k", r.heating_amplitude_k}, {"phase_seconds", r.heating_phase_seconds}}},
+    };
 }
 
 Json column_config_json(const terraflux::weather::ColumnConfig& config) {
@@ -391,6 +510,7 @@ int main(int argc, char** argv) {
 
         const auto config = parse_config(request);
         const auto column = parse_column(request);
+        const auto clouds = parse_cloud_formation(request, column);
         Json pressure_provenance, temperature_provenance, humidity_provenance;
         terraflux::weather::CoupledWindState state;
         state.pressure_pa = parse_pressure(request, config.grid, pressure_provenance);
@@ -419,6 +539,8 @@ int main(int argc, char** argv) {
                     "snapshot_every_steps must not exceed the configured step count");
             }
         }
+        const auto precipitation = parse_precipitation(
+            request, clouds.has_value(), static_cast<double>(snapshot_every) * config.time.timestep_seconds);
 
         Json frames = Json::array();
         Json humidity_by_frame = Json::array();
@@ -430,6 +552,8 @@ int main(int argc, char** argv) {
         Json cape_by_frame = Json::array(), cin_by_frame = Json::array(), potential_by_frame = Json::array();
         Json condensed_by_frame = Json::array();
         Json column_mass = Json::array(), top_pressure = Json::array();
+        Json cloud_frames = Json::array();
+        Json precipitation_frames = Json::array();
         const auto record = [&](const terraflux::weather::CoupledWindState& current) {
             const auto diagnostics = terraflux::weather::diagnose_moist_layer(current, config);
             std::vector<double> relative_humidity_pct(diagnostics.relative_humidity_fraction.size());
@@ -456,6 +580,73 @@ int main(int argc, char** argv) {
                 if (column_mass.empty()) {
                     column_mass = d.column_mass_kg_m2;
                     top_pressure = d.top_pressure_pa;
+                }
+            }
+            if (clouds) {
+                const double heating = terraflux::weather::diurnal_surface_heating_k(
+                    current.elapsed_seconds, clouds->heating_amplitude_k, clouds->heating_phase_seconds);
+                const auto fronts = terraflux::weather::analyse_fronts(current, config.grid, clouds->config);
+                const auto field = terraflux::weather::diagnose_cloud_formation(
+                    current, config.grid, clouds->config, heating, fronts);
+                Json thunderstorm = Json::array(), side = Json::array();
+                for (unsigned char flag : field.thunderstorm) thunderstorm.push_back(flag != 0);
+                for (int value : fronts.side) side.push_back(value);
+                cloud_frames.push_back({
+                    {"elapsed_seconds", current.elapsed_seconds},
+                    {"surface_heating_k", heating},
+                    {"cloud_type", field.cloud_type},
+                    {"mechanism", field.mechanism},
+                    {"trigger", field.trigger},
+                    {"base_m", nullable_array(field.base_m)},
+                    {"top_m", nullable_array(field.top_m)},
+                    {"cloud_fraction", field.cloud_fraction},
+                    {"thunderstorm", thunderstorm},
+                    {"lifting_depth_m", field.lifting_depth_m},
+                    {"heated_cape_j_kg", field.heated_cape_j_kg},
+                    {"heated_cin_j_kg", field.heated_cin_j_kg},
+                    {"front_type", fronts.front_type},
+                    {"temperature_gradient_k_m", fronts.temperature_gradient_k_m},
+                    {"temperature_advection_k_s", fronts.temperature_advection_k_s},
+                    {"divergence_s", fronts.divergence_s},
+                    {"distance_to_front_m", nullable_array(fronts.distance_to_front_m)},
+                    {"side", side},
+                    {"cloudy_cells", field.cloudy_cells},
+                    {"thunderstorm_cells", field.thunderstorm_cells},
+                    {"front_cells", fronts.front_cell_count},
+                });
+                if (precipitation) {
+                    const auto outcome = terraflux::weather::diagnose_precipitation(
+                        current, config.grid, clouds->config, field, *precipitation);
+                    Json lightning = Json::array(), virga = Json::array(), hazards = Json::array();
+                    for (unsigned char flag : outcome.lightning) lightning.push_back(flag != 0);
+                    for (unsigned char flag : outcome.virga) virga.push_back(flag != 0);
+                    for (const auto& list : outcome.hazards) hazards.push_back(list);
+                    precipitation_frames.push_back({
+                        {"elapsed_seconds", current.elapsed_seconds},
+                        {"precipitation_type", outcome.precipitation_type},
+                        {"phase", outcome.phase},
+                        {"character", outcome.character},
+                        {"intensity", outcome.intensity},
+                        {"rate_mm_h", outcome.rate_mm_h},
+                        {"duration_fraction", outcome.duration_fraction},
+                        {"accumulation_mm", outcome.accumulation_mm},
+                        {"hail_max_diameter_cm", outcome.hail_max_diameter_cm},
+                        {"lightning", lightning},
+                        {"virga", virga},
+                        {"updraft_m_s", outcome.updraft_m_s},
+                        {"freezing_level_m", nullable_array(outcome.freezing_level_m)},
+                        {"surface_wet_bulb_k", outcome.surface_wet_bulb_k},
+                        {"precipitable_water_mm", outcome.precipitable_water_mm},
+                        {"cloud_base_temperature_k", nullable_array(outcome.cloud_base_temperature_k)},
+                        {"cloud_top_temperature_k", nullable_array(outcome.cloud_top_temperature_k)},
+                        {"hazards", hazards},
+                        {"precipitating_cells", outcome.precipitating_cells},
+                        {"lightning_cells", outcome.lightning_cells},
+                        {"hail_cells", outcome.hail_cells},
+                        {"snow_cells", outcome.snow_cells},
+                        {"max_rate_mm_h", outcome.max_rate_mm_h},
+                        {"total_accumulation_mm", outcome.total_accumulation_mm},
+                    });
                 }
             }
         };
@@ -505,6 +696,24 @@ int main(int argc, char** argv) {
                 {"cin_j_kg_by_frame", cin_by_frame},
                 {"convective_potential_by_frame", potential_by_frame},
                 {"condensed_water_kg_m2_by_frame", condensed_by_frame},
+            };
+        }
+        if (clouds) {
+            output["coupled_atmosphere"]["clouds"] = {
+                {"schema_version", "terraflux.weather.cloud_formation/v1"},
+                {"method", "frontal_convergence_overrunning_heated_parcel_convection"},
+                {"source_kind", "engine_output"},
+                {"config", cloud_config_json(*clouds)},
+                {"frames", cloud_frames},
+            };
+        }
+        if (precipitation) {
+            output["coupled_atmosphere"]["precipitation"] = {
+                {"schema_version", "terraflux.weather.precipitation_outcomes/v1"},
+                {"method", "genus_condensation_rate_wet_bulb_phase_updraft_hail"},
+                {"source_kind", "engine_output"},
+                {"config", precipitation_config_json(*precipitation)},
+                {"frames", precipitation_frames},
             };
         }
 

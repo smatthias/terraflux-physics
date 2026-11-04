@@ -98,6 +98,33 @@ double relative_humidity_fraction(
            saturation_vapour_pressure_pa(air_temperature_k);
 }
 
+double wet_bulb_temperature_k(
+    double air_temperature_k,
+    double specific_humidity_kg_kg,
+    double pressure_pa) {
+    require_temperature(air_temperature_k);
+    require_specific_humidity(specific_humidity_kg_kg);
+    require_pressure(pressure_pa);
+    const double e = vapour_pressure_pa(specific_humidity_kg_kg, pressure_pa);
+    const double gamma = 1004.6 * pressure_pa / (kEpsilon * 2.501e6);  // psychrometric constant, Pa/K
+    double t_w = air_temperature_k;
+    for (int iteration = 0; iteration < 50; ++iteration) {
+        const double f = saturation_vapour_pressure_pa(t_w) - e - gamma * (air_temperature_k - t_w);
+        const double celsius = t_w - kCelsiusOffsetK;
+        const double des_dt = saturation_vapour_pressure_pa(t_w) * kMagnusB * kMagnusC /
+                              ((celsius + kMagnusC) * (celsius + kMagnusC));
+        const double step = f / (des_dt + gamma);
+        t_w -= step;
+        if (std::abs(step) < 1.0e-10) {
+            break;
+        }
+    }
+    if (!std::isfinite(t_w) || t_w > air_temperature_k + 1.0e-9) {
+        throw std::invalid_argument("wet-bulb iteration failed");
+    }
+    return t_w;
+}
+
 MoistAirSensitivities moist_air_sensitivities(
     double pressure_pa,
     double air_temperature_k,

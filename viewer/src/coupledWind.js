@@ -2,6 +2,8 @@
 // and a request editor that mirrors the C++ configuration bounds. No physics
 // is solved in the browser; the request is downloaded and run with
 // terraflux-run-coupled-wind, and the resulting timeline is opened here.
+import { validateCloudFormation } from './cloudFormation.js'
+import { validatePrecipitation } from './weatherMap.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 const clone = value => JSON.parse(JSON.stringify(value))
@@ -11,6 +13,27 @@ export const DENSITY_MODES = ['diagnosed', 'constant']
 export const SCALAR_BOUNDARIES = ['zero_gradient', 'periodic']
 export const GRADIENT_BOUNDARIES = ['one_sided', 'periodic']
 export const CONVECTIVE_POTENTIALS = ['none', 'weak', 'moderate', 'strong']
+// Cloud formation configuration keys edited in the request form (all required in a request).
+export const CLOUD_CONFIG_KEYS = [
+  ['frontal_gradient_threshold_k_m', 'Frontal |∇T| threshold K/m', 2e-5], ['advection_threshold_k_s', 'Advection threshold K/s', 0.1 / 3600],
+  ['boundary_layer_depth_m', 'Boundary-layer depth m', 1500], ['lifting_time_scale_s', 'Lifting time scale s', 21600],
+  ['mixed_layer_growth_m_per_k', 'Mixed-layer growth m/K', 300], ['warm_front_slope', 'Warm front slope', 1 / 200],
+  ['cold_front_slope', 'Cold front slope', 1 / 75], ['warm_front_reach_m', 'Warm front cloud reach m', 800000],
+  ['cold_front_reach_m', 'Cold front cloud reach m', 200000], ['frontal_band_width_m', 'Frontal band width m', 150000],
+  ['cin_trigger_j_kg', 'CIN trigger J/kg', 20], ['cape_threshold_j_kg', 'CAPE threshold J/kg', 100], ['max_cloud_top_m', 'Max cloud top m', 12000],
+]
+export const defaultCloudConfig = () => Object.fromEntries(CLOUD_CONFIG_KEYS.map(([k, , v]) => [k, v]))
+// Precipitation outcome configuration keys edited in the request form.
+export const PRECIP_CONFIG_KEYS = [
+  ['stratiform_efficiency', 'Stratiform efficiency', 0.7], ['convective_efficiency', 'Convective efficiency', 0.4],
+  ['convective_updraft_fraction', 'Convective updraft area fraction', 0.08], ['updraft_parcel_factor', 'Updraft parcel factor', 0.5],
+  ['interval_seconds', 'Accumulation interval s', 28800], ['snow_wet_bulb_k', 'Snow wet-bulb limit K', 273.65],
+  ['sleet_wet_bulb_k', 'Sleet wet-bulb limit K', 275.15], ['lightning_top_temperature_k', 'Lightning cloud-top limit K', 253.15],
+  ['hail_min_diameter_cm', 'Minimum hail cm', 0.5], ['hail_melting_cm_per_km', 'Hail melting cm/km', 0.3], ['hail_max_diameter_cm', 'Maximum hail cm', 10],
+  ['drizzle_max_rate_mm_h', 'Drizzle cap mm/h', 0.5], ['virga_surface_rh', 'Virga surface RH (fraction)', 0.4], ['virga_max_rate_mm_h', 'Virga rate limit mm/h', 1],
+  ['virga_min_base_m', 'Virga minimum base m', 2000], ['minimum_rate_mm_h', 'Minimum reported rate mm/h', 0.05],
+]
+export const defaultPrecipConfig = () => Object.fromEntries(PRECIP_CONFIG_KEYS.map(([k, , v]) => [k, v]))
 const EARTH_OMEGA = 7.2921159e-5, EARTH_RADIUS = 6371000
 
 // Form model: pressure centers carry co-located temperature and humidity
@@ -26,6 +49,9 @@ export function defaultCoupledForm() {
     background_pressure_pa: 101500, background_temperature_k: 287, background_humidity_kg_kg: 0.007,
     column_enabled: true, column_layer_count: 24, column_layer_thickness_m: 500, column_lapse_rate_k_m: 0.0065,
     column_tropopause_height_m: 11000, column_humidity_scale_height_m: 2500, column_parcel_step_m: 50,
+    cloud_enabled: false, cloud: defaultCloudConfig(), cloud_heating_amplitude_k: 6, cloud_heating_phase_seconds: 7200,
+    precip_enabled: false, precip: defaultPrecipConfig(),
+    airmasses: [],
     centers: [
       { kind: 'high', east_m: -300000, north_m: -40000, radius_m: 350000, pressure_anomaly_pa: 800, temperature_anomaly_k: -4, humidity_anomaly_kg_kg: -0.003 },
       { kind: 'low', east_m: 260000, north_m: 100000, radius_m: 300000, pressure_anomaly_pa: -900, temperature_anomaly_k: 6, humidity_anomaly_kg_kg: 0.006 },
@@ -37,6 +63,9 @@ export function formToRequest(form) {
   const anomaly = (c, amplitude) => ({ east_m: c.east_m, north_m: c.north_m, radius_m: c.radius_m, amplitude })
   const atmosphere = { air_density_kg_m3: form.air_density_kg_m3, surface_friction_coefficient_s: form.surface_friction_coefficient_s, coriolis_mode: form.coriolis_mode }
   if (form.coriolis_mode === 'prescribed') atmosphere.coriolis_parameter_s = form.coriolis_parameter_s
+  const airmass = (a, amplitude) => ({ east_m: a.east_m, north_m: a.north_m, radius_m: a.radius_m, amplitude })
+  const cloud = form.cloud_enabled ? { cloud_formation: { ...Object.fromEntries(CLOUD_CONFIG_KEYS.map(([k]) => [k, form.cloud[k]])), surface_heating: { amplitude_k: form.cloud_heating_amplitude_k, phase_seconds: form.cloud_heating_phase_seconds } } } : {}
+  const precip = form.cloud_enabled && form.precip_enabled ? { precipitation: Object.fromEntries(PRECIP_CONFIG_KEYS.map(([k]) => [k, form.precip[k]])) } : {}
   const column = form.column_enabled ? { column: {
     layer_count: form.column_layer_count, layer_thickness_m: form.column_layer_thickness_m, environment_lapse_rate_k_m: form.column_lapse_rate_k_m,
     tropopause_height_m: form.column_tropopause_height_m, humidity_scale_height_m: form.column_humidity_scale_height_m, parcel_step_m: form.column_parcel_step_m,
@@ -55,10 +84,12 @@ export function formToRequest(form) {
     pressure_gradient_boundary: form.pressure_gradient_boundary, scalar_boundary: form.scalar_boundary, density_mode: form.density_mode,
     pressure: { pressure_systems: { background_pressure_pa: form.background_pressure_pa, centers: form.centers.map(c => ({ kind: c.kind, east_m: c.east_m, north_m: c.north_m, pressure_anomaly_pa: c.pressure_anomaly_pa, radius_m: c.radius_m })) } },
     initial_fields: {
-      air_temperature_k: { background: form.background_temperature_k, anomalies: form.centers.map(c => anomaly(c, c.temperature_anomaly_k)) },
-      specific_humidity_kg_kg: { background: form.background_humidity_kg_kg, anomalies: form.centers.map(c => anomaly(c, c.humidity_anomaly_kg_kg)) },
+      air_temperature_k: { background: form.background_temperature_k, anomalies: [...form.centers.map(c => anomaly(c, c.temperature_anomaly_k)), ...form.airmasses.map(a => airmass(a, a.temperature_anomaly_k))] },
+      specific_humidity_kg_kg: { background: form.background_humidity_kg_kg, anomalies: [...form.centers.map(c => anomaly(c, c.humidity_anomaly_kg_kg)), ...form.airmasses.map(a => airmass(a, a.humidity_anomaly_kg_kg))] },
     },
     ...column,
+    ...cloud,
+    ...precip,
     snapshot_every_steps: form.snapshot_every_steps,
   }
 }
@@ -70,9 +101,19 @@ export function formFromRequest(request) {
   const systems = request.pressure?.pressure_systems, t = request.initial_fields?.air_temperature_k, q = request.initial_fields?.specific_humidity_kg_kg
   check(systems && t?.background !== undefined && q?.background !== undefined, 'The editor only represents Gaussian pressure systems and background + anomaly fields.')
   const centers = systems.centers ?? [], ta = t.anomalies ?? [], qa = q.anomalies ?? []
-  check(ta.length === centers.length && qa.length === centers.length, 'Temperature and humidity anomalies must match the pressure centers one-to-one.')
+  check(ta.length === qa.length && ta.length >= centers.length, 'Temperature and humidity anomalies must pair up, one per pressure center first, then free air masses.')
   const same = (a, c) => a.east_m === c.east_m && a.north_m === c.north_m && a.radius_m === c.radius_m
-  check(centers.every((c, i) => same(ta[i], c) && same(qa[i], c)), 'Anomalies must be co-located with the pressure centers.')
+  check(centers.every((c, i) => same(ta[i], c) && same(qa[i], c)), 'The first anomalies must be co-located with the pressure centers.')
+  check(ta.slice(centers.length).every((a, i) => same(a, qa[centers.length + i])), 'Air-mass temperature and humidity anomalies must be co-located.')
+  const cf = request.cloud_formation
+  if (cf !== undefined) {
+    check(CLOUD_CONFIG_KEYS.every(([k]) => finite(cf[k])) && cf.surface_heating && finite(cf.surface_heating.amplitude_k) && finite(cf.surface_heating.phase_seconds), 'Cloud formation needs every configuration value and the surface heating.')
+    check(Object.keys(cf).length === CLOUD_CONFIG_KEYS.length + 1, 'The editor represents the full cloud formation configuration only.')
+  }
+  const pr = request.precipitation
+  if (pr !== undefined) {
+    check(cf !== undefined && PRECIP_CONFIG_KEYS.every(([k]) => finite(pr[k])) && Object.keys(pr).length === PRECIP_CONFIG_KEYS.length, 'The editor represents the full precipitation configuration only, with cloud formation enabled.')
+  }
   const g = request.grid
   check(g.origin_east_m === -0.5 * g.nx * g.spacing_east_m && g.origin_north_m === -0.5 * g.ny * g.spacing_north_m, 'The editor centers the grid on the geographic anchor.')
   return {
@@ -89,6 +130,10 @@ export function formFromRequest(request) {
     column_layer_count: request.column?.layer_count ?? 24, column_layer_thickness_m: request.column?.layer_thickness_m ?? 500,
     column_lapse_rate_k_m: request.column?.environment_lapse_rate_k_m ?? 0.0065, column_tropopause_height_m: request.column?.tropopause_height_m ?? 11000,
     column_humidity_scale_height_m: request.column?.humidity_scale_height_m ?? 2500, column_parcel_step_m: request.column?.parcel_step_m ?? 50,
+    cloud_enabled: cf !== undefined, cloud: cf ? Object.fromEntries(CLOUD_CONFIG_KEYS.map(([k]) => [k, cf[k]])) : defaultCloudConfig(),
+    cloud_heating_amplitude_k: cf?.surface_heating.amplitude_k ?? 6, cloud_heating_phase_seconds: cf?.surface_heating.phase_seconds ?? 7200,
+    precip_enabled: pr !== undefined, precip: pr ? Object.fromEntries(PRECIP_CONFIG_KEYS.map(([k]) => [k, pr[k]])) : defaultPrecipConfig(),
+    airmasses: ta.slice(centers.length).map((a, i) => ({ east_m: a.east_m, north_m: a.north_m, radius_m: a.radius_m, temperature_anomaly_k: a.amplitude, humidity_anomaly_kg_kg: qa[centers.length + i].amplitude })),
     centers: centers.map((c, i) => ({ kind: c.kind, east_m: c.east_m, north_m: c.north_m, radius_m: c.radius_m, pressure_anomaly_pa: c.pressure_anomaly_pa, temperature_anomaly_k: ta[i].amplitude, humidity_anomaly_kg_kg: qa[i].amplitude })),
   }
 }
@@ -113,6 +158,8 @@ export function requestFromCoupledAtmosphere(atmosphere, frames) {
       specific_humidity_kg_kg: q ?? { values: clone(atmosphere.specific_humidity_kg_kg_by_frame[0]) },
     },
     ...(atmosphere.columns ? { column: clone(atmosphere.columns.config) } : {}),
+    ...(atmosphere.clouds ? { cloud_formation: clone(atmosphere.clouds.config) } : {}),
+    ...(atmosphere.precipitation ? { precipitation: clone(atmosphere.precipitation.config) } : {}),
     snapshot_every_steps: r.snapshot_every_steps ?? r.time.steps,
   }
 }
@@ -172,6 +219,21 @@ export function checkCoupledRequest(request) {
       const top = Math.min(col.layer_count * col.layer_thickness_m, col.tropopause_height_m)
       fail(coldest - col.environment_lapse_rate_k_m * top > 0, 'The environment lapse rate drives the column below 0 K.')
     }
+  }
+  const cf = request.cloud_formation
+  if (cf !== undefined) {
+    fail(col !== undefined, 'Cloud formation requires the vertical column diagnostics.')
+    for (const [key, label] of CLOUD_CONFIG_KEYS) fail(finite(cf[key]) && cf[key] > 0, `${label} must be positive.`)
+    fail(finite(cf.warm_front_slope) && finite(cf.cold_front_slope) && cf.warm_front_slope <= cf.cold_front_slope, 'A warm front must be gentler than a cold front.')
+    fail(cf.surface_heating && finite(cf.surface_heating.amplitude_k) && cf.surface_heating.amplitude_k >= 0 && finite(cf.surface_heating.phase_seconds), 'Surface heating needs a non-negative amplitude and a finite phase.')
+  }
+  const pr = request.precipitation
+  if (pr !== undefined) {
+    fail(cf !== undefined, 'Precipitation outcomes require cloud formation.')
+    for (const [key, label] of PRECIP_CONFIG_KEYS) fail(finite(pr[key]) && pr[key] > 0, `${label} must be positive.`)
+    fail(!(finite(pr.snow_wet_bulb_k) && finite(pr.sleet_wet_bulb_k)) || pr.snow_wet_bulb_k <= pr.sleet_wet_bulb_k, 'Snow wet-bulb limit must not exceed the sleet limit.')
+    fail(!finite(pr.lightning_top_temperature_k) || pr.lightning_top_temperature_k < 273.15, 'Lightning needs a cloud-top limit below 0 °C (273.15 K).')
+    for (const key of ['stratiform_efficiency', 'convective_efficiency', 'convective_updraft_fraction', 'updraft_parcel_factor', 'virga_surface_rh']) fail(!finite(pr[key]) || pr[key] <= 1, `${key} must not exceed 1.`)
   }
   if (errors.length) return { errors, warnings, estimates }
   if (col !== undefined) {
@@ -251,7 +313,7 @@ export function maxPressureGradient(request) {
 // display fields. Returns the parsed extension.
 export function validateCoupledAtmosphere(atmosphere, frames) {
   const a = atmosphere, grid = frames[0].forecast.grid, count = grid.nx * grid.ny
-  check(a?.schema_version === 'terraflux.weather.coupled_atmosphere/v1' && a.model === 'coupled_wind_moist_layer_v1' && a.source_kind === 'engine_output', 'Unsupported coupled atmosphere contract.')
+  check(a?.schema_version === 'terraflux.weather.coupled_atmosphere/v1' && a.model === 'coupled_wind_moist_layer_v1' && ['engine_output', 'synthetic'].includes(a.source_kind), 'Unsupported coupled atmosphere contract.')
   check(a.request && Object.keys(grid).every(key => a.request.grid?.[key] === grid[key]), 'Coupled atmosphere request grid must match the frames.')
   check(a.request.time?.start_time_utc === frames[0].forecast.start_time_utc, 'Coupled atmosphere start time must match the frames.')
   const r = a.request
@@ -268,9 +330,11 @@ export function validateCoupledAtmosphere(atmosphere, frames) {
     check(Array.isArray(rh) && rh.length === count && rh.every(v => finite(v) && v >= 0), 'Invalid relative humidity field.')
     check(Array.isArray(rho) && rho.length === count && rho.every(v => finite(v) && v > 0), 'Invalid air density field.')
     check(Number.isInteger(a.supersaturated_cells_by_frame[i]) && a.supersaturated_cells_by_frame[i] >= 0 && finite(a.scalar_stability_number_by_frame[i]), 'Invalid coupled frame diagnostics.')
-    frame.coupled = { pressure: a.pressure_pa, humidity: rh, density: rho, specificHumidity: q, coriolis: a.coriolis_parameter_s, supersaturated: a.supersaturated_cells_by_frame[i], stability: a.scalar_stability_number_by_frame[i], request: r, sources: { pressure: a.pressure_source, temperature: a.temperature_source, humidity: a.humidity_source }, raw: a }
+    frame.coupled = { pressure: a.pressure_pa, humidity: rh, density: rho, specificHumidity: q, coriolis: a.coriolis_parameter_s, supersaturated: a.supersaturated_cells_by_frame[i], stability: a.scalar_stability_number_by_frame[i], request: r, sources: { pressure: a.pressure_source, temperature: a.temperature_source, humidity: a.humidity_source }, raw: a, synthetic: a.source_kind === 'synthetic' }
   })
   if (a.columns !== undefined) validateColumnDiagnostics(a.columns, frames)
+  if (a.clouds !== undefined) validateCloudFormation(a.clouds, frames)
+  if (a.precipitation !== undefined) { check(a.clouds !== undefined, 'Precipitation outcomes require the clouds block.'); validatePrecipitation(a.precipitation, frames) }
   return a
 }
 

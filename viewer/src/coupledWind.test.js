@@ -61,6 +61,28 @@ test('request check mirrors the solver bounds', () => {
   assert.ok(checkCoupledRequest(noRotation).warnings.some(w => /grows without bound/.test(w)))
 })
 
+test('cloud formation example round-trips through the editor with air masses and the full cloud config', () => {
+  const request = JSON.parse(readFileSync(join(root, 'examples', 'cloud-formation-request.json'), 'utf8'))
+  const form = formFromRequest(request)
+  assert.equal(form.airmasses.length, 2)
+  assert.equal(form.cloud_enabled, true)
+  assert.equal(form.cloud.warm_front_slope, 1 / 200)
+  assert.equal(form.precip_enabled, true)
+  assert.equal(form.precip.snow_wet_bulb_k, 273.65)
+  assert.deepEqual(formToRequest(form), request)
+  const badSnow = JSON.parse(JSON.stringify(request)); badSnow.precipitation.snow_wet_bulb_k = 280
+  assert.match(checkCoupledRequest(badSnow).errors.join(' '), /Snow wet-bulb/)
+  const report = checkCoupledRequest(request)
+  assert.deepEqual(report.errors, [])
+  const noColumn = JSON.parse(JSON.stringify(request)); delete noColumn.column
+  assert.match(checkCoupledRequest(noColumn).errors.join(' '), /requires the vertical column/)
+  const steepWarm = JSON.parse(JSON.stringify(request)); steepWarm.cloud_formation.warm_front_slope = 1 / 50
+  assert.match(checkCoupledRequest(steepWarm).errors.join(' '), /gentler/)
+  const fixture = JSON.parse(readFileSync(join(root, 'viewer', 'public', 'clouds', 'engine-timeline.json'), 'utf8'))
+  const frames = validateSequence(fixture)
+  assert.deepEqual(requestFromCoupledAtmosphere(fixture.coupled_atmosphere, frames), request)
+})
+
 test('engine fixture validates as a coupled timeline and round-trips its request', () => {
   const frames = validateSequence(fixture())
   assert.equal(frames.length, 7)

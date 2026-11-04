@@ -46,6 +46,14 @@ double relative_humidity_fraction(
     double specific_humidity_kg_kg,
     double pressure_pa);
 
+// Wet-bulb temperature from the psychrometric relation
+//   e = e_s(T_w) - (c_p p / (eps L)) (T - T_w), solved by Newton iteration.
+// The wet-bulb temperature decides the precipitation phase at the ground.
+double wet_bulb_temperature_k(
+    double air_temperature_k,
+    double specific_humidity_kg_kg,
+    double pressure_pa);
+
 // Analytic partial derivatives of the relations above at one state. They
 // quantify how strongly the three coupled fields depend on each other; see
 // docs/weather/moist-air-relations.md for the derivation and typical values.

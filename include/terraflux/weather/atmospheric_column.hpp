@@ -95,6 +95,17 @@ AtmosphericColumn build_hydrostatic_column(
 // from the current pressure, temperature and humidity.
 void rediagnose_column(AtmosphericColumn& column);
 
+// Profile access at any height (ln p linear between interfaces and
+// mid-levels; temperature and humidity linear between mid-levels).
+double column_pressure_at_height_pa(const AtmosphericColumn& column, double height_m);
+double column_temperature_at_height_k(const AtmosphericColumn& column, double height_m);
+double column_humidity_at_height_kg_kg(const AtmosphericColumn& column, double height_m);
+// Lowest height where the environment temperature crosses 0 °C (melting
+// level); empty when the whole column is below or above freezing.
+std::optional<double> column_freezing_level_m(const AtmosphericColumn& column);
+// Column-integrated water vapour sum(q dp / g) in kg/m^2 (= mm of liquid).
+double column_precipitable_water_mm(const AtmosphericColumn& column);
+
 struct ParcelAscent {
     // Samples along the ascent (every parcel_step_m from the lowest layer).
     std::vector<double> height_m;
@@ -116,6 +127,15 @@ struct ParcelAscent {
 
 ParcelAscent lift_surface_parcel(const AtmosphericColumn& column, const ColumnConfig& config);
 
+// Lift a parcel with the given temperature and humidity from the lowest
+// layer through the column's environment (e.g. a surface parcel warmed by
+// daytime heating while the air aloft is unchanged).
+ParcelAscent lift_parcel(
+    const AtmosphericColumn& column,
+    const ColumnConfig& config,
+    double parcel_temperature_k,
+    double parcel_specific_humidity_kg_kg);
+
 struct ConvectiveAdjustmentReport {
     std::size_t dry_mixing_events{0};
     std::size_t condensing_layers{0};
@@ -131,7 +151,9 @@ struct ConvectiveAdjustmentReport {
 ConvectiveAdjustmentReport adjust_column_convection(AtmosphericColumn& column);
 
 // Per-cell column diagnostics for a horizontal field of surface states, used
-// by the coupled wind CLI. Missing levels are NaN.
+// by the coupled wind CLI. Missing levels are NaN. parcel_heating_k warms the
+// lifted surface parcel only; the environment is built from the unheated
+// surface temperature.
 struct ColumnFieldDiagnostics {
     std::vector<double> lcl_height_m;
     std::vector<double> lfc_height_m;
@@ -148,6 +170,7 @@ ColumnFieldDiagnostics diagnose_column_field(
     const std::vector<double>& surface_pressure_pa,
     const std::vector<double>& surface_temperature_k,
     const std::vector<double>& surface_specific_humidity_kg_kg,
-    const ColumnConfig& config);
+    const ColumnConfig& config,
+    double parcel_heating_k = 0.0);
 
 }  // namespace terraflux::weather
