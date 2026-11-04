@@ -1491,7 +1491,7 @@ OceanDiagnostics diagnose_ocean(const OceanState& s, const OceanForcing& f, cons
             pl.minimum_salinity_psu = std::min(pl.minimum_salinity_psu, s.surface_salinity_psu[k]);
             const double kx = static_cast<double>(k % nx), ky = static_cast<double>(k / nx);
             pl.plume_extent_km = std::max(pl.plume_extent_km, std::hypot((kx - mx) * dx, (ky - my) * dy) / 1000.0);
-            cxs += fresh * kx; cys += fresh * ky; weight += fresh;
+            cxs += fresh * (kx - mx); cys += fresh * (ky - my); weight += fresh;   // offsets from the mouth: exactly 0 for the mouth itself
             const std::size_t x = k % nx, y = k / nx;
             const std::size_t neighbours[4] = {x + 1 < nx ? k + 1 : count, x > 0 ? k - 1 : count, y + 1 < ny ? k + nx : count, y > 0 ? k - nx : count};
             for (std::size_t n : neighbours) {
@@ -1501,10 +1501,15 @@ OceanDiagnostics diagnose_ocean(const OceanState& s, const OceanForcing& f, cons
             }
         }
         if (weight > 0.0) {
-            const double ddx = (cxs / weight - mx) * dx, ddy = (cys / weight - my) * dy;
-            double bearing = std::atan2(ddx, ddy) * 180.0 / kPi;
-            if (bearing < 0.0) bearing += 360.0;
-            pl.deflection_deg = (ddx == 0.0 && ddy == 0.0) ? 0.0 : bearing;
+            const double ox = cxs / weight, oy = cys / weight;   // centroid offset in cells
+            // A plume centred on its mouth (within a millionth of a cell: rounding) has no direction; without the
+            // tolerance the sign of the rounding residue would flip the bearing between 0 and 180 degrees across
+            // compilers and platforms.
+            if (std::hypot(ox, oy) > 1.0e-6) {
+                double bearing = std::atan2(ox * dx, oy * dy) * 180.0 / kPi;
+                if (bearing < 0.0) bearing += 360.0;
+                pl.deflection_deg = bearing;
+            }
         }
         d.plumes.push_back(std::move(pl));
     }

@@ -24,7 +24,7 @@ The budget closes every step: `volume = initial + Σ(rivers + P − E + sponge)`
 ## 2. Diagnostics
 
 - **Streams**: 4-connected cells faster than `stream_speed_threshold` (two or more). Each stream reports its core cell (fastest), cell count, max and mean speed, mean salinity and temperature, the dominant direction, the transport in Sverdrups across the section through the core (summing `h·u_along·width` over the stream cells of the row or column perpendicular to the flow) and the **core streamline** traced upstream and downstream through the interpolated current field (grid fractions). Streams are sorted by transport.
-- **Exchange points**: each river mouth with its discharge, the surface salinity at the mouth, the plume (surface water fresher than the reference by `plume_salinity_deficit`, connected to the mouth): area, freshwater volume held, extent, minimum salinity and the bearing of its freshwater centroid from the mouth.
+- **Exchange points**: each river mouth with its discharge, the surface salinity at the mouth, the plume (surface water fresher than the reference by `plume_salinity_deficit`, connected to the mouth): area, freshwater volume held, extent, minimum salinity and the bearing of its freshwater centroid from the mouth (0 for a plume centred on its mouth, such as a one-cell plume, so rounding cannot flip it between 0° and 180° across compilers).
 - **Formation sites** (cells with sinking), **mixing fronts**, the basin-mean salinity, minimum surface salinity and fastest current.
 
 ## 3. Configuration

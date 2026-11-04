@@ -202,6 +202,19 @@ void plumes_turn_right_in_the_northern_hemisphere() {
     const auto ds = diagnose_ocean(ss, f, cs);
     require(ds.plumes[0].deflection_deg > 0.0 && ds.plumes[0].deflection_deg < 90.0, "southern hemisphere: the plume turns left (north)");
     require(ss.salinity_psu[mouth + 2 * n] < ss.salinity_psu[mouth - 2 * n], "mirror image along the coast");
+    // The bearing of a plume centred on its mouth is 0, not the sign of a rounding residue (which used to flip it
+    // between 0 and 180 degrees across compilers); off-centre plumes keep their bearing.
+    auto plume_with = [&](const std::vector<std::size_t>& fresh) {
+        auto state = initialize_ocean(c);
+        for (std::size_t k : fresh) state.surface_salinity_psu[k] = 30.0;
+        return diagnose_ocean(state, f, c).plumes.at(0);
+    };
+    const double cell = 30000.0 * 30000.0;
+    const auto one = plume_with({mouth});
+    require(one.plume_area_m2 == cell && one.deflection_deg == 0.0, "a one-cell plume has no direction");
+    require(plume_with({mouth, mouth + n, mouth - n}).deflection_deg == 0.0, "a plume spread evenly north and south of its mouth has no direction");
+    require_near(plume_with({mouth, mouth + 1}).deflection_deg, 90.0, "a plume east of its mouth bears 90 degrees", 1.0e-9);
+    require_near(plume_with({mouth, mouth - n}).deflection_deg, 180.0, "a plume south of its mouth bears 180 degrees", 1.0e-9);
 }
 
 // 4. Cold, salty surface water sinks (deep-water formation); fresh water switches the sinking off.

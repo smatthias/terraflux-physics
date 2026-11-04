@@ -412,7 +412,7 @@
                 },
                 "deflection_deg": {
                   "type": "number",
-                  "description": "Bearing of the plume's freshwater centroid from the mouth, clockwise from north.",
+                  "description": "Bearing of the plume's freshwater centroid from the mouth, clockwise from north; 0 when the plume is centred on its mouth (within a millionth of a cell), e.g. a one-cell plume.",
                   "minimum": 0,
                   "exclusiveMaximum": 360
                 }
