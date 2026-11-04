@@ -26,6 +26,7 @@ add_library(terraflux_weather_map
     src/weather/severe_convection.cpp
     src/weather/synthetic_terrain.cpp
     src/weather/catchment_hydrology.cpp
+    src/weather/ocean_circulation.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -84,6 +85,11 @@ target_link_libraries(terraflux-run-atmospheric-column
 
 add_executable(terraflux-run-catchment-hydrology src/weather/run_catchment_hydrology.cpp)
 target_link_libraries(terraflux-run-catchment-hydrology
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-ocean-circulation src/weather/run_ocean_circulation.cpp)
+target_link_libraries(terraflux-run-ocean-circulation
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -190,6 +196,11 @@ if(BUILD_TESTING)
     add_test(NAME weather.catchment_hydrology COMMAND terraflux-catchment-hydrology-test)
     add_test(NAME weather.catchment_hydrology_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/catchment_hydrology_check.py $<TARGET_FILE:terraflux-run-catchment-hydrology>)
+    add_executable(terraflux-ocean-circulation-test tests/weather/ocean_circulation_test.cpp)
+    target_link_libraries(terraflux-ocean-circulation-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.ocean_circulation COMMAND terraflux-ocean-circulation-test)
+    add_test(NAME weather.ocean_circulation_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_circulation_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -225,6 +236,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-run-coupled-wind PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-atmospheric-column PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-catchment-hydrology PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-ocean-circulation PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
@@ -239,6 +251,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-severe-convection-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-orography-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-catchment-hydrology-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-ocean-circulation-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()
