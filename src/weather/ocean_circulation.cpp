@@ -259,7 +259,9 @@ void validate_ocean_config(const OceanConfig& c) {
     const double dt = c.timestep_seconds, dx = c.grid.spacing_east_m, dy = c.grid.spacing_north_m;
     double warmest = c.initial_temperature_k;
     for (std::size_t i = 0; i < c.initial_surface_temperature_k.size(); ++i) if (c.ocean[i]) warmest = std::max(warmest, c.initial_surface_temperature_k[i]);
-    const double g_prime = std::max(p.minimum_reduced_gravity_m_s2, reduced_gravity_m_s2(warmest, c.initial_salinity_psu, p));
+    // Stability: gravity waves of the reduced-gravity layer, Coriolis, drag, viscosity and diffusion.
+    const double dt = c.timestep_seconds, dx = c.grid.spacing_east_m, dy = c.grid.spacing_north_m;
+    const double g_prime = std::max(p.minimum_reduced_gravity_m_s2, reduced_gravity_m_s2(c.initial_temperature_k, c.initial_salinity_psu, p));
     const double wave_speed = std::sqrt(1.5 * g_prime * c.initial_thickness_m * 1.5);
     if (dt * wave_speed * (1.0 / dx + 1.0 / dy) > 1.0) throw std::invalid_argument("ocean timestep violates the gravity-wave CFL bound dt c (1/dx + 1/dy) <= 1");
     double f_max = 0.0;
