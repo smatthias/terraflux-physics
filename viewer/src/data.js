@@ -1,4 +1,5 @@
 import { validateCoupledAtmosphere } from './coupledWind.js'
+import { validateHydrology } from './hydrology.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 export function validate(input) {
@@ -147,6 +148,10 @@ export function validateSequence(input) {
       }
       frame.surfaceWater={values:depths,stored_volume_m3:stored,cumulative_rainfall_volume_m3:rain,balance_error_m3:error,soil_values:soil,soil_volume_m3:soilVolume,soil_capacity_m:hasSoil?w.soil_storage_capacity_m:null,evaporated_volume_m3:evaporated,drained_volume_m3:drained,discharged_volume_m3:discharged,boundary:w.boundary,outlets:w.outlets??[],parameters:{timestep_seconds:w.timestep_seconds,routing_speed_m_s:w.routing_speed_m_s,infiltration_rate_m_s:w.infiltration_rate_m_s??0,evaporation_rate_m_s:w.evaporation_rate_m_s??0,drainage_rate_m_s:w.drainage_rate_m_s??0}}
     })
+  }
+  if(input.hydrology !== undefined){
+    check(input.terrain !== undefined, 'Catchment hydrology requires the terrain grid.')
+    validateHydrology(input.hydrology, frames, frames[0].terrain)
   }
   if(input.terrain_derivatives !== undefined){
     const d=input.terrain_derivatives, count=first.grid.nx*first.grid.ny

@@ -28,6 +28,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/storm-systems-model.md`, `storm-systems-v1.schema.json` and `surface-v1.schema.json` — tropical cyclones: potential intensity from humid air over a warm sea, genesis index, Fujiwhara interaction and mergers, landfall with surge and inland decay
 - `docs/weather/severe-convection-model.md` and `severe-convection-v1.schema.json` — capping temperature inversions, low-level shear and helicity, the Significant Tornado Parameter
 - `docs/weather/orography-model.md` and `orography-v1.schema.json` — mountains and valleys: ridge orientation as a weather border, Froude blocking and barrier jets, foehn (moist ascent ~0.6 K/100 m, dry descent ~1 K/100 m), orographic precipitation, valley cold-air pools
+- `docs/weather/catchment-hydrology-model.md`, `catchment-run-v1.schema.json` and `catchment-hydrology-v1.schema.json` — where the rain goes: depression-filled D8 drainage network with lakes, basins and ocean/edge outlets, snow → surface → soil → groundwater stores with Darcy flow and baseflow, kinematic overland/channel routing with bankfull overflow, and the hazard layer (flood depth × velocity classes, stream-power erosion/deposition, infinite-slope landslides with runout, rainfall intensity–duration warnings)
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -163,6 +164,16 @@ An `orography` section gives the coupled layer terrain (per cell, or synthetic r
 ```
 
 **Load Alps foehn example** opens the weather map on a hillshaded 3D relief with lifting, foehn, cold-pool, orographic-precipitation and blocking layers; the editor builds ridges by orientation.
+
+### Where the rain goes: rivers, lakes, groundwater — and floods, erosion, landslides
+
+`terraflux-run-catchment-hydrology` takes a terrain (per cell or the shared synthetic ridges/basins builder with tilt and roughness), its own time stepping (hydrology step, spin-up, snapshot cadence), the grid, soil / groundwater / channel / snow / hazard parameters and a forcing (rainfall events with optional Gaussian footprint and orographic enhancement, a lapse-rate diurnal air temperature, and/or the precipitation and temperature of a coupled-wind timeline). It fills depressions into lakes, derives the D8 river network, basins and outlets, and routes every drop through snow, surface, soil and aquifer stores to the rivers, the lakes and the sea while closing the water budget in every frame. The hazard layer classifies flooding by depth × velocity, bookkeeps stream-power erosion and deposition with a sediment yield, and fails saturated slopes with the infinite-slope factor of safety, running the debris downslope. See [catchment-hydrology-model.md](docs/weather/catchment-hydrology-model.md).
+
+```sh
+./build/terraflux-run-catchment-hydrology examples/alpine-flood-request.json flood.json
+```
+
+**Load alpine flood example** opens the **Catchment** view (rivers sized by upstream area and coloured by discharge, lakes at their level, overland water, snow, rain; click a cell to trace its water to the outlet) and the **Hazards** view (flood classes, reaches above bankfull, erosion/deposition, landslides with runout, rainfall-threshold warnings); the field explorer adds discharge, soil saturation, water-table depth, snowpack, erosion, deposition, factor of safety and flood class, and the metrics panel shows the budget and a hydrograph at the peak or selected reach.
 
 ### Timeline playback
 

@@ -24,6 +24,8 @@ add_library(terraflux_weather_map
     src/weather/precipitation_outcomes.cpp
     src/weather/storm_systems.cpp
     src/weather/severe_convection.cpp
+    src/weather/synthetic_terrain.cpp
+    src/weather/catchment_hydrology.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -77,6 +79,11 @@ target_link_libraries(terraflux-run-coupled-wind
 
 add_executable(terraflux-run-atmospheric-column src/weather/run_atmospheric_column.cpp)
 target_link_libraries(terraflux-run-atmospheric-column
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-catchment-hydrology src/weather/run_catchment_hydrology.cpp)
+target_link_libraries(terraflux-run-catchment-hydrology
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -178,6 +185,11 @@ if(BUILD_TESTING)
     add_test(NAME weather.orography COMMAND terraflux-orography-test)
     add_test(NAME weather.orography_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/orography_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-catchment-hydrology-test tests/weather/catchment_hydrology_test.cpp)
+    target_link_libraries(terraflux-catchment-hydrology-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.catchment_hydrology COMMAND terraflux-catchment-hydrology-test)
+    add_test(NAME weather.catchment_hydrology_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/catchment_hydrology_check.py $<TARGET_FILE:terraflux-run-catchment-hydrology>)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -212,6 +224,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-run-pressure-wind PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-coupled-wind PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-atmospheric-column PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-catchment-hydrology PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
@@ -225,6 +238,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-storm-systems-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-severe-convection-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-orography-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-catchment-hydrology-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

@@ -3,6 +3,7 @@
 #include "terraflux/weather/precipitation_outcomes.hpp"
 #include "terraflux/weather/severe_convection.hpp"
 #include "terraflux/weather/storm_systems.hpp"
+#include "terraflux/weather/synthetic_terrain.hpp"
 #include "terraflux/weather/coupled_wind.hpp"
 #include "terraflux/weather/pressure_wind.hpp"
 
@@ -10,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -235,7 +237,6 @@ std::optional<OrographyRequest> parse_orography(const Json& request, const terra
         return std::nullopt;
     }
     const Json& o = required(request, "orography");
-    const std::size_t count = grid.nx * grid.ny;
     OrographyRequest result;
     auto& c = result.config;
     const terraflux::weather::OrographyConfig d;
@@ -246,43 +247,53 @@ std::optional<OrographyRequest> parse_orography(const Json& request, const terra
         result.terrain_source = {{"kind", "prescribed_cell_values"}};
     } else {
         const double base = optional_number(terrain, "base_elevation_m", 0.0);
-        c.elevation_m.assign(count, base);
+        terraflux::weather::SyntheticTerrainSpec spec;
+        spec.base_elevation_m = base;
+        spec.slope_east_m_per_m = optional_number(terrain, "slope_east_m_per_m", 0.0);
+        spec.slope_north_m_per_m = optional_number(terrain, "slope_north_m_per_m", 0.0);
+        spec.roughness_m = optional_number(terrain, "roughness_m", 0.0);
+        spec.roughness_seed = static_cast<std::uint32_t>(optional_number(terrain, "roughness_seed", 1.0));
         Json ridges = Json::array(), basins = Json::array();
         if (terrain.contains("ridges")) {
             const Json& list = required(terrain, "ridges");
             if (!list.is_array()) throw std::invalid_argument("orography.terrain.ridges must be an array");
             for (const Json& r : list) {
                 // orientation_deg is the direction of the ridge axis from north: 0 = north-south, 90 = east-west.
-                const double orientation = required_number(r, "orientation_deg"), ce = required_number(r, "center_east_m"), cn = required_number(r, "center_north_m");
-                const double height = required_number(r, "height_m"), half_width = required_number(r, "half_width_m"), length = required_number(r, "length_m");
-                if (half_width <= 0.0 || length <= 0.0) throw std::invalid_argument("ridge half_width_m and length_m must be positive");
-                const double ax = std::sin(orientation * 3.14159265358979323846 / 180.0), ay = std::cos(orientation * 3.14159265358979323846 / 180.0);
-                for (std::size_t i = 0; i < count; ++i) {
-                    const double dx = grid.origin_east_m + (static_cast<double>(i % grid.nx) + 0.5) * grid.spacing_east_m - ce;
-                    const double dy = grid.origin_north_m + (static_cast<double>(i / grid.nx) + 0.5) * grid.spacing_north_m - cn;
-                    const double along = dx * ax + dy * ay, across = dx * ay - dy * ax;
-                    const double end = along / (0.5 * length);
-                    c.elevation_m[i] += height * std::exp(-(across / half_width) * (across / half_width)) * std::exp(-end * end * end * end);
-                }
-                ridges.push_back({{"orientation_deg", orientation}, {"center_east_m", ce}, {"center_north_m", cn}, {"height_m", height}, {"half_width_m", half_width}, {"length_m", length}});
+                terraflux::weather::SyntheticRidge ridge;
+                ridge.orientation_deg = required_number(r, "orientation_deg");
+                ridge.center_east_m = required_number(r, "center_east_m");
+                ridge.center_north_m = required_number(r, "center_north_m");
+                ridge.height_m = required_number(r, "height_m");
+                ridge.half_width_m = required_number(r, "half_width_m");
+                ridge.length_m = required_number(r, "length_m");
+                if (ridge.half_width_m <= 0.0 || ridge.length_m <= 0.0) throw std::invalid_argument("ridge half_width_m and length_m must be positive");
+                spec.ridges.push_back(ridge);
+                ridges.push_back({{"orientation_deg", ridge.orientation_deg}, {"center_east_m", ridge.center_east_m}, {"center_north_m", ridge.center_north_m},
+                                  {"height_m", ridge.height_m}, {"half_width_m", ridge.half_width_m}, {"length_m", ridge.length_m}});
             }
         }
         if (terrain.contains("basins")) {
             const Json& list = required(terrain, "basins");
             if (!list.is_array()) throw std::invalid_argument("orography.terrain.basins must be an array");
             for (const Json& b : list) {
-                const double ce = required_number(b, "center_east_m"), cn = required_number(b, "center_north_m");
-                const double depth = required_number(b, "depth_m"), radius = required_number(b, "radius_m");
-                if (radius <= 0.0) throw std::invalid_argument("basin radius_m must be positive");
-                for (std::size_t i = 0; i < count; ++i) {
-                    const double dx = grid.origin_east_m + (static_cast<double>(i % grid.nx) + 0.5) * grid.spacing_east_m - ce;
-                    const double dy = grid.origin_north_m + (static_cast<double>(i / grid.nx) + 0.5) * grid.spacing_north_m - cn;
-                    c.elevation_m[i] -= depth * std::exp(-(dx * dx + dy * dy) / (radius * radius));
-                }
-                basins.push_back({{"center_east_m", ce}, {"center_north_m", cn}, {"depth_m", depth}, {"radius_m", radius}});
+                terraflux::weather::SyntheticBasin basin;
+                basin.center_east_m = required_number(b, "center_east_m");
+                basin.center_north_m = required_number(b, "center_north_m");
+                basin.depth_m = required_number(b, "depth_m");
+                basin.radius_m = required_number(b, "radius_m");
+                if (basin.radius_m <= 0.0) throw std::invalid_argument("basin radius_m must be positive");
+                spec.basins.push_back(basin);
+                basins.push_back({{"center_east_m", basin.center_east_m}, {"center_north_m", basin.center_north_m}, {"depth_m", basin.depth_m}, {"radius_m", basin.radius_m}});
             }
         }
+        c.elevation_m = terraflux::weather::build_synthetic_terrain(spec, grid);
         result.terrain_source = {{"kind", "synthetic_ridges_and_basins"}, {"base_elevation_m", base}, {"ridges", ridges}, {"basins", basins}};
+        if (spec.slope_east_m_per_m != 0.0 || spec.slope_north_m_per_m != 0.0 || spec.roughness_m > 0.0) {
+            result.terrain_source["slope_east_m_per_m"] = spec.slope_east_m_per_m;
+            result.terrain_source["slope_north_m_per_m"] = spec.slope_north_m_per_m;
+            result.terrain_source["roughness_m"] = spec.roughness_m;
+            result.terrain_source["roughness_seed"] = spec.roughness_seed;
+        }
     }
     c.blocking_time_scale_s = optional_number(o, "blocking_time_scale_s", d.blocking_time_scale_s);
     c.obstacle_radius_m = optional_number(o, "obstacle_radius_m", d.obstacle_radius_m);

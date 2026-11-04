@@ -1,0 +1,644 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/catchment-run-v1.json",
+  "title": "TerraFlux catchment hydrology run request v1 (input of terraflux-run-catchment-hydrology)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "time",
+    "grid",
+    "terrain",
+    "forcing"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.hydrology.catchment-run/v1"
+    },
+    "time": {
+      "type": "object",
+      "required": [
+        "start_time_utc",
+        "timestep_seconds",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "start_time_utc": {
+          "type": "string",
+          "pattern": "Z$"
+        },
+        "timestep_seconds": {
+          "type": "number",
+          "description": "Hydrology step: > 0, <= 3600 and <= 2 x the grid spacing in metres.",
+          "exclusiveMinimum": 0,
+          "maximum": 3600
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "spinup_steps": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Dry steps run before the record so the rivers carry baseflow; totals are reset afterwards."
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "required": [
+        "nx",
+        "ny",
+        "origin_east_m",
+        "origin_north_m",
+        "spacing_east_m",
+        "spacing_north_m",
+        "geographic_anchor_longitude_deg",
+        "geographic_anchor_latitude_deg"
+      ],
+      "properties": {
+        "nx": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "ny": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "origin_east_m": {
+          "type": "number"
+        },
+        "origin_north_m": {
+          "type": "number"
+        },
+        "spacing_east_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "spacing_north_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "geographic_anchor_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geographic_anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "coordinate_system": {
+          "const": "local_azimuthal_equidistant_m"
+        },
+        "array_order": {
+          "const": "row_major_y_then_x"
+        }
+      }
+    },
+    "terrain": {
+      "description": "Prescribed cell elevations or the shared synthetic ridges/basins builder (base level, tilted plane, ridges, basins, deterministic roughness).",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "values"
+          ],
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "base_elevation_m": {
+              "type": "number",
+              "default": 0
+            },
+            "slope_east_m_per_m": {
+              "type": "number",
+              "default": 0
+            },
+            "slope_north_m_per_m": {
+              "type": "number",
+              "default": 0
+            },
+            "ridges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "orientation_deg",
+                  "center_east_m",
+                  "center_north_m",
+                  "height_m",
+                  "half_width_m",
+                  "length_m"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "orientation_deg": {
+                    "type": "number",
+                    "description": "Ridge axis from north: 0 = north-south, 90 = east-west."
+                  },
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "height_m": {
+                    "type": "number",
+                    "description": "Negative heights carve valleys."
+                  },
+                  "half_width_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "length_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            },
+            "basins": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "center_east_m",
+                  "center_north_m",
+                  "depth_m",
+                  "radius_m"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "depth_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            },
+            "roughness_m": {
+              "type": "number",
+              "description": "Peak amplitude of the hashed cell-scale noise (m); turns smooth flanks into dendritic drainage.",
+              "minimum": 0,
+              "default": 0
+            },
+            "roughness_seed": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 1
+            }
+          }
+        }
+      ]
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sea_level_m": {
+          "type": "number",
+          "description": "Cells at or below this elevation are ocean.",
+          "default": 0
+        },
+        "open_edges": {
+          "type": "boolean",
+          "default": true,
+          "description": "Edge cells without a lower neighbour drain out of the domain."
+        }
+      }
+    },
+    "soil": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regolith_depth_m": {
+          "type": "number",
+          "description": "Soil/regolith thickness on flat ground.",
+          "exclusiveMinimum": 0,
+          "default": 1.0
+        },
+        "slope_thinning_tan": {
+          "type": "number",
+          "description": "Regolith thins linearly to the minimum fraction at this tan(slope).",
+          "exclusiveMinimum": 0,
+          "default": 1.5
+        },
+        "minimum_depth_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        },
+        "porosity": {
+          "type": "number",
+          "description": "Soil capacity = porosity x regolith depth.",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "default": 0.4
+        },
+        "field_capacity_fraction": {
+          "type": "number",
+          "description": "Share of the capacity held against gravity; water above it percolates.",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5
+        },
+        "infiltration_max_m_s": {
+          "type": "number",
+          "description": "Horton dry-soil infiltration capacity.",
+          "minimum": 0,
+          "default": 1e-05
+        },
+        "infiltration_min_m_s": {
+          "type": "number",
+          "description": "Horton saturated infiltration capacity (<= max).",
+          "minimum": 0,
+          "default": 1e-06
+        },
+        "percolation_rate_m_s": {
+          "type": "number",
+          "description": "Drainage to the aquifer at full saturation.",
+          "minimum": 0,
+          "default": 2e-06
+        },
+        "potential_evapotranspiration_m_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 3.5e-08
+        },
+        "detention_storage_m": {
+          "type": "number",
+          "description": "Surface water that never runs off.",
+          "minimum": 0,
+          "default": 0.002
+        },
+        "initial_saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        }
+      }
+    },
+    "groundwater": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aquifer_thickness_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 20.0
+        },
+        "specific_yield": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "default": 0.05
+        },
+        "hydraulic_conductivity_m_s": {
+          "type": "number",
+          "description": "Explicit Darcy exchange; K B dt / (S_y L^2) must be <= 0.25.",
+          "minimum": 0,
+          "default": 5e-05
+        },
+        "baseflow_time_scale_s": {
+          "type": "number",
+          "description": "Linear-reservoir time scale of the groundwater discharge to the nearest channel.",
+          "exclusiveMinimum": 0,
+          "default": 7776000.0
+        },
+        "initial_fill_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5
+        }
+      }
+    },
+    "channels": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channel_initiation_area_m2": {
+          "type": "number",
+          "description": "Upstream area from which a cell carries a channel.",
+          "exclusiveMinimum": 0,
+          "default": 4000000.0
+        },
+        "manning_overland": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 0.1
+        },
+        "manning_channel": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 0.035
+        },
+        "width_coefficient_m": {
+          "type": "number",
+          "description": "w = c A_km2^e",
+          "exclusiveMinimum": 0,
+          "default": 4.0
+        },
+        "width_exponent": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.5
+        },
+        "bankfull_depth_coefficient_m": {
+          "type": "number",
+          "description": "d_bf = c A_km2^e",
+          "exclusiveMinimum": 0,
+          "default": 0.6
+        },
+        "bankfull_depth_exponent": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.3
+        },
+        "minimum_slope": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 0.0001
+        },
+        "lake_initial_fill_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1.0
+        }
+      }
+    },
+    "snow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rain_snow_threshold_k": {
+          "type": "number",
+          "minimum": 250,
+          "maximum": 290,
+          "default": 274.15
+        },
+        "degree_day_factor_m_k_s": {
+          "type": "number",
+          "description": "Melt per kelvin above 0 C per second (4 mm/K/day default).",
+          "minimum": 0,
+          "default": 4.6296296296296295e-08
+        },
+        "initial_snow_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "hazards": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "erodibility_kg_j": {
+          "type": "number",
+          "description": "Detachment per joule of excess unit stream power.",
+          "minimum": 0,
+          "default": 1e-06
+        },
+        "critical_stream_power_w_m2": {
+          "type": "number",
+          "minimum": 0,
+          "default": 30.0
+        },
+        "transport_capacity_kg_j": {
+          "type": "number",
+          "description": "kg m/J: capacity per unit width per unit excess stream power.",
+          "minimum": 0,
+          "default": 0.001
+        },
+        "settling_velocity_m_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.001
+        },
+        "bulk_density_kg_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1600.0
+        },
+        "cohesion_pa": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2000.0
+        },
+        "friction_angle_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 89,
+          "default": 32.0
+        },
+        "soil_unit_weight_n_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 18000.0
+        },
+        "water_unit_weight_n_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 9810.0
+        },
+        "minimum_failure_tan": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.05
+        },
+        "runout_tan": {
+          "type": "number",
+          "description": "Debris stops where the downstream slope is gentler.",
+          "minimum": 0,
+          "default": 0.2
+        },
+        "residual_depth_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.2
+        },
+        "failure_area_fraction": {
+          "type": "number",
+          "description": "Share of a failing cell that mobilises.",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "default": 0.05
+        },
+        "restabilisation_factor_of_safety": {
+          "type": "number",
+          "minimum": 1,
+          "default": 1.1
+        },
+        "flood_depth_threshold_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.1
+        },
+        "intensity_duration_a_mm_h": {
+          "type": "number",
+          "description": "Caine threshold I = a D^b (D in hours).",
+          "exclusiveMinimum": 0,
+          "default": 14.82
+        },
+        "intensity_duration_b": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 0,
+          "default": -0.39
+        },
+        "dry_spell_reset_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 21600.0
+        }
+      }
+    },
+    "forcing": {
+      "type": "object",
+      "required": [
+        "rainfall"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "air_temperature": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sea_level_k": {
+              "type": "number",
+              "minimum": 200,
+              "maximum": 330,
+              "default": 287.0
+            },
+            "lapse_rate_k_m": {
+              "type": "number",
+              "minimum": -0.02,
+              "maximum": 0.02,
+              "default": 0.0065
+            },
+            "diurnal_amplitude_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0
+            },
+            "diurnal_phase_seconds": {
+              "type": "number",
+              "default": 0
+            }
+          }
+        },
+        "rainfall": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "start_seconds",
+                  "duration_seconds",
+                  "rate_mm_h"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "start_seconds": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "duration_seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "rate_mm_h": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 500
+                  },
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "description": "Gaussian e-folding radius; omitted = uniform rain.",
+                    "exclusiveMinimum": 0
+                  },
+                  "orographic_enhancement_per_km": {
+                    "type": "number",
+                    "description": "Rate multiplier 1 + f z/1000 with the cell elevation above sea level.",
+                    "minimum": 0,
+                    "maximum": 5,
+                    "default": 0
+                  }
+                },
+                "dependentRequired": {
+                  "radius_m": [
+                    "center_east_m",
+                    "center_north_m"
+                  ]
+                }
+              }
+            },
+            "coupled_timeline_path": {
+              "type": "string",
+              "description": "A terraflux.weather.timeline/v1 file with coupled_atmosphere.orography and/or .precipitation frames; rain and air temperature are sampled at the nearest coupled cell, piecewise constant in time."
+            },
+            "coupled_time_offset_seconds": {
+              "type": "number",
+              "default": 0
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "events"
+              ]
+            },
+            {
+              "required": [
+                "coupled_timeline_path"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "snapshot_every_steps": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    }
+  }
+}

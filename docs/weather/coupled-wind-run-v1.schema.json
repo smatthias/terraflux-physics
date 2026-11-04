@@ -1021,7 +1021,8 @@
                     "type": "number"
                   },
                   "height_m": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "Negative heights carve valleys."
                   },
                   "half_width_m": {
                     "type": "number",
@@ -1063,6 +1064,26 @@
                   }
                 }
               }
+            },
+            "slope_east_m_per_m": {
+              "type": "number",
+              "default": 0,
+              "description": "Tilted plane through the grid origin (shared synthetic terrain builder)."
+            },
+            "slope_north_m_per_m": {
+              "type": "number",
+              "default": 0
+            },
+            "roughness_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Peak amplitude of deterministic hashed cell-scale noise."
+            },
+            "roughness_seed": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 1
             }
           },
           "description": "Terrain per cell, or a synthetic base elevation with Gaussian ridges (orientation, height, width, length) and basins."
