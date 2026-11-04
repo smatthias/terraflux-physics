@@ -29,7 +29,8 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/severe-convection-model.md` and `severe-convection-v1.schema.json` — capping temperature inversions, low-level shear and helicity, the Significant Tornado Parameter
 - `docs/weather/orography-model.md` and `orography-v1.schema.json` — mountains and valleys: ridge orientation as a weather border, Froude blocking and barrier jets, foehn (moist ascent ~0.6 K/100 m, dry descent ~1 K/100 m), orographic precipitation, valley cold-air pools
 - `docs/weather/catchment-hydrology-model.md`, `catchment-run-v1.schema.json` and `catchment-hydrology-v1.schema.json` — where the rain goes: depression-filled D8 drainage network with lakes, basins and ocean/edge outlets, snow → surface → soil → groundwater stores with Darcy flow and baseflow, kinematic overland/channel routing with bankfull overflow, and the hazard layer (flood depth × velocity classes, stream-power erosion/deposition, infinite-slope landslides with runout, rainfall intensity–duration warnings)
-- `docs/weather/ocean-circulation-model.md`, `ocean-run-v1.schema.json` and `ocean-circulation-v1.schema.json` — the ocean streams: a reduced-gravity upper layer on a β-plane (Sverdrup interior, Stommel western boundary current, separation and extension, subpolar gyre), salinity and temperature with density feedback, river exchange points with surface plumes and mixing fronts, deep-water formation and the overturning that fresh water weakens
+- `docs/weather/ocean-circulation-model.md`, `ocean-run-v1.schema.json` and `ocean-circulation-v1.schema.json` — rain on the sea and the coast, evaporation, the air–sea heat exchange and the layered temperature/salinity column (§7), and the ocean streams: a reduced-gravity upper layer on a β-plane (Sverdrup interior, Stommel western boundary current, separation and extension, subpolar gyre), salinity and temperature with density feedback, river exchange points with surface plumes and mixing fronts, deep-water formation and the overturning that fresh water weakens
+- `docs/weather/polar-melt-model.md`, `polar-melt-run-v1.schema.json` and `polar-melt-v1.schema.json`: melting polar ice and the Atlantic overturning. Covers a Greenland-like ice sheet (shallow-ice flow, degree-day melt with the melt–elevation feedback, ocean-driven frontal melt), thermodynamic sea ice, an Arctic column, and a two-box overturning calibrated to 17 Sv with its tipping point, hysteresis and critical slowing down. Warming scenarios from 1850 to 2300 answer when the currents collapse, with an uncertainty ensemble and ocean temperature and oxygen indicators. Sea ice, a coupled ice sheet, warming and meltwater hosing in the 2-D ocean are covered in `ocean-circulation-model.md` §8.
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -50,6 +51,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
 - `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline, optionally with per-cell vertical column diagnostics
+- `terraflux-run-polar-melt`: Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios over centuries; writes a viewer timeline with a `polar` block
 - `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
@@ -179,6 +181,33 @@ An `orography` section gives the coupled layer terrain (per cell, or synthetic r
 ```sh
 ./build/terraflux-run-ocean-circulation examples/atlantic-streams-request.json ocean.json
 ```
+
+**Rain over the sea and the coast, evaporation and a layered ocean.** `forcing.rain` lets rain fall on the sea (fresh water at its own temperature into the surface: a buoyant rain lens that cools the surface and caps convection until the wind erodes it) and on the land, where the coastal band drains directly to the nearest sea cell through a linear reservoir while land farther inland is left to the rivers and the catchment model; rain comes from events, moving storms or the cell-mean precipitation of a coupled-wind run. `forcing.air_sea` computes evaporation and the air–sea heat exchange by bulk formulae (Dalton evaporation and latent heat, sensible heat, Berliand longwave, Zillman/Reed shortwave from the sun's position), solved implicitly at the surface, from an analytic atmosphere with diurnal cycle and moving air masses (e.g. a cold, dry outbreak) or from a coupled run including its storm winds. `physics.thermal_layers` splits the upper ocean into a temperature and salinity column (sigma layers moving with the currents, shortwave penetration, convective adjustment, Kraus–Turner wind mixing, bulk-Richardson shear mixing, diffusion) with mixed-layer, isothermal-layer and barrier-layer diagnostics. Volume, salt, heat and the coastal land water close every step; without these sections the slab model and its output are unchanged. See [ocean-circulation-model.md §7](docs/weather/ocean-circulation-model.md#7-rain-over-the-sea-and-the-coast-evaporation-airsea-heat-and-the-layered-column).
+
+```sh
+./build/terraflux-run-ocean-circulation examples/ocean-heat-rain-request.json ocean-heat.json
+python3 tools/build_ocean_example.py --build-dir build            # regenerate viewer/public/ocean-heat
+python3 tools/build_ocean_example.py --build-dir build --check    # compare with the committed fixture
+```
+
+**Load ocean heat & rain example** opens the Ocean streams view on a late-summer subtropical basin: a tropical rain band crosses the sea and makes landfall, a storm floods the coastal plain, a cold dry outbreak draws heat and water out of the sea and the sun drives a daily warm layer. Colour the water by sea-surface temperature, mixed-layer depth, net heat flux or evaporation; overlays show rain on sea and land, the coastal band, runoff arrows to the sea and the surface lenses by source; the inspector decomposes the heat flux of a cell and tells where the rain on a land cell goes; the metrics strip, time series and a water-column panel (profile and time–depth section) show what happens.
+
+**Melting polar ice and the overturning.** `terraflux-run-polar-melt` runs warming scenarios (global-mean warming curves) from 1850 to 2300 through the following:
+
+- a Greenland-like ice sheet: shallow-ice flow, positive-degree-day surface mass balance with the melt–elevation feedback, and Rignot frontal melt from the ocean's thermal forcing;
+- a central-Arctic sea-ice column;
+- a two-box Atlantic overturning calibrated to today's 17 Sv, whose fresh water comes from Greenland, the Arctic and a stronger water cycle and whose tipping point falls with polar amplification.
+
+It reports when the summer sea ice goes, when Greenland starts losing mass at its surface, when the overturning crosses its tipping point, weakens by 25 % / 50 % and collapses, with a 9-member ensemble over the two least-known quantities. It also reports the sea level, ocean temperature and oxygen solubility. In the ocean CLI, `physics.sea_ice`, an `ice_sheet` section, `forcing.warming` and `forcing.hosing` add sea ice, a coupled ice sheet, climate warming and meltwater hosing to the layered ocean with seasons. See [polar-melt-model.md](docs/weather/polar-melt-model.md) and [ocean-circulation-model.md §8](docs/weather/ocean-circulation-model.md#8-polar-processes-sea-ice-a-coupled-ice-sheet-warming-and-meltwater-hosing).
+
+```sh
+./build/terraflux-run-polar-melt examples/polar-melt-request.json polar.json            # about 50 s
+./build/terraflux-run-ocean-circulation examples/polar-ocean-request.json polar-ocean.json   # about 3.5 min
+python3 tools/build_ocean_example.py --build-dir build --cli terraflux-run-polar-melt \
+  --request examples/polar-melt-request.json --output viewer/public/polar/engine-timeline.json --check
+```
+
+**🧊 Load polar melt & overturning example** opens the **Polar melt** view. It shows Greenland's ice in relief (thickness, surface mass balance, melt or air temperature), the metrics of the scenario in focus, the **"When do the currents collapse?"** table with the ensemble range, scenario charts and the equilibrium diagram of the overturning. **❄ Load polar ocean (sea ice & hosing) example** opens the Ocean streams view with sea ice, the ice sheet on land and the hosing ring. It includes charts of overturning, sea ice, SMB, northern SST and oxygen, and a year-by-year table of when the overturning weakens.
 
 **Load Atlantic streams example** opens the **Ocean streams** view: water coloured by surface salinity (or speed, temperature, thermocline depth, freshwater fraction), streams sized by transport and coloured by speed with labels, current arrows, river mouths ⊕ with discharge and plume salinity, fronts, formation sites ⇩, and time series of the overturning, the main stream and the river input — the example's meltwater pulse collapses the overturning.
 

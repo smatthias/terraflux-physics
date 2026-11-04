@@ -2,6 +2,7 @@
 
 #include "terraflux/weather/moist_air.hpp"
 #include "terraflux/weather/pressure_wind.hpp"
+#include "terraflux/weather/sea_ice.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -251,6 +252,14 @@ void validate_ocean_config(const OceanConfig& c) {
             if (c.ocean[i] && (!std::isfinite(v) || v < 270.0 || v > 310.0)) throw std::invalid_argument("ocean initial surface temperatures must lie within 270-310 K");
         }
     }
+    // Sea ice.
+    if (c.sea_ice.enabled) {
+        if (!layered(c)) throw std::invalid_argument("ocean sea ice needs the layered column (thermal_layers)");
+        validate_sea_ice_physics(c.sea_ice.physics);
+        if (!std::isfinite(c.sea_ice.initial_thickness_m) || c.sea_ice.initial_thickness_m < 0.0 || c.sea_ice.initial_thickness_m > 20.0) throw std::invalid_argument("ocean sea_ice.initial_thickness_m must lie within 0-20 m");
+        if (!std::isfinite(c.sea_ice.initial_concentration) || c.sea_ice.initial_concentration < 0.0 || c.sea_ice.initial_concentration > c.sea_ice.physics.maximum_concentration) throw std::invalid_argument("ocean sea_ice.initial_concentration must lie within 0 and the maximum concentration");
+        require_finite_nonnegative(c.sea_ice.initial_band_k, "sea_ice.initial_band_k");
+    }
     // Coastal runoff.
     require_finite_nonnegative(c.coastal.band_m, "coastal.band_m");
     if (!std::isfinite(c.coastal.runoff_coefficient) || c.coastal.runoff_coefficient < 0.0 || c.coastal.runoff_coefficient > 1.0) throw std::invalid_argument("ocean coastal.runoff_coefficient must lie within 0-1");
@@ -259,9 +268,7 @@ void validate_ocean_config(const OceanConfig& c) {
     const double dt = c.timestep_seconds, dx = c.grid.spacing_east_m, dy = c.grid.spacing_north_m;
     double warmest = c.initial_temperature_k;
     for (std::size_t i = 0; i < c.initial_surface_temperature_k.size(); ++i) if (c.ocean[i]) warmest = std::max(warmest, c.initial_surface_temperature_k[i]);
-    // Stability: gravity waves of the reduced-gravity layer, Coriolis, drag, viscosity and diffusion.
-    const double dt = c.timestep_seconds, dx = c.grid.spacing_east_m, dy = c.grid.spacing_north_m;
-    const double g_prime = std::max(p.minimum_reduced_gravity_m_s2, reduced_gravity_m_s2(c.initial_temperature_k, c.initial_salinity_psu, p));
+    const double g_prime = std::max(p.minimum_reduced_gravity_m_s2, reduced_gravity_m_s2(warmest, c.initial_salinity_psu, p));
     const double wave_speed = std::sqrt(1.5 * g_prime * c.initial_thickness_m * 1.5);
     if (dt * wave_speed * (1.0 / dx + 1.0 / dy) > 1.0) throw std::invalid_argument("ocean timestep violates the gravity-wave CFL bound dt c (1/dx + 1/dy) <= 1");
     double f_max = 0.0;
@@ -286,7 +293,9 @@ void check_layers(const OceanState& s, const OceanConfig& c) {
     if (layered(c) && (s.layer_temperature_k.size() != count * c.thermal.count || s.layer_salinity_psu.size() != count * c.thermal.count)) throw std::invalid_argument("ocean state lacks the layered column; initialise it with the same thermal configuration");
     if (!layered(c) && (!s.layer_temperature_k.empty() || !s.layer_salinity_psu.empty())) throw std::invalid_argument("ocean state carries a layered column but the configuration has none");
     if (!s.coastal_store_m.empty() && s.coastal_store_m.size() != count) throw std::invalid_argument("ocean coastal store must be empty or match the grid");
-    for (const auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m}) if (!v->empty() && v->size() != count) throw std::invalid_argument("ocean freshwater records must be empty or match the grid");
+    for (const auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m, &s.recent_glacial_m}) if (!v->empty() && v->size() != count) throw std::invalid_argument("ocean freshwater records must be empty or match the grid");
+    if (c.sea_ice.enabled && (s.ice_thickness_m.size() != count || s.ice_concentration.size() != count)) throw std::invalid_argument("ocean state lacks the sea ice; initialise it with sea ice enabled");
+    if (!c.sea_ice.enabled && (!s.ice_thickness_m.empty() || !s.ice_concentration.empty())) throw std::invalid_argument("ocean state carries sea ice but the configuration has none");
 }
 
 void check_forcing(const OceanForcing& f, const OceanConfig& c) {
@@ -323,6 +332,16 @@ void check_forcing(const OceanForcing& f, const OceanConfig& c) {
             if (!std::isfinite(f.shortwave_down_w_m2[i]) || f.shortwave_down_w_m2[i] < 0.0 || f.shortwave_down_w_m2[i] > 1400.0) throw std::invalid_argument("ocean shortwave must lie within 0-1400 W/m2");
         }
     }
+    for (const auto* glacial : {&f.glacial_meltwater_m3_s, &f.glacial_ice_m3_s}) {
+        if (glacial->empty()) continue;
+        if (glacial->size() != count) throw std::invalid_argument("ocean glacial fresh water must be empty or match the grid");
+        for (std::size_t i = 0; i < count; ++i) {
+            const double v = (*glacial)[i];
+            if (!std::isfinite(v) || v < 0.0 || v > 1.0e7) throw std::invalid_argument("ocean glacial fresh water must lie within 0-1e7 m3/s");
+            if (v > 0.0 && !c.ocean[i]) throw std::invalid_argument("ocean glacial fresh water must enter sea cells");
+        }
+    }
+    if (c.sea_ice.enabled && f.air_temperature_k.empty()) throw std::invalid_argument("ocean sea ice needs the air-sea forcing");
     if (!f.mixing_stress_pa.empty()) {
         if (f.mixing_stress_pa.size() != count) throw std::invalid_argument("ocean mixing stress must be empty or match the grid");
         for (double v : f.mixing_stress_pa) if (!std::isfinite(v) || v < 0.0 || v > 20.0) throw std::invalid_argument("ocean mixing stress must lie within 0-20 Pa");
@@ -391,7 +410,8 @@ void remap_column(const std::vector<double>& dz_src, const std::vector<double>& 
 // Convective adjustment: merge neighbouring groups (temperature and salinity together) while the upper is denser.
 void convective_adjustment(std::vector<double>& t, std::vector<double>& sal, const std::vector<double>& dz, const OceanPhysicsConfig& p) {
     struct Group { std::size_t first, last; double thickness, temperature, salinity; };
-    std::vector<Group> stack;
+    thread_local std::vector<Group> stack;
+    stack.clear();
     for (std::size_t k = 0; k < t.size(); ++k) {
         stack.push_back({k, k, dz[k], t[k], sal[k]});
         while (stack.size() >= 2) {
@@ -488,7 +508,8 @@ void shear_mixing(std::vector<double>& t, std::vector<double>& sal, const std::v
 void vertical_diffusion(std::vector<double>& t, const std::vector<double>& dz, double kappa, double dt) {
     const std::size_t n = t.size();
     if (!(kappa > 0.0) || n < 2) return;
-    std::vector<double> a(n, 0.0), b(n, 0.0), cc(n, 0.0), d(n, 0.0);
+    thread_local std::vector<double> a, b, cc, d;   // reused work space (called per cell per step)
+    a.assign(n, 0.0); b.assign(n, 0.0); cc.assign(n, 0.0); d.assign(n, 0.0);
     for (std::size_t k = 0; k < n; ++k) {
         const double up = k > 0 ? kappa * dt / (0.5 * (dz[k - 1] + dz[k])) : 0.0;
         const double down = k + 1 < n ? kappa * dt / (0.5 * (dz[k] + dz[k + 1])) : 0.0;
@@ -579,6 +600,10 @@ void diagnose_fields(OceanState& s, const OceanConfig& c) {
     long double store = 0.0L;
     for (std::size_t i = 0; i < s.coastal_store_m.size(); ++i) store += static_cast<long double>(s.coastal_store_m[i]) * g.area;
     s.coastal_storage_m3 = static_cast<double>(store);
+    long double ice_volume = 0.0L, ice_area = 0.0L;
+    for (std::size_t i = 0; i < s.ice_thickness_m.size(); ++i) { ice_volume += static_cast<long double>(s.ice_concentration[i]) * s.ice_thickness_m[i] * g.area; ice_area += static_cast<long double>(s.ice_concentration[i]) * g.area; }
+    s.ice_volume_m3 = static_cast<double>(ice_volume);
+    s.ice_area_m2 = static_cast<double>(ice_area);
     // Mixing fronts: surface-salinity gradient magnitude over water neighbours.
     const double threshold = p.front_gradient_psu_per_100km / 1.0e5;
     for (std::size_t i = 0; i < count; ++i) {
@@ -631,8 +656,9 @@ OceanState initialize_ocean(const OceanConfig& c) {
     s.sinking_m_s.assign(count, 0.0);
     s.upwelling_field_m_s.assign(count, 0.0);
     s.coastal_store_m.assign(count, 0.0);
-    for (auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m}) v->assign(count, 0.0);
-    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s}) v->assign(count, 0.0);
+    for (auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m, &s.recent_glacial_m}) v->assign(count, 0.0);
+    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s, &s.ice_growth_m_s, &s.ocean_to_ice_heat_w_m2}) v->assign(count, 0.0);
+    s.ice_surface_temperature_k.assign(count, 0.0);
     for (std::size_t i = 0; i < count; ++i) {
         if (!c.ocean[i]) continue;
         s.thickness_m[i] = c.initial_thickness_m;
@@ -649,8 +675,24 @@ OceanState initialize_ocean(const OceanConfig& c) {
             initial_column(c, sigma, i, &s.layer_temperature_k[i * layers]);
             for (std::size_t k = 0; k < layers; ++k) s.layer_salinity_psu[i * layers + k] = c.initial_salinity_psu;
             double bulk = 0.0;
-            for (std::size_t k = 0; k < layers; ++k) bulk += sigma[k] * s.layer_temperature_k[i * layers + k];
+            // The water cannot start below its freezing point.
+            for (std::size_t k = 0; k < layers; ++k) {
+                double& tk = s.layer_temperature_k[i * layers + k];
+                tk = std::max(tk, seawater_freezing_point_k(c.initial_salinity_psu));
+                bulk += sigma[k] * tk;
+            }
             s.temperature_k[i] = bulk;
+        }
+        if (c.sea_ice.enabled) {
+            s.ice_thickness_m.assign(count, 0.0);
+            s.ice_concentration.assign(count, 0.0);
+            const double tf = seawater_freezing_point_k(c.initial_salinity_psu);
+            for (std::size_t i = 0; i < count; ++i) {
+                if (!c.ocean[i] || s.layer_temperature_k[i * layers] > tf + c.sea_ice.initial_band_k || c.sea_ice.initial_thickness_m <= 0.0 || c.sea_ice.initial_concentration <= 0.0) continue;
+                s.ice_thickness_m[i] = c.sea_ice.initial_thickness_m;
+                s.ice_concentration[i] = c.sea_ice.initial_concentration;
+                s.ice_surface_temperature_k[i] = tf;   // until the first surface balance
+            }
         }
     }
     diagnose_fields(s, c);
@@ -679,11 +721,17 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
     s.sinking_m_s.assign(count, 0.0);
     if (s.coastal_store_m.empty()) s.coastal_store_m.assign(count, 0.0);
     const double memory = std::exp(-dt / p.lens_memory_s);
-    for (auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m}) {
+    for (auto* v : {&s.recent_rain_m, &s.recent_runoff_m, &s.recent_river_m, &s.recent_glacial_m}) {
         if (v->empty()) v->assign(count, 0.0);
         for (double& x : *v) x *= memory;
     }
-    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s}) v->assign(count, 0.0);
+    for (auto* v : {&s.evaporation_m_s, &s.shortwave_w_m2, &s.longwave_w_m2, &s.sensible_w_m2, &s.latent_w_m2, &s.rain_heat_w_m2, &s.net_heat_w_m2, &s.coastal_inflow_m3_s, &s.ice_growth_m_s, &s.ocean_to_ice_heat_w_m2}) v->assign(count, 0.0);
+    s.ice_surface_temperature_k.assign(count, 0.0);
+    const bool ice = c.sea_ice.enabled;
+    const SeaIcePhysics& ip = c.sea_ice.physics;
+    const double ice_to_water = ip.ice_density_kg_m3 / p.reference_density_kg_m3;   // water (m) per m of ice
+    const double latent_per_ice = ip.ice_density_kg_m3 * ip.latent_heat_fusion_j_kg / rho_cp;   // K m per m of ice
+    long double ice_water_total = 0.0L, ice_salt_total = 0.0L, glacial_liquid_total = 0.0L, glacial_ice_total = 0.0L;
     double water_area = 0.0;
     for (std::size_t i = 0; i < count; ++i) if (c.ocean[i]) water_area += area;
 
@@ -788,7 +836,7 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
         river_heat[r.cell] += depth * r.temperature_k;
         river_total += r.discharge_m3_s;
     }
-    std::vector<double> vol(layers), lh(layers), ls(layers), dz(layers), column(layers), column_s(layers), remapped(layers), remapped_s(layers), initial(layers);
+    std::vector<double> vol(layers), lh(layers), ls(layers), dz(layers), column(layers), column_s(layers), remapped(layers), remapped_s(layers), initial(layers), absorbed;
     for (std::size_t i = 0; i < count; ++i) {
         if (!c.ocean[i]) continue;
         const std::size_t x = i % nx, y = i / nx;
@@ -848,6 +896,23 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             if (layers) { vol[0] += added; lh[0] += added_heat; }
             if (has_rain) s.rain_heat_w_m2[i] = rho_cp * f.rain_m_s[i] * (f.rain_temperature_k[i] - surface_before);
         }
+        // Glacial fresh water: meltwater arrives liquid at 0 degC; ice melts in the top layer with the water's heat.
+        const double glacial_liquid = f.glacial_meltwater_m3_s.empty() ? 0.0 : f.glacial_meltwater_m3_s[i] * dt / area;
+        const double glacial_ice = f.glacial_ice_m3_s.empty() ? 0.0 : f.glacial_ice_m3_s[i] * dt / area;
+        if (glacial_liquid > 0.0 || glacial_ice > 0.0) {
+            const double top_salinity = layers ? ls[0] / vol[0] : salt / h;
+            const double melt_temperature = seawater_freezing_point_k(top_salinity);
+            const double latent = glacial_ice * 1000.0 * ip.latent_heat_fusion_j_kg / rho_cp;   // ice of fresh-water mass
+            const double added_heat = glacial_liquid * kZeroCelsius + glacial_ice * melt_temperature - latent;
+            fresh += glacial_liquid + glacial_ice;
+            h += glacial_liquid + glacial_ice;
+            heat += added_heat;
+            heat_source += added_heat;
+            if (layers) { vol[0] += glacial_liquid + glacial_ice; lh[0] += added_heat; }
+            glacial_liquid_total += static_cast<long double>(glacial_liquid) * area / dt;
+            glacial_ice_total += static_cast<long double>(glacial_ice) * area / dt;
+            s.recent_glacial_m[i] += glacial_liquid + glacial_ice;
+        }
         // Prescribed net precipitation: rain dilutes, evaporation leaves the salt behind; both at the local temperature.
         double pe = f.net_precipitation_m_s[i] * dt;
         if (pe < 0.0) pe = -std::min(-pe, std::max(0.0, h - p.minimum_thickness_m));
@@ -870,7 +935,7 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             const double top_volume = layers ? vol[0] : h;
             double top_heat = layers ? lh[0] : heat;
             const double t_start = top_heat / top_volume;
-            std::vector<double> absorbed(std::max<std::size_t>(layers, 1), 0.0);
+            absorbed.assign(std::max<std::size_t>(layers, 1), 0.0);
             if (layers) {
                 double depth = 0.0;
                 for (std::size_t k = 0; k < layers; ++k) {
@@ -886,30 +951,50 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             const double per_flux = dt / rho_cp;   // K m per W/m2
             const double qsw = (1.0 - c.air_sea.surface_albedo) * sw;
             auto non_solar = [&](double ts) { return air_sea_fluxes(ts, ta, qa, pa, wind, cloud, 0.0, c.air_sea).net_w_m2; };
+            // Sea ice: the covered fraction a takes heat F_oi from the water and evolves with its own surface balance;
+            // the open fraction exchanges with the air. Without ice open = 1 and the ice terms vanish exactly.
+            const double a_ice = ice ? previous.ice_concentration[i] : 0.0, h_ice = ice ? previous.ice_thickness_m[i] : 0.0;
+            const double open = 1.0 - a_ice;
+            const double freezing = layers ? seawater_freezing_point_k(ls[0] / vol[0]) : 0.0;
+            double f_oi = 0.0, ice_surplus = 0.0, h_ice_new = h_ice;
+            if (ice && a_ice > 0.0) {
+                f_oi = std::max(0.0, ocean_ice_heat_flux_w_m2(t_start, freezing, p.reference_density_kg_m3, p.heat_capacity_j_kg_k, ip));
+                f_oi = std::min(f_oi, std::max(0.0, top_volume * rho_cp * (t_start - freezing)) / (a_ice * dt));
+                AirState air;
+                air.temperature_k = ta; air.specific_humidity_kg_kg = qa; air.pressure_pa = pa; air.wind_speed_m_s = wind; air.cloud_fraction = cloud; air.shortwave_down_w_m2 = sw;
+                SeaIceSurfaceBalance balance;
+                h_ice_new = step_ice_thickness(h_ice, freezing, f_oi, air, c.air_sea, ip, dt, ice_surplus, balance);
+                s.ice_surface_temperature_k[i] = balance.surface_temperature_k;
+            }
+            const double ice_heat = per_flux * a_ice * f_oi - a_ice * ice_surplus / rho_cp;   // K m the water gives the ice
             double t1 = t_start;
             for (int it = 0; it < 20; ++it) {
-                const double residual = top_volume * (t1 - t_start) - per_flux * (absorbed[0] * qsw + non_solar(t1));
-                const double slope = top_volume - per_flux * (non_solar(t1 + 1.0e-3) - non_solar(t1 - 1.0e-3)) / 2.0e-3;
+                const double residual = top_volume * (t1 - t_start) - per_flux * (open * (absorbed[0] * qsw + non_solar(t1))) + ice_heat;
+                const double slope = top_volume - per_flux * open * (non_solar(t1 + 1.0e-3) - non_solar(t1 - 1.0e-3)) / 2.0e-3;
                 const double step = residual / slope;
                 t1 -= step;
                 if (std::abs(step) < 1.0e-11) break;
             }
             const AirSeaFluxes flux = air_sea_fluxes(t1, ta, qa, pa, wind, cloud, sw, c.air_sea);
-            top_heat += per_flux * (absorbed[0] * flux.shortwave_w_m2 + flux.longwave_w_m2 + flux.sensible_w_m2 + flux.latent_w_m2);
+            top_heat += per_flux * (open * (absorbed[0] * flux.shortwave_w_m2 + flux.longwave_w_m2 + flux.sensible_w_m2 + flux.latent_w_m2)) - ice_heat;
             if (layers) {
                 lh[0] = top_heat;
-                for (std::size_t k = 1; k < layers; ++k) lh[k] += per_flux * absorbed[k] * flux.shortwave_w_m2;
+                for (std::size_t k = 1; k < layers; ++k) lh[k] += per_flux * absorbed[k] * (open * flux.shortwave_w_m2);   // keeps the slab-free rounding when open = 1
             } else {
                 heat = top_heat;
             }
-            heat_source += per_flux * flux.net_w_m2;
-            surface_heat += static_cast<long double>(flux.net_w_m2) * area * dt / rho_cp;
-            s.shortwave_w_m2[i] = flux.shortwave_w_m2;
-            s.longwave_w_m2[i] = flux.longwave_w_m2;
-            s.sensible_w_m2[i] = flux.sensible_w_m2;
-            s.latent_w_m2[i] = flux.latent_w_m2;
-            s.net_heat_w_m2[i] = flux.net_w_m2;
-            double evaporated = flux.evaporation_m_s * dt;
+            // The ocean's surface heat: the open-water exchange with the air and the heat given to the ice.
+            const double surface_w_m2 = open * flux.net_w_m2 - ice_heat / per_flux;
+            heat_source += per_flux * (open * flux.net_w_m2) - ice_heat;
+            surface_heat += static_cast<long double>(surface_w_m2) * area * dt / rho_cp;
+            s.shortwave_w_m2[i] = open * flux.shortwave_w_m2;
+            s.longwave_w_m2[i] = open * flux.longwave_w_m2;
+            s.sensible_w_m2[i] = open * flux.sensible_w_m2;
+            s.latent_w_m2[i] = open * flux.latent_w_m2;
+            s.net_heat_w_m2[i] = surface_w_m2;
+            s.ocean_to_ice_heat_w_m2[i] = ice_heat / per_flux;
+            if (!ice || a_ice <= 0.0) s.ice_surface_temperature_k[i] = t1;
+            double evaporated = open * flux.evaporation_m_s * dt;
             if (evaporated > 0.0) evaporated = std::min(evaporated, std::max(0.0, h - p.minimum_thickness_m));
             if (layers && evaporated > 0.0) evaporated = std::min(evaporated, 0.5 * vol[0]);
             const double t_top = layers ? lh[0] / vol[0] : heat / h;
@@ -919,6 +1004,41 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             fresh -= evaporated;
             s.evaporation_m_s[i] = evaporated / dt;
             evaporation_total += static_cast<long double>(evaporated) * area / dt;
+            if (ice) {
+                // Melt or basal growth of the covered part exchanges water at the freezing point (ice keeps S_i).
+                auto exchange = [&](double water, double temperature) {   // water > 0 into the ocean
+                    vol[0] += water; lh[0] += water * temperature; ls[0] += water * ip.ice_salinity_psu; h += water;
+                    heat_source += water * temperature;
+                    ice_water_total += static_cast<long double>(water) * area / dt;
+                    ice_salt_total += static_cast<long double>(water) * ip.ice_salinity_psu * 1.0e-3 * p.reference_density_kg_m3 * area / dt;
+                };
+                const double covered_volume = a_ice * h_ice_new;   // per cell area
+                exchange(-(covered_volume - a_ice * h_ice) * ice_to_water, freezing);
+                // Open water cooled below its freezing point freezes: the latent heat warms it back to freezing.
+                double frazil = 0.0;
+                const double top_t = lh[0] / vol[0], top_freezing = seawater_freezing_point_k(ls[0] / vol[0]);
+                if (top_t < top_freezing) {
+                    const double deficit = vol[0] * (top_freezing - top_t);   // K m
+                    frazil = deficit / latent_per_ice;
+                    lh[0] += deficit;
+                    heat_source += deficit;
+                    exchange(-frazil * ice_to_water, top_freezing);
+                }
+                double a_new = a_ice, h_new = h_ice_new, total = covered_volume + frazil;
+                update_ice_cover(a_new, h_new, total, frazil, ip);
+                if (total > 0.0 && h_new < ip.minimum_thickness_m) {
+                    // Too thin to last: it melts with the water's heat.
+                    const double latent = total * latent_per_ice;
+                    lh[0] -= latent;
+                    heat_source -= latent;
+                    exchange(total * ice_to_water, seawater_freezing_point_k(ls[0] / vol[0]));
+                    total = 0.0;
+                }
+                if (total <= 0.0) { a_new = 0.0; h_new = 0.0; }
+                s.ice_concentration[i] = a_new;
+                s.ice_thickness_m[i] = h_new;
+                s.ice_growth_m_s[i] = (a_new * h_new - a_ice * h_ice) / dt;
+            }
         }
         const double lowest = air_sea ? -0.5 * p.mixed_layer_depth_m : 0.0;   // evaporation can leave a salty surface
         fresh = std::max(lowest, fresh) * (1.0 - std::min(1.0, dt / p.freshwater_mixing_time_s));
@@ -953,7 +1073,8 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
             remap_column(vol, column, dz, remapped);
             remap_column(vol, column_s, dz, remapped_s);
             convective_adjustment(remapped, remapped_s, dz, p);
-            const double stress = f.mixing_stress_pa.empty() ? std::hypot(f.wind_stress_east_pa[i], f.wind_stress_north_pa[i]) : f.mixing_stress_pa[i];
+            const double open_water = ice ? 1.0 - s.ice_concentration[i] : 1.0;   // the ice shelters the water from the wind
+            const double stress = open_water * (f.mixing_stress_pa.empty() ? std::hypot(f.wind_stress_east_pa[i], f.wind_stress_north_pa[i]) : f.mixing_stress_pa[i]);
             const double friction_velocity = std::sqrt(stress / p.reference_density_kg_m3);
             wind_mixing(remapped, remapped_s, dz, c.thermal.wind_mixing_efficiency * p.reference_density_kg_m3 * std::pow(friction_velocity, 3) * dt, p);
             shear_mixing(remapped, remapped_s, dz, friction_velocity, coriolis[i], c.thermal.bulk_richardson_number, p);
@@ -1018,6 +1139,10 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
     s.coastal_loss_m3_s = static_cast<double>(loss_total);
     s.evaporation_m3_s = static_cast<double>(evaporation_total);
     s.surface_heat_w = static_cast<double>(surface_heat * rho_cp / dt);
+    s.ice_water_m3_s = static_cast<double>(ice_water_total);
+    s.ice_salt_kg_s = static_cast<double>(ice_salt_total);
+    s.glacial_meltwater_m3_s = static_cast<double>(glacial_liquid_total);
+    s.glacial_ice_m3_s = static_cast<double>(glacial_ice_total);
 
     // 4. Momentum on the new thickness; forward-backward Coriolis with alternating order.
     std::vector<double> gph(count, 0.0);
@@ -1098,8 +1223,9 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
         salt_source += (static_cast<long double>(s.upwelling_field_m_s[i]) * dt * p.deep_salinity_psu - static_cast<long double>(s.sinking_m_s[i]) * dt * previous.salinity_psu[i] + river_salt[i]) * 1.0e-3 * p.reference_density_kg_m3 * area;
     }
     salt_source += sponge_salt;
+    salt_source += static_cast<long double>(s.ice_salt_kg_s) * dt;
     double expected_volume_change = (static_cast<double>(river_total) + static_cast<double>(precip_total)) * dt + static_cast<double>(sponge_volume);  // sinking and upwelling cancel
-    const double fresh_exchange = s.rain_sea_m3_s + s.coastal_runoff_m3_s - s.evaporation_m3_s;
+    const double fresh_exchange = s.rain_sea_m3_s + s.coastal_runoff_m3_s - s.evaporation_m3_s + s.ice_water_m3_s + s.glacial_meltwater_m3_s + s.glacial_ice_m3_s;
     if (fresh_exchange != 0.0) expected_volume_change += fresh_exchange * dt;
     s.volume_balance_error_m3 = (s.volume_m3 - previous.volume_m3) - expected_volume_change;
     s.salt_balance_error_kg = (s.salt_kg - previous.salt_kg) - static_cast<double>(salt_source);
@@ -1123,6 +1249,8 @@ OceanState advance_ocean(const OceanState& previous, const OceanForcing& f, cons
     s.cumulative_coastal_loss_m3 += s.coastal_loss_m3_s * dt;
     s.cumulative_evaporation_m3 += s.evaporation_m3_s * dt;
     s.cumulative_surface_heat_j += s.surface_heat_w * dt;
+    s.cumulative_ice_water_m3 += s.ice_water_m3_s * dt;
+    s.cumulative_glacial_m3 += (s.glacial_meltwater_m3_s + s.glacial_ice_m3_s) * dt;
     return s;
 }
 
@@ -1304,7 +1432,7 @@ OceanDiagnostics diagnose_ocean(const OceanState& s, const OceanForcing& f, cons
         SurfaceLens lens;
         lens.freshest_cell = start;
         lens.minimum_surface_salinity_psu = s.surface_salinity_psu[start];
-        long double sst_sum = 0.0L, rain_sum = 0.0L, runoff_sum = 0.0L, river_sum = 0.0L;
+        long double sst_sum = 0.0L, rain_sum = 0.0L, runoff_sum = 0.0L, river_sum = 0.0L, glacial_sum = 0.0L;
         std::vector<std::size_t> stack{start};
         lens_seen[start] = 1;
         while (!stack.empty()) {
@@ -1317,6 +1445,7 @@ OceanDiagnostics diagnose_ocean(const OceanState& s, const OceanForcing& f, cons
             rain_sum += record(s.recent_rain_m, k);
             runoff_sum += record(s.recent_runoff_m, k);
             river_sum += record(s.recent_river_m, k);
+            glacial_sum += record(s.recent_glacial_m, k);
             if (s.surface_salinity_psu[k] < lens.minimum_surface_salinity_psu) { lens.minimum_surface_salinity_psu = s.surface_salinity_psu[k]; lens.freshest_cell = k; }
             const std::size_t x = k % nx, y = k / nx;
             const std::size_t neighbours[4] = {x + 1 < nx ? k + 1 : count, x > 0 ? k - 1 : count, y + 1 < ny ? k + nx : count, y > 0 ? k - nx : count};
@@ -1326,12 +1455,14 @@ OceanDiagnostics diagnose_ocean(const OceanState& s, const OceanForcing& f, cons
                 stack.push_back(n);
             }
         }
-        const long double total = rain_sum + runoff_sum + river_sum;
+        const long double total = rain_sum + runoff_sum + river_sum + glacial_sum;
         if (total > 0.0L) {
             lens.rain_share = static_cast<double>(rain_sum / total);
             lens.coastal_runoff_share = static_cast<double>(runoff_sum / total);
             lens.river_share = static_cast<double>(river_sum / total);
-            lens.kind = (river_sum >= rain_sum && river_sum >= runoff_sum) ? "river" : (runoff_sum >= rain_sum ? "coastal_runoff" : "rain");
+            lens.glacial_share = static_cast<double>(glacial_sum / total);
+            const long double largest = std::max({rain_sum, runoff_sum, river_sum, glacial_sum});
+            lens.kind = largest == glacial_sum ? "glacial" : largest == river_sum ? "river" : largest == runoff_sum ? "coastal_runoff" : "rain";
         } else {
             lens.kind = "other";
         }

@@ -278,11 +278,17 @@
               },
               "evaporation": {
                 "type": "number"
+              },
+              "ice_water": {
+                "type": "number",
+                "description": "Polar runs: net water from sea ice (melt minus freezing) since the first frame."
+              },
+              "glacial": {
+                "type": "number",
+                "description": "Polar runs: glacial fresh water (ice-sheet meltwater, icebergs, frontal melt, hosing) since the first frame."
               }
             },
-            "description": "volume = initial + river + net_precipitation + sponge + rain_sea + coastal_runoff - evaporation; rain_coast = coastal_runoff + coastal_loss + storage change."
-              }
-            }
+            "description": "volume = initial + river + net_precipitation + sponge + rain_sea + coastal_runoff - evaporation + ice_water + glacial; rain_coast = coastal_runoff + coastal_loss + storage change."
           },
           "streams": {
             "type": "array",
@@ -721,6 +727,13 @@
               "barrier_layer_cells": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "surface_oxygen_umol_kg": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Polar runs: dissolved-oxygen saturation at the sea surface (Garcia & Gordon 1992) from SST and surface salinity; 0 on land. A physical capacity, not a biogeochemical tracer."
               }
             }
           },
@@ -746,6 +759,7 @@
                     "river",
                     "coastal_runoff",
                     "rain",
+                    "glacial",
                     "other"
                   ],
                   "description": "Largest share of the fresh water its cells received recently; other = nothing recorded."
@@ -799,6 +813,12 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
+                    },
+                    "glacial": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Polar runs only: share of ice-sheet meltwater, icebergs and hosing."
                     }
                   }
                 }
@@ -830,6 +850,178 @@
                 "type": "number"
               }
             }
+          },
+          "hosing_sv": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Hosing rate at the frame time."
+          },
+          "glacial": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "meltwater_m3_s",
+              "ice_m3_s",
+              "cumulative_m3"
+            ],
+            "description": "Glacial fresh water entering the sea: liquid meltwater (ice-sheet runoff and hosing, at 0 degC) and ice (icebergs and frontal melt) that melts taking latent heat from the top layer.",
+            "properties": {
+              "meltwater_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "ice_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cumulative_m3": {
+                "type": "number"
+              }
+            }
+          },
+          "sea_ice": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ice_thickness_m",
+              "ice_concentration",
+              "ice_surface_temperature_k",
+              "ocean_to_ice_heat_w_m2",
+              "ice_area_km2",
+              "ice_extent_km2",
+              "ice_volume_km3",
+              "ice_water_m3_s",
+              "cumulative_ice_water_m3"
+            ],
+            "description": "Sea ice: air_sea fluxes are those of the open fraction, net_heat_w_m2 = shortwave + longwave + sensible + latent - ocean_to_ice_heat_w_m2.",
+            "properties": {
+              "ice_thickness_m": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Thickness of the covered part; 0 on land and open water."
+              },
+              "ice_concentration": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Ice-covered fraction 0-1."
+              },
+              "ice_surface_temperature_k": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Ice surface temperature where there is ice (at most melting); 0 elsewhere."
+              },
+              "ocean_to_ice_heat_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Heat the water gives the ice per cell area."
+              },
+              "ice_area_km2": {
+                "type": "number",
+                "description": "Sum of concentration x cell area."
+              },
+              "ice_extent_km2": {
+                "type": "number",
+                "description": "Area of cells above 15 % concentration."
+              },
+              "ice_volume_km3": {
+                "type": "number",
+                "description": "Sum of concentration x thickness x cell area."
+              },
+              "ice_water_m3_s": {
+                "type": "number",
+                "description": "Water the ice gives the ocean (melt positive, freezing negative)."
+              },
+              "cumulative_ice_water_m3": {
+                "type": "number"
+              }
+            }
+          },
+          "ice_sheet": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ice_thickness_m",
+              "surface_elevation_m",
+              "smb_m_ice_yr",
+              "melt_m_ice_yr",
+              "volume_m3",
+              "sea_level_equivalent_m",
+              "sea_level_rise_m",
+              "smb_gt_yr",
+              "runoff_m3_s",
+              "calving_m3_s",
+              "frontal_ablation_m3_s",
+              "mean_front_thermal_forcing_k"
+            ],
+            "description": "The coupled ice sheet at the frame time.",
+            "properties": {
+              "ice_thickness_m": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Ice thickness, only inside the ice-sheet domain."
+              },
+              "surface_elevation_m": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Bed plus ice."
+              },
+              "smb_m_ice_yr": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Surface mass balance (snowfall - runoff)."
+              },
+              "melt_m_ice_yr": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Surface melt."
+              },
+              "volume_m3": {
+                "type": "number"
+              },
+              "sea_level_equivalent_m": {
+                "type": "number",
+                "description": "volume x 917 / 1000 / 3.618e14 m2 (global ocean)."
+              },
+              "sea_level_rise_m": {
+                "type": "number",
+                "description": "(initial volume - volume) x 0.917 / 3.618e14."
+              },
+              "smb_gt_yr": {
+                "type": "number"
+              },
+              "runoff_m3_s": {
+                "type": "number",
+                "description": "Surface meltwater reaching the sea."
+              },
+              "calving_m3_s": {
+                "type": "number",
+                "description": "Ice flux into sea cells (icebergs)."
+              },
+              "frontal_ablation_m3_s": {
+                "type": "number",
+                "description": "Ocean-driven melt at the marine fronts."
+              },
+              "mean_front_thermal_forcing_k": {
+                "type": "number",
+                "description": "Ocean temperature above freezing at the front depth, mean over the fronts."
+              }
+            }
           }
         }
       }
@@ -841,11 +1033,15 @@
           "rain",
           "coastal_runoff",
           "air_sea",
-          "thermal_layers"
+          "thermal_layers",
+          "sea_ice",
+          "ice_sheet",
+          "warming",
+          "hosing"
         ]
       },
       "uniqueItems": true,
-      "description": "Extensions active in the run; absent for the 1.5-layer slab with prescribed net precipitation."
+      "description": "Extensions active in the run; absent for the 1.5-layer slab with prescribed net precipitation. sea_ice, ice_sheet, warming and hosing are the polar processes: with any of them the frames carry glacial, cumulative ice_water/glacial and the surface oxygen."
     },
     "initial_heat_content_j": {
       "type": "number",
@@ -912,7 +1108,40 @@
           "minimum": 0
         }
       }
-          }
+    },
+    "ice_sheet": {
+      "type": "object",
+      "required": [
+        "domain",
+        "bed_elevation_m",
+        "initial_volume_m3",
+        "initial_sea_level_equivalent_m",
+        "source"
+      ],
+      "properties": {
+        "domain": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "description": "Land cells of the ice-sheet region."
+        },
+        "bed_elevation_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Bed: terrain on land, min(0, terrain) at sea."
+        },
+        "initial_volume_m3": {
+          "type": "number"
+        },
+        "initial_sea_level_equivalent_m": {
+          "type": "number"
+        },
+        "source": {
+          "type": "object",
+          "description": "Region, dome, precipitation, coupling description."
         }
       }
     }

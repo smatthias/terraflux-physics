@@ -63,6 +63,7 @@ test('styling helpers', () => {
 })
 
 // ---- Rain on the sea and the coast, evaporation, air-sea heat and the layered column ----------------------
+import { summarizePolarOcean, polarOceanSeries, polarOceanYears, overturningEvents, sameSeason, seaIceColor, oxygenColor } from './ocean.js'
 import { summarizeOceanHeat, columnProfile, columnSection, heatSeries, strongestCooling, heatFluxColor, evaporationColor, depthColor, rampColor, PROCESSES } from './ocean.js'
 
 const heatFixture = () => JSON.parse(readFileSync(join(root, 'viewer', 'public', 'ocean-heat', 'engine-timeline.json'), 'utf8'))
@@ -146,7 +147,7 @@ test('ocean extension contract rejects inconsistent blocks', () => {
 
 test('every ocean colour helper produces a colour THREE can parse', async () => {
   const { Color } = await import('three')
-  const samples = [speedColor(0.4), salinityColor(33), salinityColor(36), temperatureColor(290), heatFluxColor(-200), heatFluxColor(150), evaporationColor(6), depthColor(40), rampColor(299, 295, 303)]
+  const samples = [speedColor(0.4), salinityColor(33), salinityColor(36), temperatureColor(290), heatFluxColor(-200), heatFluxColor(150), evaporationColor(6), depthColor(40), rampColor(299, 295, 303), seaIceColor(0.8, 2).color, oxygenColor(320)]
   for (const css of samples) {
     const parsed = new Color(0x123456).setStyle(css)
     assert.notEqual(parsed.getHex(), 0x123456, `THREE ignored ${css}`)
@@ -154,11 +155,103 @@ test('every ocean colour helper produces a colour THREE can parse', async () => 
 })
 
 test('heat and rain styling helpers', () => {
-  assert.equal(PROCESSES.length, 4)
+  assert.equal(PROCESSES.length, 8)
   assert.notEqual(heatFluxColor(-300), heatFluxColor(300))
   assert.equal(heatFluxColor(800), heatFluxColor(400), 'saturates')
   assert.ok(heatFluxColor(0).startsWith('rgb('))
   assert.ok(evaporationColor(5).startsWith('hsl(') && evaporationColor(30) === evaporationColor(15))
   assert.notEqual(depthColor(10), depthColor(60))
   assert.equal(rampColor(300, 290, 300), rampColor(310, 290, 300))
+})
+
+// ---- Polar processes: sea ice, the coupled ice sheet, warming and meltwater hosing ---------------------------
+const polarFixture = () => JSON.parse(readFileSync(join(root, 'viewer', 'public', 'polar-ocean', 'engine-timeline.json'), 'utf8'))
+const YEAR = 31557600
+
+test('polar ocean fixture validates: seasonal sea ice, a melting ice sheet and hosing weaken the overturning', () => {
+  const frames = validateSequence(polarFixture())
+  assert.equal(frames.length, 41, 'ten years of quarterly snapshots')
+  const o0 = frames[0].ocean
+  assert.deepEqual(o0.processes, ['air_sea', 'thermal_layers', 'sea_ice', 'ice_sheet', 'warming', 'hosing'])
+  assert.ok(o0.polar && o0.seaIce && o0.iceSheet && o0.oxygen && o0.hosing === 0)
+  assert.ok(o0.iceSheet.domain.every((d, i) => !d || !o0.mask[i]), 'the ice sheet sits on land')
+  const m = frames.map(summarizePolarOcean)
+  // Seasons: winter sea ice, (almost) none in late summer; winter convection drives the sinking.
+  const winter = frames.map((f, k) => k).filter(k => Math.abs((frames[k].forecast.elapsed_seconds % YEAR) - 0.25 * YEAR) < 86400 * 3)
+  const autumn = frames.map((f, k) => k).filter(k => Math.abs((frames[k].forecast.elapsed_seconds % YEAR) - 0.75 * YEAR) < 86400 * 3)
+  assert.equal(winter.length, 10)
+  assert.ok(winter.every(k => m[k].sea_ice_area_mkm2 > 1), 'sea ice every spring')
+  assert.ok(autumn.slice(1).every(k => m[k].sea_ice_area_mkm2 < 0.05), 'no sea ice left at the end of the summer')
+  assert.ok(m[autumn[0]].overturning_sv < 0.3 * m[0].overturning_sv, 'the sinking is a winter process')
+  // Warming and hosing: the same season a decade later.
+  assert.ok(m.at(-1).hosing_sv > 0.49 && m.at(-1).glacial_sv >= m.at(-1).hosing_sv, 'glacial water = hosing + the ice sheet')
+  assert.ok(m.at(-1).overturning_sv < 0.3 * m[0].overturning_sv, 'January overturning down by more than 70 %')
+  assert.ok(m.at(-1).sea_ice_area_mkm2 < 0.5 * m[0].sea_ice_area_mkm2, 'less winter sea ice')
+  assert.ok(m.at(-1).north_oxygen_umol_kg < m[0].north_oxygen_umol_kg, 'warmer water holds less oxygen')
+  assert.ok(m.at(-1).greenland_sea_level_rise_mm > 3 && m.at(-1).greenland_sle_m < m[0].greenland_sle_m, 'the ice sheet loses mass and raises the sea')
+  assert.ok(m.every(x => x.greenland_discharge_m3_s > 0), 'icebergs and frontal melt all year')
+  // Annual means: the seasonal cycle removed.
+  const years = polarOceanYears(frames)
+  assert.equal(years.length, 10)
+  assert.ok(years.every(y => y.samples === 4))
+  assert.ok(years.every((y, k) => k < 2 || y.overturning_mean_sv < years[k - 1].overturning_mean_sv), 'the overturning weakens year after year once the hosing grows')
+  assert.ok(years.at(-1).north_sst_c > years[0].north_sst_c + 2 && years.at(-1).north_mld_max_m < years[0].north_mld_max_m, 'warmer, more stratified north')
+  assert.ok(years.at(-1).greenland_smb_gt_yr < years[0].greenland_smb_gt_yr, 'the surface mass balance falls with warming')
+  const events = overturningEvents(years)
+  assert.ok(events.weakened_25pct !== null && events.weakened_50pct !== null && events.weakened_25pct <= events.weakened_50pct, 'weakened by 25 % then 50 %')
+  assert.ok(events.ice_free_summer !== null && events.ice_free_summer <= events.weakened_25pct, 'the summer sea ice goes first')
+  assert.ok(events.last_pct > 0 && events.last_pct < 50)
+  assert.equal(overturningEvents([]), null)
+  // Same season across the years.
+  const same = sameSeason(frames, 5)
+  assert.deepEqual(same, [1, 5, 9, 13, 17, 21, 25, 29, 33, 37])
+  const series = polarOceanSeries(frames)
+  assert.equal(series.length, 41)
+  assert.ok(series.every(p => p.sea_ice_area_mkm2 >= 0 && p.mean_oxygen_umol_kg > 200))
+})
+
+test('non-polar fixtures carry no polar metrics', () => {
+  const frames = validateSequence(heatFixture())
+  assert.equal(frames[0].ocean.polar, false)
+  assert.equal(summarizePolarOcean(frames[3]), null)
+  assert.deepEqual(polarOceanYears(frames), [])
+})
+
+test('polar ocean contract rejects inconsistent blocks', () => {
+  const base = polarFixture()
+  const frames = validateSequence(base)
+  const terrain = frames[0].terrain
+  const mask = base.ocean.ocean_mask, land = mask.indexOf(false)
+  const iced = base.ocean.frames[4].sea_ice.ice_concentration.findIndex(a => a > 0.5)
+  const onSheet = base.ocean.ice_sheet.domain.indexOf(true), offSheet = base.ocean.ice_sheet.domain.findIndex((d, i) => !d && !mask[i])
+  const mutate = (f, message) => {
+    const copy = JSON.parse(JSON.stringify(base.ocean))
+    f(copy)
+    assert.throws(() => validateOcean(copy, frames, terrain), new RegExp(message))
+  }
+  mutate(o => { o.processes = o.processes.filter(p => p !== 'thermal_layers') }, 'Sea ice needs the layered column')
+  mutate(o => { o.ice_sheet.domain[mask.indexOf(true)] = true }, 'ice-sheet domain must be land')
+  mutate(o => { o.frames[4].cumulative_m3.ice_water += 1e12 }, 'Ocean volume budget|Sea-ice water disagrees')
+  mutate(o => { o.frames[4].cumulative_m3.glacial *= 2 }, 'Ocean volume budget|glacial')
+  mutate(o => { o.frames[4].sea_ice.ice_concentration[land] = 0.5 }, 'Land cells carry no sea ice')
+  mutate(o => { o.frames[4].sea_ice.ice_concentration[iced] = 1.5 }, 'out of range')
+  mutate(o => { o.frames[4].sea_ice.ice_area_km2 *= 1.5 }, 'Sea-ice area disagrees')
+  mutate(o => { o.frames[4].sea_ice.ice_volume_km3 *= 1.5 }, 'Sea-ice volume disagrees')
+  mutate(o => { o.frames[4].sea_ice.ice_surface_temperature_k[iced] = 280 }, 'cannot be warmer than melting')
+  mutate(o => { o.frames[4].sea_ice.ocean_to_ice_heat_w_m2[iced] += 300 }, 'Net heat flux must be')
+  mutate(o => { o.frames[4].ice_sheet.ice_thickness_m[offSheet] = 100 }, 'Ice rests on the ice-sheet domain')
+  mutate(o => { o.frames[4].ice_sheet.volume_m3 *= 0.9 }, 'Ice-sheet volume disagrees')
+  mutate(o => { o.frames[4].ice_sheet.sea_level_rise_m += 0.01 }, 'Sea-level rise must equal the ice lost')
+  mutate(o => { o.frames[4].ice_sheet.smb_gt_yr += 500 }, 'Surface mass balance disagrees')
+  mutate(o => { o.frames[4].ice_sheet.smb_m_ice_yr[onSheet] += 50 }, 'Surface mass balance disagrees')
+  mutate(o => { o.frames[4].glacial.meltwater_m3_s = -1 }, 'Invalid glacial fresh water')
+  mutate(o => { o.frames[4].hosing_sv = -0.1 }, 'Invalid hosing rate')
+  mutate(o => { o.frames[4].thermal.surface_oxygen_umol_kg[land] = 300 }, 'Invalid surface oxygen')
+})
+
+test('polar colour helpers', () => {
+  assert.equal(seaIceColor(0, 2), null)
+  assert.ok(seaIceColor(0.9, 3).weight === 0.9 && seaIceColor(0.5, 0.2).color !== seaIceColor(0.5, 3).color)
+  assert.notEqual(oxygenColor(220), oxygenColor(400))
+  assert.equal(oxygenColor(500), oxygenColor(420), 'saturates')
 })

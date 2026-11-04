@@ -24,3 +24,5 @@
 @media(max-width:700px){aside section:nth-of-type(n+5){order:5}aside section.map-layers{order:1}}
 
 .map-layers .toggle select{margin-left:6px}
+.comparison svg.equilibrium{display:block;height:220px;width:100%;margin:10px 0;background:#09151d}.comparison tbody tr{cursor:pointer}.comparison tr.selected td{background:#1c302f}.comparison td strong{color:#ffb4a8;font-weight:600}
+.comparison .selected-year{color:#ffd166}

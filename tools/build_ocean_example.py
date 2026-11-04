@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate (or check) an ocean viewer fixture with the built terraflux-run-ocean-circulation CLI.
+"""Generate (or check) an engine viewer fixture with a built CLI (terraflux-run-ocean-circulation by default,
+or --cli terraflux-run-polar-melt).
 
 The fixture is the CLI timeline written compactly with sorted keys, the format of the committed
 viewer/public/ocean*/engine-timeline.json files. --check regenerates into a temporary directory and
@@ -59,10 +60,11 @@ def main():
     parser.add_argument('--build-dir', type=Path, default=ROOT / 'build')
     parser.add_argument('--request', type=Path, default=ROOT / 'examples/ocean-heat-rain-request.json')
     parser.add_argument('--output', type=Path, default=ROOT / 'viewer/public/ocean-heat/engine-timeline.json')
+    parser.add_argument('--cli', default='terraflux-run-ocean-circulation', choices=['terraflux-run-ocean-circulation', 'terraflux-run-polar-melt'])
     parser.add_argument('--check', action='store_true', help='check that the committed fixture matches regeneration')
     args = parser.parse_args()
-    cli = args.build_dir.resolve() / 'terraflux-run-ocean-circulation'
-    with tempfile.TemporaryDirectory(prefix='terraflux-ocean-') as temporary:
+    cli = args.build_dir.resolve() / args.cli
+    with tempfile.TemporaryDirectory(prefix='terraflux-example-') as temporary:
         generated = Path(temporary) / 'timeline.json'
         # Requests may name other fixtures relative to the repository root (e.g. a catchment timeline).
         subprocess.run([str(cli), str(args.request.resolve()), str(generated)], check=True, cwd=ROOT)
@@ -71,9 +73,9 @@ def main():
         committed = json.loads(args.output.read_text())
         difference = first_difference(committed, document)
         if difference:
-            print(f'Ocean fixture {args.output} differs from regeneration at {difference}. Regenerate it.', file=sys.stderr)
+            print(f'Fixture {args.output} differs from regeneration at {difference}. Regenerate it.', file=sys.stderr)
             return 1
-        print(f'Committed ocean fixture {args.output.relative_to(ROOT)} matches regeneration')
+        print(f'Committed fixture {args.output.relative_to(ROOT)} matches regeneration')
         return 0
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(compact(document))

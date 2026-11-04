@@ -541,6 +541,93 @@
           "exclusiveMinimum": 0,
           "default": 864000,
           "description": "e-folding memory of the fresh water each sea cell received, for attributing surface lenses."
+        },
+        "sea_ice": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Sea ice (zero-layer Semtner thermodynamics with a concentration): needs thermal_layers and forcing.air_sea. The covered fraction takes the ocean-ice heat flux and has its own surface energy balance; open water below the freezing point forms frazil; freezing rejects brine (ice keeps ice_salinity_psu), melt returns fresh water; ice shelters the water from the wind stress.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "initial_thickness_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 1.5
+            },
+            "initial_concentration": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.9,
+              "description": "At most maximum_concentration."
+            },
+            "initial_band_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0.5,
+              "description": "Initial ice where the top layer is within this band above its freezing point."
+            },
+            "albedo_cold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.65
+            },
+            "albedo_melting": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.5
+            },
+            "conductivity_w_m_k": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 5,
+              "default": 2.03
+            },
+            "ice_salinity_psu": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 5
+            },
+            "minimum_thickness_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 1,
+              "default": 0.05
+            },
+            "new_ice_thickness_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 5,
+              "default": 0.5,
+              "description": "Thickness of new ice over open water (lead closing); at least minimum_thickness_m."
+            },
+            "heat_transfer_coefficient": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.1,
+              "default": 0.006,
+              "description": "Ocean-ice heat exchange coefficient (McPhee)."
+            },
+            "friction_velocity_m_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.2,
+              "default": 0.01
+            },
+            "maximum_concentration": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 1,
+              "default": 0.99
+            }
+          }
         }
       }
     },
@@ -1036,6 +1123,19 @@
                   "default": 1000
                 }
               }
+            },
+            "seasonal_amplitude_south_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0,
+              "description": "Annual air temperature cycle (warmest on day 196), linear from south to north; analytic air only."
+            },
+            "seasonal_amplitude_north_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0
             }
           }
         },
@@ -1145,6 +1245,81 @@
               }
             }
           }
+        },
+        "warming": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rate_k_per_year"
+          ],
+          "description": "Climate warming: dT = min(max_k, rate (t - start)) x amplification (linear from south to north), added to the surface-temperature target and the analytic air. Off during the spin-up (t counts from the start of the main run).",
+          "properties": {
+            "rate_k_per_year": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2
+            },
+            "start_seconds": {
+              "type": "number",
+              "default": 0
+            },
+            "max_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 5
+            },
+            "amplification_south": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 1
+            },
+            "amplification_north": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 1
+            }
+          }
+        },
+        "hosing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_east_m",
+            "center_north_m",
+            "radius_m",
+            "ramp_sv_per_year",
+            "max_sv"
+          ],
+          "description": "Meltwater hosing: F = min(max_sv, ramp (t - start)) of fresh water at 0 degC spread evenly over the sea cells within the circle (glacial meltwater of the budgets).",
+          "properties": {
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "start_seconds": {
+              "type": "number",
+              "default": 0
+            },
+            "ramp_sv_per_year": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "max_sv": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            }
+          }
         }
       }
     },
@@ -1152,6 +1327,158 @@
       "type": "integer",
       "minimum": 1,
       "default": 1
+    },
+    "ice_sheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region",
+        "initial_dome"
+      ],
+      "description": "A coupled land ice sheet (shallow-ice flow, positive-degree-day surface mass balance, ocean-driven frontal melt): lives on the land cells of the region (bed = terrain), is driven by the air-sea air temperature lapse-rated to its surface and by the ocean thermal forcing at front_depth_m; its meltwater enters the nearest sea cells as liquid at 0 degC, its icebergs and frontal melt as ice that takes latent heat from the top layer. Needs thermal_layers and forcing.air_sea.",
+      "properties": {
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_east_m",
+            "center_north_m",
+            "radius_east_m",
+            "radius_north_m"
+          ],
+          "properties": {
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radius_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "initial_dome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_thickness_m"
+          ],
+          "description": "Elliptical (Vialov-like) initial dome; centre and radii default to the region.",
+          "properties": {
+            "center_thickness_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5000
+            },
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radius_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "precipitation_m_we_yr": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 0.35,
+          "description": "Snowfall at the reference air temperature."
+        },
+        "precipitation_reference_k": {
+          "type": "number",
+          "default": 263.15
+        },
+        "precipitation_per_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.2,
+          "default": 0.07,
+          "description": "Relative increase of snowfall per kelvin (Clausius-Clapeyron-like)."
+        },
+        "front_depth_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2000,
+          "default": 300,
+          "description": "Depth at which the ocean thermal forcing of the fronts is read."
+        },
+        "step_every": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 24,
+          "description": "The ice sheet steps once every this many ocean steps."
+        },
+        "physics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rate_factor_pa3_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1e-20,
+              "default": 2.4e-24
+            },
+            "degree_day_factor_snow_mm_k_day": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 86.4,
+              "default": 3
+            },
+            "degree_day_factor_ice_mm_k_day": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 86.4,
+              "default": 8
+            },
+            "pdd_standard_deviation_k": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 15,
+              "default": 5
+            },
+            "refreezing_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.6
+            },
+            "lapse_rate_k_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.012,
+              "default": 0.0065
+            },
+            "front_water_depth_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3000
+            },
+            "marine_front_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 1,
+              "description": "Share of the margin cells that end in the sea (tidewater) and melt at the front."
+            }
+          }
+        }
+      }
     }
   }
 }

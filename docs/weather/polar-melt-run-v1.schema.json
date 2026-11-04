@@ -1,0 +1,443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/polar-melt-run-v1.schema.json",
+  "title": "TerraFlux polar melt run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "time",
+    "scenarios",
+    "greenland",
+    "overturning"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.polar.melt-run/v1"
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_year",
+        "end_year"
+      ],
+      "properties": {
+        "start_year": {
+          "type": "number",
+          "minimum": 1000,
+          "maximum": 5000
+        },
+        "end_year": {
+          "type": "number",
+          "minimum": 1000,
+          "maximum": 5000
+        },
+        "timestep_days": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 30.5,
+          "default": 10
+        },
+        "output_every_years": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        }
+      },
+      "description": "At most 2000 years and 240 output frames."
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "global_warming_k"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "global_warming_k": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "[year, global-mean warming above pre-industrial in K]; piecewise linear, held beyond the ends.",
+            "minItems": 1
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "control": {
+      "type": "boolean",
+      "default": true,
+      "description": "Add a run that holds the start climate (model drift)."
+    },
+    "map_scenario": {
+      "type": "string",
+      "description": "Scenario whose Greenland maps fill the timeline frames (default: the last)."
+    },
+    "greenland": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grid",
+        "land",
+        "initial_dome",
+        "climate"
+      ],
+      "properties": {
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nx",
+            "ny",
+            "spacing_m"
+          ],
+          "properties": {
+            "nx": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ny": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "spacing_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "origin_east_m": {
+              "type": "number"
+            },
+            "origin_north_m": {
+              "type": "number"
+            },
+            "anchor_latitude_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "anchor_longitude_deg": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          }
+        },
+        "land": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_east_m",
+            "center_north_m",
+            "radius_east_m",
+            "radius_north_m"
+          ],
+          "properties": {
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radius_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "coast_bed_m": {
+              "type": "number",
+              "default": 0
+            },
+            "centre_bed_m": {
+              "type": "number",
+              "default": 300
+            },
+            "sea_bed_m": {
+              "type": "number",
+              "default": -500
+            }
+          },
+          "description": "An elliptical island; sea elsewhere."
+        },
+        "initial_dome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_thickness_m"
+          ],
+          "properties": {
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radius_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "center_thickness_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5000
+            }
+          },
+          "description": "Elliptical Vialov profile before the spin-up."
+        },
+        "climate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "south_sea_level_temperature_k": {
+              "type": "number"
+            },
+            "temperature_gradient_k_per_km": {
+              "type": "number"
+            },
+            "seasonal_amplitude_k": {
+              "type": "number"
+            },
+            "warming_amplification": {
+              "type": "number"
+            },
+            "precipitation_m_we_yr": {
+              "type": "number"
+            },
+            "precipitation_reference_k": {
+              "type": "number"
+            },
+            "precipitation_per_k": {
+              "type": "number"
+            },
+            "thermal_forcing_k": {
+              "type": "number"
+            },
+            "thermal_forcing_per_k": {
+              "type": "number"
+            },
+            "thermal_forcing_amoc_factor": {
+              "type": "number"
+            }
+          }
+        },
+        "physics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rate_factor_pa3_s": {
+              "type": "number"
+            },
+            "degree_day_factor_snow_mm_k_day": {
+              "type": "number"
+            },
+            "degree_day_factor_ice_mm_k_day": {
+              "type": "number"
+            },
+            "pdd_standard_deviation_k": {
+              "type": "number"
+            },
+            "refreezing_fraction": {
+              "type": "number"
+            },
+            "snow_threshold_k": {
+              "type": "number"
+            },
+            "lapse_rate_k_m": {
+              "type": "number"
+            },
+            "front_water_depth_m": {
+              "type": "number"
+            }
+          }
+        },
+        "spinup_years": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 20000,
+          "default": 3000
+        },
+        "step_every": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12,
+          "default": 3
+        }
+      }
+    },
+    "arctic_sea_ice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mean_temperature_k": {
+          "type": "number"
+        },
+        "seasonal_amplitude_k": {
+          "type": "number"
+        },
+        "warming_amplification": {
+          "type": "number"
+        },
+        "latitude_deg": {
+          "type": "number"
+        },
+        "relative_humidity": {
+          "type": "number"
+        },
+        "wind_speed_m_s": {
+          "type": "number"
+        },
+        "cloud_winter": {
+          "type": "number"
+        },
+        "cloud_summer": {
+          "type": "number"
+        },
+        "deep_ocean_heat_flux_w_m2": {
+          "type": "number"
+        },
+        "deep_heat_per_k": {
+          "type": "number"
+        },
+        "freshwater_residence_years": {
+          "type": "number"
+        },
+        "mixed_layer_depth_m": {
+          "type": "number"
+        },
+        "arctic_ocean_area_m2": {
+          "type": "number"
+        },
+        "ice_export_per_year": {
+          "type": "number"
+        },
+        "spinup_years": {
+          "type": "number"
+        },
+        "heat_follows_overturning": {
+          "type": "boolean"
+        }
+      }
+    },
+    "overturning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "present": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "overturning_sv": {
+              "type": "number"
+            },
+            "temperature_difference_k": {
+              "type": "number"
+            },
+            "salinity_difference_psu": {
+              "type": "number"
+            },
+            "north_temperature_k": {
+              "type": "number"
+            },
+            "north_salinity_psu": {
+              "type": "number"
+            }
+          },
+          "description": "Observable present-day state the box model is calibrated to."
+        },
+        "box": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "north_volume_m3": {
+              "type": "number"
+            },
+            "south_volume_m3": {
+              "type": "number"
+            },
+            "temperature_relaxation_s": {
+              "type": "number"
+            },
+            "temperature_relaxation_years": {
+              "type": "number"
+            },
+            "thermal_expansion_per_k": {
+              "type": "number"
+            },
+            "haline_contraction_per_psu": {
+              "type": "number"
+            }
+          }
+        },
+        "north_amplification": {
+          "type": "number"
+        },
+        "south_amplification": {
+          "type": "number"
+        },
+        "hydrological_sv_per_k": {
+          "type": "number"
+        },
+        "greenland_fraction": {
+          "type": "number"
+        },
+        "noise_sv": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "collapse_fraction": {
+          "type": "number"
+        },
+        "early_warning_window_years": {
+          "type": "number"
+        }
+      }
+    },
+    "ensemble": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salinity_difference_psu": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 1
+        },
+        "greenland_warming_amplification": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "minItems": 1,
+          "maxItems": 10
+        }
+      },
+      "description": "Members = every combination (at most 40)."
+    }
+  }
+}

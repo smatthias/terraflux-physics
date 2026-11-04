@@ -92,12 +92,39 @@ The ocean circulation suite (`weather.ocean_circulation`, plus `weather.ocean_ci
 
 The ocean heat and rain suite (`weather.ocean_heat_rain`, plus `weather.ocean_heat_rain_cli` running a re-timed version of the example and the ocean under the engine's hurricane run, and `weather.viewer_ocean_heat_rain` / `weather.viewer_ocean_streams` regenerating both ocean fixtures) covers: the bulk air-sea formulae against hand calculations (Dalton evaporation, latent heat = L_v E, sensible heat, Berliand longwave, gustiness floor, condensation, albedo); the sun's position and the Zillman/Reed shortwave; the sigma-layer geometry and the two-band shortwave penetration (each layer absorbs exactly its share); the initial thermocline; rain on the open sea (exact volume, salt conservation, a fresh, cool and stable rain lens that the wind erodes); coastal rain (receivers within the band, coastal/inland split, the land budget, the exact linear-reservoir recession, nearshore freshening); evaporation (volume loss, the concentration law, a saltier surface, cooling, humidity dependence); calm sunshine forming a shallow warm layer and Kraus–Turner wind mixing deepening it; bulk-Richardson shear mixing to the critical value; convective deepening under a cold-air outbreak; layer–bulk consistency under a gyre; deep-water formation under an outbreak and its suppression by a fresh rain cap; the legacy slab's heat budget; contract rejections; and a pinned regression. Every case checks the volume, salt and heat budgets at every step.
 
+The polar melt suite (`weather.polar_melt`) covers:
+
+- positive degree days (limits, quadrature);
+- Vialov and elliptic domes and routing to the nearest sea cell;
+- the ice-sheet surface mass balance: snowfall, ice and snow melt, refreezing, runoff only to the sea, the lapse-rate melt–elevation feedback;
+- flow that conserves ice, spreads the dome and never goes negative;
+- calving with the matching sea-level rise;
+- Rignot frontal melt and the retreat of the face;
+- the seawater freezing point and the sea-ice surface balance (closure, thin ice, summer melt, albedo);
+- sea-ice growth in a −30 °C winter with energy closure and brine rejection; open water freezing without supercooling;
+- the seasonal column from perennial to ice-free under warming, and thinning by Atlantic-water heat;
+- the overturning:
+  - Stommel's closed form and the calibration to 17 Sv, steady for a century;
+  - bistability, the collapse past the threshold, hysteresis and recovery only with net evaporation, a recovering sub-threshold pulse, polar amplification lowering the threshold;
+  - the recovery time growing towards the threshold and matching the decay of a perturbation;
+  - early-warning statistics and Kendall's τ;
+- oxygen solubility reference values;
+- the ocean kernel's sea ice (freezing over with brine rejection, summer melt, melt from below by warm water) and glacial meltwater and icebergs (volume, no salt, latent cooling, a glacier lens), with volume, salt and heat budgets every step;
+- contract rejections.
+
+Related CTest cases:
+
+- `weather.polar_melt_cli` runs a fast variant of the polar melt CLI with every event, checking contract, identities, physics, schemas and rejections.
+- `weather.polar_ocean_cli` runs one year of the polar ocean example with hosing and warming against a control. It checks budgets with sea-ice and glacial water, map–total identities, the hosing ramp, a weaker next-winter overturning, a glacial lens and rejections.
+- `weather.viewer_polar_melt` and `weather.viewer_polar_ocean` regenerate the two fixtures and compare them. The latter takes about 3.5 minutes and has the label `slow`.
+
 Build and run the registered CTest case with:
 
 ~~~sh
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+ctest --test-dir build --output-on-failure -LE slow   # skip the 3.5-minute polar ocean fixture check
 ~~~
 
 Keep expected results and tolerances tied to the model assumptions and numerical resolution. Do not treat a visually plausible result as physical validation.

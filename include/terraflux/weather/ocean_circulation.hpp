@@ -1,5 +1,6 @@
 #pragma once
 
+#include "terraflux/weather/sea_ice_physics.hpp"
 #include "terraflux/weather/transport_model.hpp"
 
 #include <cstddef>
@@ -169,6 +170,21 @@ struct OceanCoastalConfig {
     double runoff_time_scale_s{86400.0};
 };
 
+// Sea ice on the layered column (requires the column and the air-sea exchange). Each water cell carries ice of
+// thickness h over a fraction a (thermodynamics of sea_ice.hpp, no drift): the open water exchanges with the air as
+// before, weighted by 1 - a; under the ice the water gives heat F_oi to the ice base; cooling the top layer below
+// its freezing point freezes new ice (its latent heat warms the water back to freezing) and rejects brine; melting
+// returns nearly fresh water at the freezing point. The ice shelters the water from the wind (mixing energy x (1 - a)).
+// Budgets: water (ocean + ice as water) and salt (ocean + ice) are conserved up to the sources; the ocean heat budget
+// carries the latent heat exchanged with the ice.
+struct OceanSeaIceConfig {
+    bool enabled{false};
+    SeaIcePhysics physics;
+    double initial_thickness_m{1.5};            // where the initial surface is within initial_band_k of freezing
+    double initial_concentration{0.9};
+    double initial_band_k{0.5};
+};
+
 struct OceanConfig {
     double timestep_seconds{1800.0};
     TransportGrid2D grid;
@@ -181,6 +197,7 @@ struct OceanConfig {
     OceanAirSeaConfig air_sea;
     OceanThermalLayersConfig thermal;
     OceanCoastalConfig coastal;
+    OceanSeaIceConfig sea_ice;
     // Optional initial surface temperature per cell for the layered column (empty = initial_temperature_k).
     // With layers the bulk temperature is the column mean, so initial_temperature_k is then the surface value.
     std::vector<double> initial_surface_temperature_k;
@@ -220,6 +237,11 @@ struct OceanForcing {
     // Optional stress magnitude that drives the vertical mixing of the layered column (empty = |wind stress|):
     // the full wind, e.g. a storm vortex whose speed is known but whose direction the momentum forcing lacks.
     std::vector<double> mixing_stress_pa;
+    // Optional glacial fresh water from land ice (per sea cell, m3/s of water; empty = none): meltwater arrives as
+    // liquid at 0 degC, ice (icebergs, submarine frontal melt) melts in the top layer and takes its latent heat
+    // from the water.
+    std::vector<double> glacial_meltwater_m3_s;
+    std::vector<double> glacial_ice_m3_s;
 };
 
 struct OceanState {
@@ -239,7 +261,9 @@ struct OceanState {
     std::vector<double> recent_rain_m;
     std::vector<double> recent_runoff_m;
     std::vector<double> recent_river_m;
-    std::vector<double> freshwater_m;   // surface freshwater content (metres of fresh water in the mixed layer)
+    std::vector<double> recent_glacial_m;     // meltwater and ice from land ice sheets
+    std::vector<double> ice_thickness_m;      // sea ice over its covered part (empty without sea ice)
+    std::vector<double> ice_concentration;    // covered fraction of the cell
     // Diagnostics of the last step (cell centres).
     std::vector<double> speed_m_s;
     std::vector<double> u_centre_m_s;
@@ -263,6 +287,9 @@ struct OceanState {
     std::vector<double> rain_heat_w_m2;           // rho c_p P (T_rain - SST): cooling by rain colder than the sea
     std::vector<double> net_heat_w_m2;            // heat applied at the surface (air-sea fluxes or the relaxation)
     std::vector<double> coastal_inflow_m3_s;      // coastal runoff received by each sea cell
+    std::vector<double> ice_surface_temperature_k;  // top of the sea ice (the water temperature where there is none)
+    std::vector<double> ice_growth_m_s;           // change of the ice volume per cell area (negative = melt)
+    std::vector<double> ocean_to_ice_heat_w_m2;   // heat the water gives the ice per cell area (net_heat = open-water fluxes - this)
     double upwelling_m_s{0.0};                    // basin-mean upwelling rate
     double overturning_m3_s{0.0};                 // total sinking
     double river_input_m3_s{0.0};
@@ -284,6 +311,12 @@ struct OceanState {
     double coastal_storage_m3{0.0};
     double coastal_balance_error_m3{0.0};
     double evaporation_m3_s{0.0};                 // net evaporation from the sea (condensation counts negative)
+    double ice_water_m3_s{0.0};                   // water from sea-ice melt minus water frozen into ice
+    double ice_salt_kg_s{0.0};                    // salt returned by melting ice minus salt locked into new ice
+    double glacial_meltwater_m3_s{0.0};
+    double glacial_ice_m3_s{0.0};
+    double ice_volume_m3{0.0};                    // sea ice
+    double ice_area_m2{0.0};                      // sum of a x cell area
     // Heat (relative to 0 degC): content rho_0 c_p sum h (T - 273.15) A and its budget.
     double surface_heat_w{0.0};                   // area-integrated heat applied at the surface
     double heat_content_j{0.0};
@@ -300,6 +333,8 @@ struct OceanState {
     double cumulative_coastal_loss_m3{0.0};
     double cumulative_evaporation_m3{0.0};
     double cumulative_surface_heat_j{0.0};
+    double cumulative_ice_water_m3{0.0};
+    double cumulative_glacial_m3{0.0};
 };
 
 OceanState initialize_ocean(const OceanConfig& config);
@@ -332,13 +367,14 @@ struct RiverPlume {
 
 // Surface lens: a connected area where the surface is fresher than the layer below by the lens deficit.
 // Attributed by the fresh water its cells received recently (rain on the sea, coastal runoff, rivers):
-// kind is the largest share, "other" when nothing was recorded (e.g. a lens carried away from its source
+// kind is the largest share ("glacial" for land-ice meltwater), "other" when nothing was recorded (e.g. a lens carried away from its source
 // for longer than the memory).
 struct SurfaceLens {
     std::string kind;
     double rain_share{0.0};
     double coastal_runoff_share{0.0};
     double river_share{0.0};
+    double glacial_share{0.0};
     std::size_t freshest_cell{0};
     std::size_t cell_count{0};
     double area_m2{0.0};
@@ -358,6 +394,12 @@ struct OceanDiagnostics {
     double max_sst_k{0.0};
     double mean_mixed_layer_depth_m{0.0};
     double max_mixed_layer_depth_m{0.0};
+    std::size_t formation_cells{0};
+    double formation_area_m2{0.0};
+    double mean_salinity_psu{0.0};
+    double min_salinity_psu{0.0};
+    double max_speed_m_s{0.0};
+};
 
 OceanDiagnostics diagnose_ocean(const OceanState& state, const OceanForcing& forcing, const OceanConfig& config);
 
