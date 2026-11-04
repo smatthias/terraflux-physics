@@ -1,0 +1,1145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/coupled-wind-run-v1.json",
+  "title": "TerraFlux coupled wind / moist-layer run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "time",
+    "grid",
+    "atmosphere",
+    "diffusion",
+    "pressure",
+    "initial_fields"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.coupled-wind-run/v1"
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_time_utc",
+        "timestep_seconds",
+        "steps"
+      ],
+      "properties": {
+        "start_time_utc": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "timestep_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Must satisfy timestep * (max |f| + k) <= 1 for the configured atmosphere."
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nx",
+        "ny",
+        "origin_east_m",
+        "origin_north_m",
+        "spacing_east_m",
+        "spacing_north_m",
+        "geographic_anchor_longitude_deg",
+        "geographic_anchor_latitude_deg"
+      ],
+      "properties": {
+        "nx": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "ny": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "origin_east_m": {
+          "type": "number"
+        },
+        "origin_north_m": {
+          "type": "number"
+        },
+        "spacing_east_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "spacing_north_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "geographic_anchor_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geographic_anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90,
+          "description": "Latitude used for f_plane and beta_plane Coriolis modes; the anchor is local (0, 0)."
+        }
+      }
+    },
+    "atmosphere": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "air_density_kg_m3",
+        "surface_friction_coefficient_s",
+        "coriolis_mode"
+      ],
+      "properties": {
+        "air_density_kg_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "surface_friction_coefficient_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Linear (Rayleigh) drag coefficient k in 1/s. Zero gives a frictionless, purely geostrophic steady state."
+        },
+        "coriolis_mode": {
+          "enum": [
+            "none",
+            "f_plane",
+            "beta_plane",
+            "prescribed"
+          ]
+        },
+        "coriolis_parameter_s": {
+          "type": "number",
+          "description": "Required when coriolis_mode is prescribed; ignored otherwise."
+        },
+        "earth_angular_speed_rad_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 7.2921159e-05
+        },
+        "earth_radius_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 6371000
+        }
+      },
+      "if": {
+        "properties": {
+          "coriolis_mode": {
+            "const": "prescribed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "coriolis_parameter_s"
+        ]
+      }
+    },
+    "diffusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature_m2_s",
+        "humidity_m2_s",
+        "momentum_m2_s"
+      ],
+      "properties": {
+        "temperature_m2_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "humidity_m2_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "momentum_m2_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Must satisfy 2 nu dt (1/dx^2 + 1/dy^2) <= 1."
+        }
+      },
+      "description": "Horizontal mixing diffusivities between the pressure systems; additional to the implicit numerical diffusion of first-order upwind transport."
+    },
+    "pressure_gradient_boundary": {
+      "enum": [
+        "one_sided",
+        "periodic"
+      ],
+      "default": "one_sided"
+    },
+    "scalar_boundary": {
+      "enum": [
+        "zero_gradient",
+        "periodic"
+      ],
+      "default": "zero_gradient"
+    },
+    "density_mode": {
+      "enum": [
+        "diagnosed",
+        "constant"
+      ],
+      "default": "diagnosed",
+      "description": "diagnosed: rho = p / (R_d T (1 + 0.608 q)) each step; constant: atmosphere.air_density_kg_m3."
+    },
+    "pressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "pressure_pa"
+          ]
+        },
+        {
+          "required": [
+            "pressure_systems"
+          ]
+        }
+      ],
+      "properties": {
+        "pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "description": "Row-major nx * ny cell-center pressures in pascals."
+        },
+        "pressure_systems": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "background_pressure_pa",
+            "centers"
+          ],
+          "properties": {
+            "background_pressure_pa": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "centers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "east_m",
+                  "north_m",
+                  "pressure_anomaly_pa",
+                  "radius_m"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "high",
+                      "low"
+                    ]
+                  },
+                  "east_m": {
+                    "type": "number"
+                  },
+                  "north_m": {
+                    "type": "number"
+                  },
+                  "pressure_anomaly_pa": {
+                    "type": "number",
+                    "description": "Positive for high, negative for low. Added as anomaly * exp(-(r / radius_m)^2)."
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "initial_fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "air_temperature_k",
+        "specific_humidity_kg_kg"
+      ],
+      "properties": {
+        "air_temperature_k": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "background"
+              ]
+            }
+          ],
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "background": {
+              "type": "number"
+            },
+            "anomalies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "east_m",
+                  "north_m",
+                  "radius_m",
+                  "amplitude"
+                ],
+                "properties": {
+                  "east_m": {
+                    "type": "number"
+                  },
+                  "north_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "amplitude": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "description": "Kelvin; per-cell values or background + Gaussian anomalies. Must stay above 0 K."
+        },
+        "specific_humidity_kg_kg": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "background"
+              ]
+            }
+          ],
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "background": {
+              "type": "number"
+            },
+            "anomalies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "east_m",
+                  "north_m",
+                  "radius_m",
+                  "amplitude"
+                ],
+                "properties": {
+                  "east_m": {
+                    "type": "number"
+                  },
+                  "north_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "amplitude": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "description": "kg/kg; per-cell values or background + Gaussian anomalies. Must stay within [0, 1)."
+        }
+      }
+    },
+    "initial_wind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "elapsed_seconds",
+        "wind_east_m_s",
+        "wind_north_m_s"
+      ],
+      "properties": {
+        "elapsed_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wind_east_m_s": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "wind_north_m_s": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Optional; the run starts from rest at elapsed 0 when omitted."
+    },
+    "snapshot_every_steps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional; emit a wind snapshot after every N steps. Must not exceed steps."
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_count",
+        "layer_thickness_m",
+        "environment_lapse_rate_k_m",
+        "humidity_scale_height_m"
+      ],
+      "properties": {
+        "layer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "layer_thickness_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "environment_lapse_rate_k_m": {
+          "type": "number",
+          "minimum": -0.05,
+          "maximum": 0.05,
+          "description": "Environment T(z) = T_surface - lapse * min(z, tropopause); positive values cool with height."
+        },
+        "tropopause_height_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 11000
+        },
+        "humidity_scale_height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "q(z) = q_surface exp(-z / scale height)."
+        },
+        "parcel_step_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 50,
+          "description": "Vertical step of the parcel ascent; at most the layer thickness."
+        },
+        "inversion_base_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Base of a capping temperature inversion."
+        },
+        "inversion_depth_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "inversion_strength_k": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Temperature rise through the layer; 0 disables the inversion. The environment above keeps the offset (loaded-gun profile)."
+        },
+        "lapse_rate_above_inversion_k_m": {
+          "type": "number",
+          "maximum": 0.05,
+          "default": -1,
+          "description": "Lapse rate above the inversion (elevated mixed layer); negative = same as the environment."
+        }
+      },
+      "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
+    },
+    "cloud_formation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frontal_gradient_threshold_k_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "|grad T| at or above this marks a frontal zone (K/m; 2e-5 = 2 K per 100 km)."
+        },
+        "advection_threshold_k_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "|\u2212V\u00b7grad T| above this classifies cold (negative) or warm (positive) fronts; otherwise stationary."
+        },
+        "boundary_layer_depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "H in the convergence lifting w = \u2212H div V; also the base of the thermal mixed layer."
+        },
+        "lifting_time_scale_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Lifting depth = w \u00d7 time scale."
+        },
+        "mixed_layer_growth_m_per_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Mixed-layer top reached by thermals = H + growth \u00d7 surface heating."
+        },
+        "warm_front_slope": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rise per horizontal distance of the warm-front surface (e.g. 1/200)."
+        },
+        "cold_front_slope": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rise per horizontal distance of the cold-front surface (e.g. 1/75); must be at least the warm slope."
+        },
+        "warm_front_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Horizontal reach of overrunning cloud on the cold side of a warm front."
+        },
+        "cold_front_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Horizontal reach of overrunning cloud behind a cold front."
+        },
+        "frontal_band_width_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Warm-side distance within which lifting counts as frontal."
+        },
+        "cin_trigger_j_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Convection is released freely when the heated parcel's CIN is at or below this."
+        },
+        "cape_threshold_j_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum CAPE for convective cloud."
+        },
+        "max_cloud_top_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cloud tops are capped here."
+        },
+        "surface_heating": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "amplitude_k"
+          ],
+          "properties": {
+            "amplitude_k": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Diurnal surface heating amplitude applied to the lifted surface parcel: heating(t) = amplitude \u00d7 max(0, sin(2\u03c0 (t \u2212 phase) / 86400))."
+            },
+            "phase_seconds": {
+              "type": "number",
+              "default": 0,
+              "description": "Elapsed time at which heating starts rising (sunrise); negative values start before the run."
+            }
+          }
+        }
+      },
+      "description": "Cloud formation diagnostics (fronts + convection). Requires the column section. Every value is optional and defaults to the documented rule-of-thumb constants."
+    },
+    "precipitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stratiform_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Fraction of condensate from layered lifting that reaches the ground."
+        },
+        "convective_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Fraction of condensate from convective updrafts that reaches the ground."
+        },
+        "convective_updraft_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Area fraction of a cell occupied by convective updrafts (cell-mean rate = fraction \u00d7 updraft rate)."
+        },
+        "updraft_parcel_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Updraft = factor \u00d7 sqrt(2 CAPE); parcel theory overestimates real updrafts by about 2."
+        },
+        "interval_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Interval over which accumulation = rate \u00d7 duration fraction \u00d7 interval is estimated; defaults to the snapshot interval."
+        },
+        "snow_wet_bulb_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surface wet-bulb temperature at or below which precipitation is snow (default 0.5 \u00b0C)."
+        },
+        "sleet_wet_bulb_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surface wet-bulb temperature up to which precipitation is mixed sleet (default 2 \u00b0C); liquid above."
+        },
+        "lightning_top_temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cumulonimbus tops at or below this temperature (default \u221220 \u00b0C) carry lightning when the cloud crosses the freezing level."
+        },
+        "hail_min_diameter_cm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Smallest hail reported after melting."
+        },
+        "hail_melting_cm_per_km": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Diameter lost per kilometre of fall below the freezing level."
+        },
+        "hail_max_diameter_cm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cap on the reported hail size."
+        },
+        "drizzle_max_rate_mm_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rate cap for stratus drizzle and stratocumulus."
+        },
+        "virga_surface_rh": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Light precipitation into air drier than this (fraction) from a base above virga_min_base_m evaporates (virga)."
+        },
+        "virga_max_rate_mm_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Largest rate that can evaporate completely as virga."
+        },
+        "virga_min_base_m": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Lowest cloud base for virga."
+        },
+        "minimum_rate_mm_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rates below this are reported as no precipitation."
+        }
+      },
+      "description": "Precipitation outcomes of the diagnosed clouds. Requires cloud_formation. Every value is optional; interval_seconds defaults to the snapshot interval."
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "land",
+        "sea_surface_temperature_k"
+      ],
+      "properties": {
+        "land": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "coast_east_m",
+                "land_side"
+              ]
+            }
+          ],
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "coast_east_m": {
+              "type": "number"
+            },
+            "land_side": {
+              "enum": [
+                "west",
+                "east"
+              ]
+            }
+          },
+          "description": "Land mask per cell, or a straight north-south coastline with land on the given side."
+        },
+        "sea_surface_temperature_k": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "background"
+              ]
+            }
+          ],
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "background": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "gradient_north_k_per_m": {
+              "type": "number",
+              "default": 0
+            }
+          }
+        }
+      },
+      "description": "Surface for the storm systems: land (no enthalpy flux, Kaplan-DeMaria decay) versus ocean with its sea-surface temperature."
+    },
+    "storms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enthalpy_exchange_ratio": {
+          "type": "number",
+          "description": "C_k/C_D in the potential intensity",
+          "default": 0.9
+        },
+        "surface_wind_factor": {
+          "type": "number",
+          "description": "Gradient-to-surface wind reduction",
+          "default": 0.8
+        },
+        "sst_threshold_k": {
+          "type": "number",
+          "description": "SST below which no potential intensity exists (26.5 C)",
+          "default": 299.65
+        },
+        "minimum_coriolis_s": {
+          "type": "number",
+          "description": "Smallest |f| allowing storms (~10 degrees latitude)",
+          "default": 2.5e-05
+        },
+        "mid_level_height_m": {
+          "type": "number",
+          "description": "Height of the mid-level humidity used by the GPI",
+          "default": 4000.0
+        },
+        "shear_layer_depth_m": {
+          "type": "number",
+          "description": "Depth of the thermal-wind shear estimate",
+          "default": 10000.0
+        },
+        "shear_limit_m_s": {
+          "type": "number",
+          "description": "Shear at which the potential intensity vanishes",
+          "default": 20.0
+        },
+        "genesis_gpi_threshold": {
+          "type": "number",
+          "description": "GPI at or above which a storm is seeded",
+          "default": 8.0
+        },
+        "genesis_separation_m": {
+          "type": "number",
+          "description": "No genesis within this distance of an existing storm",
+          "default": 600000.0
+        },
+        "genesis_max_wind_m_s": {
+          "type": "number",
+          "description": "Wind of a newly formed storm",
+          "default": 17.0
+        },
+        "intensification_time_scale_s": {
+          "type": "number",
+          "description": "Relaxation time toward the potential intensity",
+          "default": 86400.0
+        },
+        "decay_alpha_per_s": {
+          "type": "number",
+          "description": "Kaplan-DeMaria decay rate (0.095 1/h)",
+          "default": 2.638888888888889e-05
+        },
+        "decay_background_wind_m_s": {
+          "type": "number",
+          "description": "Kaplan-DeMaria background wind",
+          "default": 13.75
+        },
+        "landfall_reduction": {
+          "type": "number",
+          "description": "Wind reduction factor at landfall",
+          "default": 0.9
+        },
+        "dissipation_wind_m_s": {
+          "type": "number",
+          "description": "Storms below this wind are removed",
+          "default": 10.0
+        },
+        "holland_b": {
+          "type": "number",
+          "description": "Holland pressure profile parameter",
+          "default": 1.3
+        },
+        "steering_radius_m": {
+          "type": "number",
+          "description": "Radius of the steering-flow average",
+          "default": 300000.0
+        },
+        "steering_factor": {
+          "type": "number",
+          "description": "Fraction of the steering flow applied",
+          "default": 1.0
+        },
+        "beta_drift_west_m_s": {
+          "type": "number",
+          "description": "Westward beta drift",
+          "default": 1.0
+        },
+        "beta_drift_poleward_m_s": {
+          "type": "number",
+          "description": "Poleward beta drift",
+          "default": 1.5
+        },
+        "merge_distance_m": {
+          "type": "number",
+          "description": "Storms merge when closer than this plus both radii of maximum wind",
+          "default": 100000.0
+        },
+        "induction_factor": {
+          "type": "number",
+          "description": "Fraction of another storm's Rankine wind steering a storm (Fujiwhara)",
+          "default": 0.4
+        },
+        "genesis_edge_margin_m": {
+          "type": "number",
+          "description": "No genesis this close to the domain edge",
+          "default": 100000.0
+        },
+        "surge_wind_coefficient_s2_m": {
+          "type": "number",
+          "description": "Wind-setup surge coefficient",
+          "default": 0.0015
+        },
+        "rain_core_factor_mm_h_per_m_s": {
+          "type": "number",
+          "description": "Core rain rate per m/s of maximum wind",
+          "default": 0.4
+        },
+        "substep_seconds": {
+          "type": "number",
+          "description": "Storm sub-step",
+          "default": 600.0
+        },
+        "max_storms": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8
+        },
+        "seeds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "east_m",
+              "north_m",
+              "max_wind_m_s"
+            ],
+            "properties": {
+              "east_m": {
+                "type": "number"
+              },
+              "north_m": {
+                "type": "number"
+              },
+              "max_wind_m_s": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "radius_max_wind_m": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 40000
+              }
+            }
+          }
+        }
+      },
+      "description": "Tropical cyclone objects. Requires surface and column. Seeds enter at the start; genesis follows the Emanuel-Nolan index afterwards."
+    },
+    "severe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deep_shear_depth_m": {
+          "type": "number",
+          "description": "Depth of the thermal-wind contribution to the deep shear",
+          "default": 6000.0
+        },
+        "bunkers_deviation_m_s": {
+          "type": "number",
+          "description": "Bunkers storm-motion deviation from the mean wind",
+          "default": 7.5
+        },
+        "geostrophic_air_density_kg_m3": {
+          "type": "number",
+          "description": "Density for the geostrophic wind aloft",
+          "default": 1.2
+        },
+        "stp_low": {
+          "type": "number",
+          "description": "STP class boundary none/low",
+          "default": 0.5
+        },
+        "stp_moderate": {
+          "type": "number",
+          "description": "STP class boundary low/moderate",
+          "default": 1.0
+        },
+        "stp_significant": {
+          "type": "number",
+          "description": "STP class boundary moderate/significant",
+          "default": 3.0
+        }
+      },
+      "description": "Tornado / supercell potential. Requires cloud_formation. Add a column inversion for a capped (loaded-gun) environment."
+    },
+    "orography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terrain"
+      ],
+      "properties": {
+        "terrain": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "ridges"
+              ]
+            }
+          ],
+          "properties": {
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "base_elevation_m": {
+              "type": "number",
+              "default": 0
+            },
+            "ridges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "orientation_deg",
+                  "center_east_m",
+                  "center_north_m",
+                  "height_m",
+                  "half_width_m",
+                  "length_m"
+                ],
+                "properties": {
+                  "orientation_deg": {
+                    "type": "number",
+                    "description": "Direction of the ridge axis from north: 0 = north-south (e.g. the Rockies), 90 = east-west (e.g. the Alps)."
+                  },
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "height_m": {
+                    "type": "number",
+                    "description": "Negative heights carve valleys."
+                  },
+                  "half_width_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Gaussian e-folding half width across the axis."
+                  },
+                  "length_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Axis length; the ends taper smoothly."
+                  }
+                }
+              }
+            },
+            "basins": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "center_east_m",
+                  "center_north_m",
+                  "depth_m",
+                  "radius_m"
+                ],
+                "properties": {
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "depth_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            },
+            "slope_east_m_per_m": {
+              "type": "number",
+              "default": 0,
+              "description": "Tilted plane through the grid origin (shared synthetic terrain builder)."
+            },
+            "slope_north_m_per_m": {
+              "type": "number",
+              "default": 0
+            },
+            "roughness_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Peak amplitude of deterministic hashed cell-scale noise."
+            },
+            "roughness_seed": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 1
+            }
+          },
+          "description": "Terrain per cell, or a synthetic base elevation with Gaussian ridges (orientation, height, width, length) and basins."
+        },
+        "blocking_time_scale_s": {
+          "type": "number",
+          "description": "Time scale over which the blocked up-slope wind component is removed; at least one timestep.",
+          "default": 1800.0
+        },
+        "obstacle_radius_m": {
+          "type": "number",
+          "description": "How far ahead (downwind) the air sees the terrain it must climb for the Froude number.",
+          "default": 200000.0
+        },
+        "influence_radius_m": {
+          "type": "number",
+          "description": "Neighbourhood for the valley depth and the cold-pool reference temperature.",
+          "default": 100000.0
+        },
+        "brunt_vaisala_s": {
+          "type": "number",
+          "description": "Ambient stability frequency N for Fr = U_n / (N dh).",
+          "default": 0.01
+        },
+        "boundary_layer_depth_m": {
+          "type": "number",
+          "description": "Layer mass (rho H) converting condensed vapour into orographic precipitation.",
+          "default": 1500.0
+        },
+        "daytime_heating_k_per_s": {
+          "type": "number",
+          "description": "Peak daytime surface heating rate of the sine cycle.",
+          "default": 0.0
+        },
+        "nocturnal_cooling_k_per_s": {
+          "type": "number",
+          "description": "Peak nocturnal cooling rate; enhanced in valleys by valley_pooling_per_km.",
+          "default": 0.0
+        },
+        "diurnal_phase_seconds": {
+          "type": "number",
+          "description": "Elapsed time at sunrise.",
+          "default": 0.0
+        },
+        "valley_pooling_per_km": {
+          "type": "number",
+          "description": "Heating/cooling enhancement per kilometre of valley depth.",
+          "default": 1.0
+        },
+        "initial_lapse_rate_k_m": {
+          "type": "number",
+          "description": "Lapse rate applied to the initial temperature with elevation (mountain tops start colder).",
+          "default": 0.0065
+        }
+      },
+      "description": "Mountains and valleys in the coupled layer: terrain-following adiabatic ascent/descent (foehn), Froude blocking with orientation dependence, valley cold-air pooling, terrain surface pressure. The CLI also writes the terrain as a terrain-grid/v1 block for the viewer."
+    }
+  }
+}

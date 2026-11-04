@@ -1,0 +1,16 @@
+{
+  "schema_version": "terraflux.weather.column-run/v1",
+  "surface": {
+    "pressure_pa": 100000.0,
+    "air_temperature_k": 298.15,
+    "specific_humidity_kg_kg": 0.016
+  },
+  "column": {
+    "layer_count": 30,
+    "layer_thickness_m": 500.0,
+    "environment_lapse_rate_k_m": 0.0065,
+    "tropopause_height_m": 11000.0,
+    "humidity_scale_height_m": 2500.0,
+    "parcel_step_m": 50.0
+  }
+}

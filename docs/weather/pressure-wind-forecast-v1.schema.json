@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/pressure-wind-forecast-v1.json",
+  "title": "TerraFlux pressure-gradient wind forecast v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model",
+    "start_time_utc",
+    "elapsed_seconds",
+    "time",
+    "grid",
+    "atmosphere",
+    "pressure_gradient_boundary",
+    "pressure",
+    "fields",
+    "snapshots",
+    "diagnostics"
+  ],
+  "$defs": {
+    "windFields": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wind_east", "wind_north"],
+      "properties": {
+        "wind_east": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["units", "values"],
+          "properties": {
+            "units": { "const": "m/s" },
+            "values": { "type": "array", "items": { "type": "number" } }
+          }
+        },
+        "wind_north": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["units", "values"],
+          "properties": {
+            "units": { "const": "m/s" },
+            "values": { "type": "array", "items": { "type": "number" } }
+          }
+        }
+      }
+    },
+    "optionalBalance": {
+      "oneOf": [
+        { "$ref": "#/$defs/windFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["undefined"],
+          "properties": { "undefined": { "type": "string" } }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": { "const": "terraflux.weather.pressure-wind-forecast/v1" },
+    "model": { "const": "pressure_gradient_coriolis_friction_v1" },
+    "start_time_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "elapsed_seconds": { "type": "number", "minimum": 0 },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_time_utc", "timestep_seconds", "steps"],
+      "properties": {
+        "start_time_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestep_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "steps": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nx", "ny", "origin_east_m", "origin_north_m", "spacing_east_m", "spacing_north_m",
+        "geographic_anchor_longitude_deg", "geographic_anchor_latitude_deg",
+        "coordinate_system", "array_order"
+      ],
+      "properties": {
+        "nx": { "type": "integer", "minimum": 2 },
+        "ny": { "type": "integer", "minimum": 2 },
+        "origin_east_m": { "type": "number" },
+        "origin_north_m": { "type": "number" },
+        "spacing_east_m": { "type": "number", "exclusiveMinimum": 0 },
+        "spacing_north_m": { "type": "number", "exclusiveMinimum": 0 },
+        "geographic_anchor_longitude_deg": { "type": "number", "minimum": -180, "maximum": 180 },
+        "geographic_anchor_latitude_deg": { "type": "number", "minimum": -90, "maximum": 90 },
+        "coordinate_system": { "const": "local_azimuthal_equidistant_m" },
+        "array_order": { "const": "row_major_y_then_x" }
+      }
+    },
+    "atmosphere": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "air_density_kg_m3", "surface_friction_coefficient_s", "coriolis_mode",
+        "coriolis_parameter_s", "earth_angular_speed_rad_s", "earth_radius_m"
+      ],
+      "properties": {
+        "air_density_kg_m3": { "type": "number", "exclusiveMinimum": 0 },
+        "surface_friction_coefficient_s": { "type": "number", "minimum": 0 },
+        "coriolis_mode": { "enum": ["none", "f_plane", "beta_plane", "prescribed"] },
+        "coriolis_parameter_s": { "type": "number" },
+        "earth_angular_speed_rad_s": { "type": "number", "minimum": 0 },
+        "earth_radius_m": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "pressure_gradient_boundary": { "enum": ["one_sided", "periodic"] },
+    "pressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["units", "source", "values"],
+      "properties": {
+        "units": { "const": "Pa" },
+        "source": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": { "kind": { "enum": ["prescribed_cell_values", "synthetic_gaussian_systems"] } }
+        },
+        "values": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 } }
+      }
+    },
+    "fields": { "$ref": "#/$defs/windFields" },
+    "snapshots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["elapsed_seconds", "fields"],
+        "properties": {
+          "elapsed_seconds": { "type": "number", "minimum": 0 },
+          "fields": { "$ref": "#/$defs/windFields" }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coriolis_parameter_s", "geostrophic_wind", "balanced_wind"],
+      "properties": {
+        "coriolis_parameter_s": { "type": "array", "items": { "type": "number" } },
+        "geostrophic_wind": { "$ref": "#/$defs/optionalBalance" },
+        "balanced_wind": { "$ref": "#/$defs/optionalBalance" }
+      }
+    }
+  },
+  "description": "All cell arrays are row-major, indexed by y * nx + x, with nx * ny values. The pressure field is prescribed and static; the wind in fields is the state after all configured steps, and snapshots lists intermediate states ending with the final one. Diagnostics report the analytic geostrophic and friction-balanced winds for the same pressure field, or why they are undefined."
+}

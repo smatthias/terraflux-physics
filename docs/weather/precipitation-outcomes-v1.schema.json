@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/precipitation-outcomes-v1.json",
+  "title": "TerraFlux precipitation outcomes v1 (precipitation block of a coupled timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "config",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.precipitation_outcomes/v1"
+    },
+    "method": {
+      "const": "genus_condensation_rate_wet_bulb_phase_updraft_hail"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stratiform_efficiency",
+        "convective_efficiency",
+        "convective_updraft_fraction",
+        "updraft_parcel_factor",
+        "interval_seconds",
+        "snow_wet_bulb_k",
+        "sleet_wet_bulb_k",
+        "lightning_top_temperature_k",
+        "hail_min_diameter_cm",
+        "hail_melting_cm_per_km",
+        "hail_max_diameter_cm",
+        "drizzle_max_rate_mm_h",
+        "virga_surface_rh",
+        "virga_max_rate_mm_h",
+        "virga_min_base_m",
+        "minimum_rate_mm_h"
+      ],
+      "properties": {
+        "stratiform_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Fraction of condensate from layered lifting that reaches the ground."
+        },
+        "convective_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Fraction of condensate from convective updrafts that reaches the ground."
+        },
+        "convective_updraft_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Area fraction of a cell occupied by convective updrafts (cell-mean rate = fraction \u00d7 updraft rate)."
+        },
+        "updraft_parcel_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Updraft = factor \u00d7 sqrt(2 CAPE); parcel theory overestimates real updrafts by about 2."
+        },
+        "interval_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Interval over which accumulation = rate \u00d7 duration fraction \u00d7 interval is estimated; defaults to the snapshot interval."
+        },
+        "snow_wet_bulb_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surface wet-bulb temperature at or below which precipitation is snow (default 0.5 \u00b0C)."
+        },
+        "sleet_wet_bulb_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Surface wet-bulb temperature up to which precipitation is mixed sleet (default 2 \u00b0C); liquid above."
+        },
+        "lightning_top_temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cumulonimbus tops at or below this temperature (default \u221220 \u00b0C) carry lightning when the cloud crosses the freezing level."
+        },
+        "hail_min_diameter_cm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Smallest hail reported after melting."
+        },
+        "hail_melting_cm_per_km": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Diameter lost per kilometre of fall below the freezing level."
+        },
+        "hail_max_diameter_cm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cap on the reported hail size."
+        },
+        "drizzle_max_rate_mm_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rate cap for stratus drizzle and stratocumulus."
+        },
+        "virga_surface_rh": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Light precipitation into air drier than this (fraction) from a base above virga_min_base_m evaporates (virga)."
+        },
+        "virga_max_rate_mm_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Largest rate that can evaporate completely as virga."
+        },
+        "virga_min_base_m": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Lowest cloud base for virga."
+        },
+        "minimum_rate_mm_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rates below this are reported as no precipitation."
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "elapsed_seconds",
+          "precipitation_type",
+          "phase",
+          "character",
+          "intensity",
+          "rate_mm_h",
+          "duration_fraction",
+          "accumulation_mm",
+          "hail_max_diameter_cm",
+          "lightning",
+          "virga",
+          "updraft_m_s",
+          "freezing_level_m",
+          "surface_wet_bulb_k",
+          "precipitable_water_mm",
+          "cloud_base_temperature_k",
+          "cloud_top_temperature_k",
+          "hazards",
+          "precipitating_cells",
+          "lightning_cells",
+          "hail_cells",
+          "snow_cells",
+          "max_rate_mm_h",
+          "total_accumulation_mm"
+        ],
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "precipitation_type": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "drizzle",
+                "rain",
+                "sleet",
+                "snow",
+                "rain_showers",
+                "sleet_showers",
+                "snow_showers"
+              ]
+            },
+            "description": "Phase \u00d7 character label per cell."
+          },
+          "phase": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "liquid",
+                "mixed",
+                "solid"
+              ]
+            }
+          },
+          "character": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "drizzle",
+                "continuous",
+                "intermittent",
+                "showers"
+              ]
+            },
+            "description": "From the cloud genus: stratus drizzle, nimbostratus continuous, stratocumulus/altostratus intermittent, towering cumulus/cumulonimbus showers."
+          },
+          "intensity": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "light",
+                "moderate",
+                "heavy",
+                "violent"
+              ]
+            },
+            "description": "WMO classes of the rate: < 2.5, < 10, < 50, \u2265 50 mm/h."
+          },
+          "rate_mm_h": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Cell-mean rate at the ground while precipitating."
+          },
+          "duration_fraction": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "Fraction of the interval with precipitation: continuous/drizzle 1, intermittent 0.5, showers 0.2."
+          },
+          "accumulation_mm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "rate \u00d7 duration fraction \u00d7 interval."
+          },
+          "hail_max_diameter_cm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Largest hail after melting; 0 when none. Requires lightning."
+          },
+          "lightning": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "virga": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "updraft_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Lifting used for the rate: cloud depth / lifting time scale for layered cloud, parcel-theory updraft for convection."
+          },
+          "freezing_level_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "description": "Height of the 0 \u00b0C level; null when the column never crosses it."
+          },
+          "surface_wet_bulb_k": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "precipitable_water_mm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "cloud_base_temperature_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "cloud_top_temperature_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "hazards": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "thunderstorm",
+                  "hail",
+                  "heavy_rain",
+                  "violent_rain",
+                  "prolonged_rain",
+                  "snow",
+                  "sleet",
+                  "drizzle",
+                  "virga"
+                ]
+              }
+            }
+          },
+          "precipitating_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lightning_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hail_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snow_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_rate_mm_h": {
+            "type": "number",
+            "minimum": 0
+          },
+          "total_accumulation_mm": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "description": "Carried as coupled_atmosphere.precipitation, one entry per timeline frame, requiring the clouds block. Cell arrays are row-major nx \u00d7 ny. Rates follow R = sigma \u00d7 efficiency \u00d7 rho_base \u00d7 w \u00d7 (q_s(base) \u2212 q_s(top)); phase follows the surface wet-bulb temperature; lightning needs a cumulonimbus top colder than the threshold crossing the freezing level; hail size is the stone whose terminal velocity equals the updraft, reduced by melting. Rule-of-thumb cell means, not observations."
+}

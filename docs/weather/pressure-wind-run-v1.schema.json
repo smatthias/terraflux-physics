@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/pressure-wind-run-v1.json",
+  "title": "TerraFlux pressure-gradient wind run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "time", "grid", "atmosphere", "pressure"],
+  "properties": {
+    "schema_version": { "const": "terraflux.weather.pressure-wind-run/v1" },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_time_utc", "timestep_seconds", "steps"],
+      "properties": {
+        "start_time_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestep_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Must satisfy timestep * (max |f| + k) <= 1 for the configured atmosphere."
+        },
+        "steps": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nx",
+        "ny",
+        "origin_east_m",
+        "origin_north_m",
+        "spacing_east_m",
+        "spacing_north_m",
+        "geographic_anchor_longitude_deg",
+        "geographic_anchor_latitude_deg"
+      ],
+      "properties": {
+        "nx": { "type": "integer", "minimum": 2 },
+        "ny": { "type": "integer", "minimum": 2 },
+        "origin_east_m": { "type": "number" },
+        "origin_north_m": { "type": "number" },
+        "spacing_east_m": { "type": "number", "exclusiveMinimum": 0 },
+        "spacing_north_m": { "type": "number", "exclusiveMinimum": 0 },
+        "geographic_anchor_longitude_deg": { "type": "number", "minimum": -180, "maximum": 180 },
+        "geographic_anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90,
+          "description": "Latitude used for f_plane and beta_plane Coriolis modes; the anchor is local (0, 0)."
+        }
+      }
+    },
+    "atmosphere": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["air_density_kg_m3", "surface_friction_coefficient_s", "coriolis_mode"],
+      "properties": {
+        "air_density_kg_m3": { "type": "number", "exclusiveMinimum": 0 },
+        "surface_friction_coefficient_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Linear (Rayleigh) drag coefficient k in 1/s. Zero gives a frictionless, purely geostrophic steady state."
+        },
+        "coriolis_mode": { "enum": ["none", "f_plane", "beta_plane", "prescribed"] },
+        "coriolis_parameter_s": {
+          "type": "number",
+          "description": "Required when coriolis_mode is prescribed; ignored otherwise."
+        },
+        "earth_angular_speed_rad_s": { "type": "number", "minimum": 0, "default": 7.2921159e-5 },
+        "earth_radius_m": { "type": "number", "exclusiveMinimum": 0, "default": 6371000 }
+      },
+      "if": { "properties": { "coriolis_mode": { "const": "prescribed" } } },
+      "then": { "required": ["coriolis_parameter_s"] }
+    },
+    "pressure_gradient_boundary": { "enum": ["one_sided", "periodic"], "default": "one_sided" },
+    "pressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["pressure_pa"] },
+        { "required": ["pressure_systems"] }
+      ],
+      "properties": {
+        "pressure_pa": {
+          "type": "array",
+          "items": { "type": "number", "exclusiveMinimum": 0 },
+          "description": "Row-major nx * ny cell-center pressures in pascals."
+        },
+        "pressure_systems": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["background_pressure_pa", "centers"],
+          "properties": {
+            "background_pressure_pa": { "type": "number", "exclusiveMinimum": 0 },
+            "centers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "east_m", "north_m", "pressure_anomaly_pa", "radius_m"],
+                "properties": {
+                  "kind": { "enum": ["high", "low"] },
+                  "east_m": { "type": "number" },
+                  "north_m": { "type": "number" },
+                  "pressure_anomaly_pa": {
+                    "type": "number",
+                    "description": "Positive for high, negative for low. Added as anomaly * exp(-(r / radius_m)^2)."
+                  },
+                  "radius_m": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "initial_wind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["elapsed_seconds", "wind_east_m_s", "wind_north_m_s"],
+      "properties": {
+        "elapsed_seconds": { "type": "number", "minimum": 0 },
+        "wind_east_m_s": { "type": "array", "items": { "type": "number" } },
+        "wind_north_m_s": { "type": "array", "items": { "type": "number" } }
+      },
+      "description": "Optional; the run starts from rest at elapsed 0 when omitted."
+    },
+    "snapshot_every_steps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional; emit a wind snapshot after every N steps. Must not exceed steps."
+    }
+  }
+}

@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/cloud-formation-v1.json",
+  "title": "TerraFlux cloud formation v1 (clouds block of a coupled timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "config",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.cloud_formation/v1"
+    },
+    "method": {
+      "const": "frontal_convergence_overrunning_heated_parcel_convection"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ],
+      "description": "engine_output from terraflux-run-coupled-wind; synthetic for hand-built mocks in the same format."
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frontal_gradient_threshold_k_m",
+        "advection_threshold_k_s",
+        "boundary_layer_depth_m",
+        "lifting_time_scale_s",
+        "mixed_layer_growth_m_per_k",
+        "warm_front_slope",
+        "cold_front_slope",
+        "warm_front_reach_m",
+        "cold_front_reach_m",
+        "frontal_band_width_m",
+        "cin_trigger_j_kg",
+        "cape_threshold_j_kg",
+        "max_cloud_top_m",
+        "surface_heating"
+      ],
+      "properties": {
+        "frontal_gradient_threshold_k_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "|grad T| at or above this marks a frontal zone (K/m; 2e-5 = 2 K per 100 km)."
+        },
+        "advection_threshold_k_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "|\u2212V\u00b7grad T| above this classifies cold (negative) or warm (positive) fronts; otherwise stationary."
+        },
+        "boundary_layer_depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "H in the convergence lifting w = \u2212H div V; also the base of the thermal mixed layer."
+        },
+        "lifting_time_scale_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Lifting depth = w \u00d7 time scale."
+        },
+        "mixed_layer_growth_m_per_k": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Mixed-layer top reached by thermals = H + growth \u00d7 surface heating."
+        },
+        "warm_front_slope": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rise per horizontal distance of the warm-front surface (e.g. 1/200)."
+        },
+        "cold_front_slope": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Rise per horizontal distance of the cold-front surface (e.g. 1/75); must be at least the warm slope."
+        },
+        "warm_front_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Horizontal reach of overrunning cloud on the cold side of a warm front."
+        },
+        "cold_front_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Horizontal reach of overrunning cloud behind a cold front."
+        },
+        "frontal_band_width_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Warm-side distance within which lifting counts as frontal."
+        },
+        "cin_trigger_j_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Convection is released freely when the heated parcel's CIN is at or below this."
+        },
+        "cape_threshold_j_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum CAPE for convective cloud."
+        },
+        "max_cloud_top_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cloud tops are capped here."
+        },
+        "surface_heating": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "amplitude_k",
+            "phase_seconds"
+          ],
+          "properties": {
+            "amplitude_k": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Diurnal surface heating amplitude applied to the lifted surface parcel: heating(t) = amplitude \u00d7 max(0, sin(2\u03c0 (t \u2212 phase) / 86400))."
+            },
+            "phase_seconds": {
+              "type": "number",
+              "default": 0,
+              "description": "Elapsed time at which heating starts rising (sunrise); negative values start before the run."
+            }
+          }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "elapsed_seconds",
+          "surface_heating_k",
+          "cloud_type",
+          "mechanism",
+          "trigger",
+          "base_m",
+          "top_m",
+          "cloud_fraction",
+          "thunderstorm",
+          "lifting_depth_m",
+          "heated_cape_j_kg",
+          "heated_cin_j_kg",
+          "front_type",
+          "temperature_gradient_k_m",
+          "temperature_advection_k_s",
+          "divergence_s",
+          "distance_to_front_m",
+          "side",
+          "cloudy_cells",
+          "thunderstorm_cells",
+          "front_cells"
+        ],
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Equals the matching timeline frame's elapsed_seconds."
+          },
+          "surface_heating_k": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Diurnal heating applied to the surface parcel in this frame."
+          },
+          "cloud_type": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "cumulus",
+                "towering_cumulus",
+                "cumulonimbus",
+                "stratocumulus",
+                "stratus",
+                "nimbostratus",
+                "altocumulus",
+                "altostratus",
+                "cirrus",
+                "cirrostratus"
+              ]
+            },
+            "description": "Rule-of-thumb cloud genus per cell."
+          },
+          "mechanism": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "convective",
+                "frontal",
+                "frontal_convective"
+              ]
+            },
+            "description": "Lifting mechanism: convective (surface heating / thermals), frontal (convergence lifting or overrunning), frontal_convective (convection released inside a frontal band)."
+          },
+          "trigger": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "free",
+                "thermals",
+                "frontal",
+                "convergence",
+                "overrunning"
+              ]
+            },
+            "description": "What released the cloud: free (CIN below trigger), thermals (mixed layer reaches the LCL), frontal (frontal lifting), convergence (non-frontal lifting reaching the LFC), overrunning (warm air over a frontal wedge)."
+          },
+          "base_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "description": "Cloud base above the surface; null when clear."
+          },
+          "top_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "description": "Cloud top above the surface; null when clear."
+          },
+          "cloud_fraction": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "thunderstorm": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "True exactly for cumulonimbus cells."
+          },
+          "lifting_depth_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "heated_cape_j_kg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "heated_cin_j_kg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "front_type": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "cold",
+                "warm",
+                "stationary"
+              ]
+            },
+            "description": "Frontal zone classification by temperature advection."
+          },
+          "temperature_gradient_k_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "temperature_advection_k_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "\u2212V\u00b7grad T; negative = cold advection."
+          },
+          "divergence_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "du/dx + dv/dy; negative = convergence (lifting)."
+          },
+          "distance_to_front_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "description": "Distance to the nearest frontal cell; null when the domain has no front."
+          },
+          "side": {
+            "type": "array",
+            "items": {
+              "enum": [
+                -1,
+                0,
+                1
+              ]
+            },
+            "description": "+1 warm side, \u22121 cold side, 0 on a front or no front."
+          },
+          "cloudy_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "thunderstorm_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "front_cells": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "description": "Carried as coupled_atmosphere.clouds in a terraflux.weather.timeline/v1 document, one entry per timeline frame. All cell arrays are row-major nx \u00d7 ny. Cloud types, mechanisms and triggers are rule-of-thumb diagnostics of fronts (temperature gradient, advection, convergence lifting, overrunning) and of the heated surface parcel's convection; they are not observations or a forecast."
+}

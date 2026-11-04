@@ -3,8 +3,8 @@ project(terraflux_physics LANGUAGES CXX)
 
 include(CTest)
 
-find_package(PNG 1.6.59 REQUIRED)
-find_package(nlohmann_json 3.12.0 REQUIRED)
+find_package(PNG 1.6 REQUIRED)
+find_package(nlohmann_json 3.10.05 REQUIRED)
 
 add_library(terraflux_weather_map
     src/weather/map_sidecar.cpp
@@ -14,6 +14,18 @@ add_library(terraflux_weather_map
     src/weather/weather_observation_json.cpp
     src/weather/transport_model_contract.cpp
     src/weather/dry_scalar_transport.cpp
+    src/weather/pressure_wind_contract.cpp
+    src/weather/pressure_wind.cpp
+    src/weather/moist_air.cpp
+    src/weather/coupled_wind_contract.cpp
+    src/weather/coupled_wind.cpp
+    src/weather/atmospheric_column.cpp
+    src/weather/cloud_formation.cpp
+    src/weather/precipitation_outcomes.cpp
+    src/weather/storm_systems.cpp
+    src/weather/severe_convection.cpp
+    src/weather/synthetic_terrain.cpp
+    src/weather/catchment_hydrology.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -52,6 +64,26 @@ target_link_libraries(terraflux-decode-temperature-map
 
 add_executable(terraflux-run-temperature-map src/weather/run_temperature_map.cpp)
 target_link_libraries(terraflux-run-temperature-map
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-pressure-wind src/weather/run_pressure_wind.cpp)
+target_link_libraries(terraflux-run-pressure-wind
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-coupled-wind src/weather/run_coupled_wind.cpp)
+target_link_libraries(terraflux-run-coupled-wind
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-atmospheric-column src/weather/run_atmospheric_column.cpp)
+target_link_libraries(terraflux-run-atmospheric-column
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-catchment-hydrology src/weather/run_catchment_hydrology.cpp)
+target_link_libraries(terraflux-run-catchment-hydrology
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -114,6 +146,50 @@ if(BUILD_TESTING)
     add_executable(terraflux-precipitation-grid-test tests/weather/precipitation_grid_test.cpp)
     target_link_libraries(terraflux-precipitation-grid-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.precipitation_grid COMMAND terraflux-precipitation-grid-test)
+    add_executable(terraflux-pressure-wind-test tests/weather/pressure_wind_test.cpp)
+    target_link_libraries(terraflux-pressure-wind-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.pressure_wind COMMAND terraflux-pressure-wind-test)
+    add_test(NAME weather.pressure_wind_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/pressure_wind_check.py $<TARGET_FILE:terraflux-run-pressure-wind>)
+    add_executable(terraflux-moist-air-test tests/weather/moist_air_test.cpp)
+    target_link_libraries(terraflux-moist-air-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.moist_air COMMAND terraflux-moist-air-test)
+    add_executable(terraflux-coupled-wind-test tests/weather/coupled_wind_test.cpp)
+    target_link_libraries(terraflux-coupled-wind-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.coupled_wind COMMAND terraflux-coupled-wind-test)
+    add_test(NAME weather.coupled_wind_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/coupled_wind_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-atmospheric-column-test tests/weather/atmospheric_column_test.cpp)
+    target_link_libraries(terraflux-atmospheric-column-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.atmospheric_column COMMAND terraflux-atmospheric-column-test)
+    add_test(NAME weather.atmospheric_column_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/column_check.py $<TARGET_FILE:terraflux-run-atmospheric-column>)
+    add_executable(terraflux-cloud-formation-test tests/weather/cloud_formation_test.cpp)
+    target_link_libraries(terraflux-cloud-formation-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.cloud_formation COMMAND terraflux-cloud-formation-test)
+    add_test(NAME weather.cloud_formation_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/cloud_formation_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-precipitation-outcomes-test tests/weather/precipitation_outcomes_test.cpp)
+    target_link_libraries(terraflux-precipitation-outcomes-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.precipitation_outcomes COMMAND terraflux-precipitation-outcomes-test)
+    add_executable(terraflux-storm-systems-test tests/weather/storm_systems_test.cpp)
+    target_link_libraries(terraflux-storm-systems-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.storm_systems COMMAND terraflux-storm-systems-test)
+    add_executable(terraflux-severe-convection-test tests/weather/severe_convection_test.cpp)
+    target_link_libraries(terraflux-severe-convection-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.severe_convection COMMAND terraflux-severe-convection-test)
+    add_test(NAME weather.storm_systems_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/storm_systems_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-orography-test tests/weather/orography_test.cpp)
+    target_link_libraries(terraflux-orography-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.orography COMMAND terraflux-orography-test)
+    add_test(NAME weather.orography_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/orography_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_executable(terraflux-catchment-hydrology-test tests/weather/catchment_hydrology_test.cpp)
+    target_link_libraries(terraflux-catchment-hydrology-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.catchment_hydrology COMMAND terraflux-catchment-hydrology-test)
+    add_test(NAME weather.catchment_hydrology_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/catchment_hydrology_check.py $<TARGET_FILE:terraflux-run-catchment-hydrology>)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -145,10 +221,24 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-decode-radar-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-decode-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-temperature-map PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-pressure-wind PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-coupled-wind PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-atmospheric-column PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-catchment-hydrology PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
         target_compile_options(terraflux-weather-transport-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-pressure-wind-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-moist-air-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-coupled-wind-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-atmospheric-column-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-cloud-formation-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-precipitation-outcomes-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-storm-systems-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-severe-convection-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-orography-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-catchment-hydrology-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/orography-v1.json",
+  "title": "TerraFlux orography v1 (orography block of a coupled timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "config",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.orography/v1"
+    },
+    "method": {
+      "const": "terrain_following_adiabats_froude_blocking_valley_pooling"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "blocking_time_scale_s",
+        "obstacle_radius_m",
+        "influence_radius_m",
+        "brunt_vaisala_s",
+        "boundary_layer_depth_m",
+        "daytime_heating_k_per_s",
+        "nocturnal_cooling_k_per_s",
+        "diurnal_phase_seconds",
+        "valley_pooling_per_km",
+        "initial_lapse_rate_k_m",
+        "terrain"
+      ],
+      "properties": {
+        "blocking_time_scale_s": {
+          "type": "number",
+          "description": "Time scale over which the blocked up-slope wind component is removed; at least one timestep.",
+          "default": 1800.0
+        },
+        "obstacle_radius_m": {
+          "type": "number",
+          "description": "How far ahead (downwind) the air sees the terrain it must climb for the Froude number.",
+          "default": 200000.0
+        },
+        "influence_radius_m": {
+          "type": "number",
+          "description": "Neighbourhood for the valley depth and the cold-pool reference temperature.",
+          "default": 100000.0
+        },
+        "brunt_vaisala_s": {
+          "type": "number",
+          "description": "Ambient stability frequency N for Fr = U_n / (N dh).",
+          "default": 0.01
+        },
+        "boundary_layer_depth_m": {
+          "type": "number",
+          "description": "Layer mass (rho H) converting condensed vapour into orographic precipitation.",
+          "default": 1500.0
+        },
+        "daytime_heating_k_per_s": {
+          "type": "number",
+          "description": "Peak daytime surface heating rate of the sine cycle.",
+          "default": 0.0
+        },
+        "nocturnal_cooling_k_per_s": {
+          "type": "number",
+          "description": "Peak nocturnal cooling rate; enhanced in valleys by valley_pooling_per_km.",
+          "default": 0.0
+        },
+        "diurnal_phase_seconds": {
+          "type": "number",
+          "description": "Elapsed time at sunrise.",
+          "default": 0.0
+        },
+        "valley_pooling_per_km": {
+          "type": "number",
+          "description": "Heating/cooling enhancement per kilometre of valley depth.",
+          "default": 1.0
+        },
+        "initial_lapse_rate_k_m": {
+          "type": "number",
+          "description": "Lapse rate applied to the initial temperature with elevation (mountain tops start colder).",
+          "default": 0.0065
+        },
+        "terrain": {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "prescribed_cell_values",
+                "synthetic_ridges_and_basins"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "elapsed_seconds",
+          "upslope_lifting_m_s",
+          "obstacle_height_m",
+          "froude_number",
+          "blocked_fraction",
+          "valley_depth_m",
+          "cross_barrier_wind_m_s",
+          "along_barrier_wind_m_s",
+          "ridge_orientation_deg",
+          "surface_pressure_pa",
+          "cold_pool_k",
+          "cold_pool",
+          "foehn",
+          "foehn_warming_k",
+          "orographic_precipitation_mm",
+          "orographic_precipitation_rate_mm_h",
+          "cumulative_orographic_precipitation_mm",
+          "cold_pool_cells",
+          "foehn_cells",
+          "surface_tendency_k_s"
+        ],
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "upslope_lifting_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "w = V . grad h; positive up-slope (cooling, condensation), negative descent (dry warming)."
+          },
+          "obstacle_height_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "froude_number": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "description": "U_n / (N dh); null where no obstacle lies ahead."
+          },
+          "blocked_fraction": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "clamp(1 - Fr) weighted by the angle of attack."
+          },
+          "valley_depth_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "cross_barrier_wind_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "along_barrier_wind_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ridge_orientation_deg": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "exclusiveMaximum": 180
+            },
+            "description": "Local contour direction from north: 0 = north-south, 90 = east-west; null on flat cells."
+          },
+          "surface_pressure_pa": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "cold_pool_k": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Temperature deficit versus the neighbourhood reduced to the cell height (6.5 K/km)."
+          },
+          "cold_pool": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "Deficit >= 1 K in a valley >= 100 m deep."
+          },
+          "foehn": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "Descending flow, warm anomaly > 1 K, relative humidity < 0.5."
+          },
+          "foehn_warming_k": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "orographic_precipitation_mm": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Condensed in up-slope flow during the interval."
+          },
+          "orographic_precipitation_rate_mm_h": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "cumulative_orographic_precipitation_mm": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "cold_pool_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "foehn_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "surface_tendency_k_s": {
+            "type": "number",
+            "description": "Diurnal surface heating (+) or cooling (-) at the frame time."
+          }
+        }
+      }
+    }
+  },
+  "description": "Per-cell mountain effects for every frame. The timeline carries the elevation itself as the top-level terrain block (terraflux.terrain.grid/v1). Parametrised single-layer orography: terrain-following adiabats, Froude blocking with angle of attack, diurnal valley pooling; not a mountain-wave model."
+}

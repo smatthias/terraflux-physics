@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/column-profile-v1.json",
+  "title": "TerraFlux atmospheric column profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model",
+    "surface",
+    "config",
+    "initial_layers",
+    "adjusted_layers",
+    "convective_adjustment",
+    "surface_parcel"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.column-profile/v1"
+    },
+    "model": {
+      "const": "hydrostatic_layers_convective_adjustment_surface_parcel_v1"
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pressure_pa",
+        "air_temperature_k",
+        "specific_humidity_kg_kg"
+      ],
+      "properties": {
+        "pressure_pa": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "air_temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "specific_humidity_kg_kg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_count",
+        "layer_thickness_m",
+        "environment_lapse_rate_k_m",
+        "tropopause_height_m",
+        "humidity_scale_height_m",
+        "parcel_step_m"
+      ],
+      "properties": {
+        "layer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "layer_thickness_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "environment_lapse_rate_k_m": {
+          "type": "number",
+          "minimum": -0.05,
+          "maximum": 0.05,
+          "description": "Environment T(z) = T_surface - lapse * min(z, tropopause); positive values cool with height."
+        },
+        "tropopause_height_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 11000
+        },
+        "humidity_scale_height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "q(z) = q_surface exp(-z / scale height)."
+        },
+        "parcel_step_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 50,
+          "description": "Vertical step of the parcel ascent; at most the layer thickness."
+        }
+      },
+      "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
+    },
+    "initial_layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interface_height_m",
+        "interface_pressure_pa",
+        "height_m",
+        "pressure_pa",
+        "air_temperature_k",
+        "specific_humidity_kg_kg",
+        "cloud_water_kg_kg",
+        "air_density_kg_m3",
+        "potential_temperature_k",
+        "relative_humidity_fraction",
+        "layer_mass_kg_m2"
+      ],
+      "properties": {
+        "interface_height_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "interface_pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "height_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "air_temperature_k": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "specific_humidity_kg_kg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 1
+          }
+        },
+        "cloud_water_kg_kg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "air_density_kg_m3": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "potential_temperature_k": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "relative_humidity_fraction": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "layer_mass_kg_m2": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "adjusted_layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interface_height_m",
+        "interface_pressure_pa",
+        "height_m",
+        "pressure_pa",
+        "air_temperature_k",
+        "specific_humidity_kg_kg",
+        "cloud_water_kg_kg",
+        "air_density_kg_m3",
+        "potential_temperature_k",
+        "relative_humidity_fraction",
+        "layer_mass_kg_m2"
+      ],
+      "properties": {
+        "interface_height_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "interface_pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "height_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "air_temperature_k": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "specific_humidity_kg_kg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 1
+          }
+        },
+        "cloud_water_kg_kg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "air_density_kg_m3": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "potential_temperature_k": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "relative_humidity_fraction": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "layer_mass_kg_m2": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "convective_adjustment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dry_mixing_events",
+        "condensing_layers",
+        "condensed_water_kg_m2",
+        "latent_heating_j_m2",
+        "iterations"
+      ],
+      "properties": {
+        "dry_mixing_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "condensing_layers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "condensed_water_kg_m2": {
+          "type": "number"
+        },
+        "latent_heating_j_m2": {
+          "type": "number"
+        },
+        "iterations": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "surface_parcel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "height_m",
+        "pressure_pa",
+        "temperature_k",
+        "specific_humidity_kg_kg",
+        "condensed_water_kg_kg",
+        "environment_temperature_k",
+        "buoyancy_m_s2",
+        "lcl_height_m",
+        "lfc_height_m",
+        "equilibrium_level_m",
+        "cape_j_kg",
+        "cin_j_kg",
+        "convective_potential"
+      ],
+      "properties": {
+        "height_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "temperature_k": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "specific_humidity_kg_kg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "condensed_water_kg_kg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "environment_temperature_k": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "buoyancy_m_s2": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "lcl_height_m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lfc_height_m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "equilibrium_level_m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cape_j_kg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cin_j_kg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "convective_potential": {
+          "enum": [
+            "none",
+            "weak",
+            "moderate",
+            "strong"
+          ]
+        }
+      }
+    }
+  },
+  "description": "Layers are indexed from the surface upward with values at layer midpoints; initial_layers is the hydrostatic environment built from the surface state, adjusted_layers the same column after dry convective adjustment and saturation adjustment. The surface parcel is the lowest layer lifted dry-adiabatically to its LCL and pseudo-adiabatically above it; buoyancy uses virtual temperature without condensate loading."
+}

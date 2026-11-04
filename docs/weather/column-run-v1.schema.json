@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/column-run-v1.json",
+  "title": "TerraFlux atmospheric column run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "surface",
+    "column"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.column-run/v1"
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pressure_pa",
+        "air_temperature_k",
+        "specific_humidity_kg_kg"
+      ],
+      "properties": {
+        "pressure_pa": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "air_temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "specific_humidity_kg_kg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_count",
+        "layer_thickness_m",
+        "environment_lapse_rate_k_m",
+        "humidity_scale_height_m"
+      ],
+      "properties": {
+        "layer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "layer_thickness_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "environment_lapse_rate_k_m": {
+          "type": "number",
+          "minimum": -0.05,
+          "maximum": 0.05,
+          "description": "Environment T(z) = T_surface - lapse * min(z, tropopause); positive values cool with height."
+        },
+        "tropopause_height_m": {
+          "type": "number",
+          "minimum": 0,
+          "default": 11000
+        },
+        "humidity_scale_height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "q(z) = q_surface exp(-z / scale height)."
+        },
+        "parcel_step_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 50,
+          "description": "Vertical step of the parcel ascent; at most the layer thickness."
+        }
+      },
+      "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
+    }
+  }
+}

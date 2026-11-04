@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/severe-convection-v1.json",
+  "title": "TerraFlux severe convection v1 (severe block of a coupled timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "config",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.severe_convection/v1"
+    },
+    "method": {
+      "const": "capping_inversion_ekman_shear_bunkers_stp"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deep_shear_depth_m",
+        "bunkers_deviation_m_s",
+        "geostrophic_air_density_kg_m3",
+        "stp_low",
+        "stp_moderate",
+        "stp_significant"
+      ],
+      "properties": {
+        "deep_shear_depth_m": {
+          "type": "number",
+          "description": "Depth of the thermal-wind contribution to the deep shear"
+        },
+        "bunkers_deviation_m_s": {
+          "type": "number",
+          "description": "Bunkers storm-motion deviation from the mean wind"
+        },
+        "geostrophic_air_density_kg_m3": {
+          "type": "number",
+          "description": "Density for the geostrophic wind aloft"
+        },
+        "stp_low": {
+          "type": "number",
+          "description": "STP class boundary none/low"
+        },
+        "stp_moderate": {
+          "type": "number",
+          "description": "STP class boundary low/moderate"
+        },
+        "stp_significant": {
+          "type": "number",
+          "description": "STP class boundary moderate/significant"
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "elapsed_seconds",
+          "low_level_shear_m_s",
+          "deep_shear_m_s",
+          "storm_motion_east_m_s",
+          "storm_motion_north_m_s",
+          "helicity_m2_s2",
+          "significant_tornado_parameter",
+          "heated_cape_j_kg",
+          "heated_cin_j_kg",
+          "cap_strength_j_kg",
+          "lcl_height_m",
+          "capped",
+          "cap_broken",
+          "tornado_risk",
+          "tornado_possible",
+          "capped_cells",
+          "cap_broken_cells",
+          "tornado_possible_cells",
+          "max_stp"
+        ],
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "low_level_shear_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "deep_shear_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "storm_motion_east_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "storm_motion_north_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "helicity_m2_s2": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Signed 0-1 km storm-relative helicity; positive for veering (NH), negative for the SH mirror."
+          },
+          "significant_tornado_parameter": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "heated_cape_j_kg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "heated_cin_j_kg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "cap_strength_j_kg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Ambient (unheated) convective inhibition."
+          },
+          "lcl_height_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "capped": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "CAPE available but ambient CIN above the trigger."
+          },
+          "cap_broken": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "Capped, and heating lowers CIN to the trigger: explosive release."
+          },
+          "tornado_risk": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "low",
+                "moderate",
+                "significant"
+              ]
+            }
+          },
+          "tornado_possible": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "Risk at least moderate and a cumulonimbus present."
+          },
+          "capped_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cap_broken_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tornado_possible_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_stp": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "description": "Supercell / tornado potential per cell: Ekman low-level shear (geostrophic minus surface wind), deep shear with the thermal wind, Bunkers storm motion, storm-relative helicity, the Significant Tornado Parameter with its class, and the capping-inversion state (capped, cap broken). Rule-of-thumb diagnostics."
+}
