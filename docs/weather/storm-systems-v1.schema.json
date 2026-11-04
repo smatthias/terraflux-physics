@@ -1,0 +1,483 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/storm-systems-v1.json",
+  "title": "TerraFlux storm systems v1 (storms block of a coupled timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "config",
+    "events",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.storm_systems/v1"
+    },
+    "method": {
+      "const": "mpi_gpi_rankine_fujiwhara_holland_kaplan_demaria"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "holland_b",
+        "decay_alpha_per_s",
+        "seeds"
+      ],
+      "properties": {
+        "enthalpy_exchange_ratio": {
+          "type": "number",
+          "description": "C_k/C_D in the potential intensity",
+          "default": 0.9
+        },
+        "surface_wind_factor": {
+          "type": "number",
+          "description": "Gradient-to-surface wind reduction",
+          "default": 0.8
+        },
+        "sst_threshold_k": {
+          "type": "number",
+          "description": "SST below which no potential intensity exists (26.5 C)",
+          "default": 299.65
+        },
+        "minimum_coriolis_s": {
+          "type": "number",
+          "description": "Smallest |f| allowing storms (~10 degrees latitude)",
+          "default": 2.5e-05
+        },
+        "mid_level_height_m": {
+          "type": "number",
+          "description": "Height of the mid-level humidity used by the GPI",
+          "default": 4000.0
+        },
+        "shear_layer_depth_m": {
+          "type": "number",
+          "description": "Depth of the thermal-wind shear estimate",
+          "default": 10000.0
+        },
+        "shear_limit_m_s": {
+          "type": "number",
+          "description": "Shear at which the potential intensity vanishes",
+          "default": 20.0
+        },
+        "genesis_gpi_threshold": {
+          "type": "number",
+          "description": "GPI at or above which a storm is seeded",
+          "default": 8.0
+        },
+        "genesis_separation_m": {
+          "type": "number",
+          "description": "No genesis within this distance of an existing storm",
+          "default": 600000.0
+        },
+        "genesis_max_wind_m_s": {
+          "type": "number",
+          "description": "Wind of a newly formed storm",
+          "default": 17.0
+        },
+        "intensification_time_scale_s": {
+          "type": "number",
+          "description": "Relaxation time toward the potential intensity",
+          "default": 86400.0
+        },
+        "decay_alpha_per_s": {
+          "type": "number",
+          "description": "Kaplan-DeMaria decay rate (0.095 1/h)",
+          "default": 2.638888888888889e-05
+        },
+        "decay_background_wind_m_s": {
+          "type": "number",
+          "description": "Kaplan-DeMaria background wind",
+          "default": 13.75
+        },
+        "landfall_reduction": {
+          "type": "number",
+          "description": "Wind reduction factor at landfall",
+          "default": 0.9
+        },
+        "dissipation_wind_m_s": {
+          "type": "number",
+          "description": "Storms below this wind are removed",
+          "default": 10.0
+        },
+        "holland_b": {
+          "type": "number",
+          "description": "Holland pressure profile parameter",
+          "default": 1.3
+        },
+        "steering_radius_m": {
+          "type": "number",
+          "description": "Radius of the steering-flow average",
+          "default": 300000.0
+        },
+        "steering_factor": {
+          "type": "number",
+          "description": "Fraction of the steering flow applied",
+          "default": 1.0
+        },
+        "beta_drift_west_m_s": {
+          "type": "number",
+          "description": "Westward beta drift",
+          "default": 1.0
+        },
+        "beta_drift_poleward_m_s": {
+          "type": "number",
+          "description": "Poleward beta drift",
+          "default": 1.5
+        },
+        "merge_distance_m": {
+          "type": "number",
+          "description": "Storms merge when closer than this plus both radii of maximum wind",
+          "default": 100000.0
+        },
+        "induction_factor": {
+          "type": "number",
+          "description": "Fraction of another storm's Rankine wind steering a storm (Fujiwhara)",
+          "default": 0.4
+        },
+        "genesis_edge_margin_m": {
+          "type": "number",
+          "description": "No genesis this close to the domain edge",
+          "default": 100000.0
+        },
+        "surge_wind_coefficient_s2_m": {
+          "type": "number",
+          "description": "Wind-setup surge coefficient",
+          "default": 0.0015
+        },
+        "rain_core_factor_mm_h_per_m_s": {
+          "type": "number",
+          "description": "Core rain rate per m/s of maximum wind",
+          "default": 0.4
+        },
+        "substep_seconds": {
+          "type": "number",
+          "description": "Storm sub-step",
+          "default": 600.0
+        },
+        "max_storms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seeds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "east_m",
+              "north_m",
+              "max_wind_m_s",
+              "radius_max_wind_m"
+            ],
+            "properties": {
+              "east_m": {
+                "type": "number"
+              },
+              "north_m": {
+                "type": "number"
+              },
+              "max_wind_m_s": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "radius_max_wind_m": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 40000
+              }
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "elapsed_seconds",
+          "storm_id",
+          "other_id",
+          "east_m",
+          "north_m",
+          "max_wind_m_s",
+          "category",
+          "surge_m"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "seed",
+              "genesis",
+              "landfall",
+              "merger",
+              "dissipation",
+              "exit"
+            ]
+          },
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "storm_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "other_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Absorbed storm for mergers, else 0."
+          },
+          "east_m": {
+            "type": "number"
+          },
+          "north_m": {
+            "type": "number"
+          },
+          "max_wind_m_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "category": {
+            "enum": [
+              "depression",
+              "tropical_storm",
+              "category_1",
+              "category_2",
+              "category_3",
+              "category_4",
+              "category_5"
+            ]
+          },
+          "surge_m": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Surge estimate at landfall, else 0."
+          }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "elapsed_seconds",
+          "storms",
+          "potential_intensity_m_s",
+          "genesis_potential_index",
+          "vertical_shear_m_s",
+          "relative_vorticity_s",
+          "mid_level_relative_humidity",
+          "outflow_temperature_k",
+          "enthalpy_disequilibrium_j_kg",
+          "storm_wind_speed_m_s",
+          "storm_pressure_anomaly_pa",
+          "storm_rain_rate_mm_h",
+          "storm_surge_m",
+          "storm_count"
+        ],
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "storms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "east_m",
+                "north_m",
+                "max_wind_m_s",
+                "radius_max_wind_m",
+                "central_pressure_pa",
+                "environment_pressure_pa",
+                "category",
+                "over_land",
+                "age_seconds",
+                "time_over_land_seconds",
+                "potential_intensity_m_s",
+                "surge_estimate_m",
+                "core_rain_rate_mm_h",
+                "track"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "east_m": {
+                  "type": "number"
+                },
+                "north_m": {
+                  "type": "number"
+                },
+                "max_wind_m_s": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "radius_max_wind_m": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "central_pressure_pa": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "environment_pressure_pa": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "category": {
+                  "enum": [
+                    "depression",
+                    "tropical_storm",
+                    "category_1",
+                    "category_2",
+                    "category_3",
+                    "category_4",
+                    "category_5"
+                  ],
+                  "description": "Saffir-Simpson class of the maximum wind: depression < 17, tropical storm < 33, then 33/43/50/58/70 m/s."
+                },
+                "over_land": {
+                  "type": "boolean"
+                },
+                "age_seconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "time_over_land_seconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "potential_intensity_m_s": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "surge_estimate_m": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "core_rain_rate_mm_h": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "track": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "description": "Centre positions [east_m, north_m] recorded at every sub-step."
+                }
+              }
+            }
+          },
+          "potential_intensity_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "genesis_potential_index": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "vertical_shear_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "relative_vorticity_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "mid_level_relative_humidity": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "outflow_temperature_k": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "enthalpy_disequilibrium_j_kg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "storm_wind_speed_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "storm_pressure_anomaly_pa": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "maximum": 0
+            }
+          },
+          "storm_rain_rate_mm_h": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "storm_surge_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "storm_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "description": "Tropical cyclones as tracked objects per frame plus their genesis environment (potential intensity, genesis potential index, shear, vorticity, mid-level humidity, outflow temperature, enthalpy disequilibrium) and per-cell storm fields (Rankine wind envelope, Holland pressure anomaly, rain rate, coastal surge). Events list every seed, genesis, landfall, merger, dissipation and domain exit with time, place, intensity and category. Parametrised diagnostics on the single-layer state; not a forecast."
+}

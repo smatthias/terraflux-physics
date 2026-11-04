@@ -1,0 +1,12 @@
+TerraFlux Physics - synthetic-input handover
+
+1. Read docs/HANDOVER.md and docs/VERIFY_PIPELINE.md.
+2. Install the native prerequisites documented there.
+3. From this extracted folder run: python3 tools/verify_pipeline.py
+4. Start the viewer: cd viewer && npm run dev
+
+Inputs are synthetic. Local C++ kernels compute the physics examples; the regional weather overview is a separate analytic illustration.
+AI, behavior prediction and training are excluded. No live weather feed is connected.
+Git history, dependencies and build output are excluded. .gitignore, MIT licence, CI recipe, tests and synthetic fixtures are included.
+Source baseline: aa2082e00a8104d4749a35ca06fd163c198e9984
+Full CI passed for this source baseline before packaging. The ZIP was checked for extraction integrity and common credential patterns; this is not a comprehensive security audit.

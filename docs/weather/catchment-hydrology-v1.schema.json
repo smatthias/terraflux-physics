@@ -1,0 +1,700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/catchment-hydrology-v1.json",
+  "title": "TerraFlux catchment hydrology v1 (hydrology block of a timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "request",
+    "terrain_source",
+    "forcing_source",
+    "snapshot_every_steps",
+    "initial_storage_m3",
+    "network",
+    "frames",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.hydrology.catchment/v1"
+    },
+    "method": {
+      "const": "priority_flood_d8_kinematic_cascade_darcy_infinite_slope_stream_power"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "time",
+        "grid",
+        "domain",
+        "soil",
+        "groundwater",
+        "channels",
+        "snow",
+        "hazards"
+      ],
+      "description": "Echo of the resolved configuration (all defaults filled in)."
+    },
+    "terrain_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_ridges_and_basins"
+          ]
+        }
+      }
+    },
+    "forcing_source": {
+      "type": "object",
+      "required": [
+        "air_temperature",
+        "rainfall_events",
+        "coupled"
+      ]
+    },
+    "snapshot_every_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "initial_storage_m3": {
+      "type": "number",
+      "description": "Total stored water at frame 0 (after spin-up); stores + ET + outflow - precipitation equals it in every frame.",
+      "minimum": 0
+    },
+    "network": {
+      "type": "object",
+      "required": [
+        "downstream",
+        "flow_direction_deg",
+        "terminal",
+        "ocean",
+        "upstream_area_km2",
+        "strahler_order",
+        "channel",
+        "lake_id",
+        "basin_id",
+        "distance_to_outlet_km",
+        "slope",
+        "channel_width_m",
+        "bankfull_depth_m",
+        "regolith_depth_m",
+        "channel_target",
+        "filled_depth_m",
+        "lakes",
+        "basins"
+      ],
+      "properties": {
+        "flow_direction_code": {
+          "type": "string"
+        },
+        "downstream": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "description": "D8 receiver index; -1 = terminal (ocean cell or edge outlet)."
+        },
+        "flow_direction_deg": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer",
+                "multipleOf": 45,
+                "minimum": 0,
+                "maximum": 315
+              }
+            ]
+          },
+          "description": "0 = east, counter-clockwise."
+        },
+        "terminal": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "none",
+              "ocean",
+              "edge"
+            ]
+          }
+        },
+        "ocean": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        },
+        "upstream_area_km2": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "strahler_order": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "channel": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        },
+        "lake_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -1
+          }
+        },
+        "basin_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -1
+          }
+        },
+        "distance_to_outlet_km": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "slope": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Downstream gradient on the filled surface, floored at minimum_slope."
+        },
+        "channel_width_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "bankfull_depth_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "regolith_depth_m": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "channel_target": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "description": "Nearest channel cell at or downstream; receives the baseflow."
+        },
+        "filled_depth_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Depression filling depth (lake floor to spill level)."
+        },
+        "lakes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "cell_count",
+              "area_km2",
+              "capacity_m3",
+              "spill_elevation_m",
+              "outlet_cell",
+              "outlet_kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cell_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "area_km2": {
+                "type": "number",
+                "minimum": 0
+              },
+              "capacity_m3": {
+                "type": "number",
+                "minimum": 0
+              },
+              "spill_elevation_m": {
+                "type": "number"
+              },
+              "outlet_cell": {
+                "type": "integer",
+                "minimum": -1
+              },
+              "outlet_kind": {
+                "enum": [
+                  "land",
+                  "ocean",
+                  "edge",
+                  "none"
+                ]
+              }
+            }
+          }
+        },
+        "basins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "outlet_cell",
+              "area_km2",
+              "terminal"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "outlet_cell": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "area_km2": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "terminal": {
+                "enum": [
+                  "ocean",
+                  "edge"
+                ]
+              }
+            }
+          },
+          "description": "Sorted by area, largest first."
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "elapsed_seconds",
+          "rainfall_rate_mm_h",
+          "snow_mm",
+          "surface_water_mm",
+          "soil_saturation",
+          "water_table_depth_m",
+          "discharge_m3_s",
+          "channel_depth_m",
+          "flood_class",
+          "erosion_mm",
+          "deposition_mm",
+          "sediment_flux_kg_s",
+          "factor_of_safety",
+          "landslide",
+          "unstable",
+          "rainfall_threshold_exceeded",
+          "lake_level_m",
+          "lake_volume_m3",
+          "storage_m3",
+          "cumulative_m3",
+          "step_precipitation_m3",
+          "balance_error_m3",
+          "sediment_yield_kg",
+          "landslide_count",
+          "landslide_volume_m3",
+          "landslide_cells",
+          "unstable_cells",
+          "threshold_cells",
+          "flooded_area_km2",
+          "flood_class_cells",
+          "max_discharge_m3_s",
+          "peak_discharge_cell"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rainfall_rate_mm_h": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Forcing of the interval ending at this frame."
+          },
+          "snow_mm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Snow water equivalent."
+          },
+          "surface_water_mm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Overland and floodplain water."
+          },
+          "soil_saturation": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "water_table_depth_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Ground surface minus water-table head; 0 where the aquifer is full."
+          },
+          "discharge_m3_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Channel outflow; 0 off the network."
+          },
+          "channel_depth_m": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "flood_class": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            },
+            "description": "0 none, 1 low, 2 medium, 3 high, 4 extreme from depth x velocity."
+          },
+          "erosion_mm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Cumulative, per cell area."
+          },
+          "deposition_mm": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Cumulative, per cell area (includes landslide debris)."
+          },
+          "sediment_flux_kg_s": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "factor_of_safety": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              ]
+            },
+            "description": "Infinite-slope FS (capped at 10); null on flat, lake or ocean cells."
+          },
+          "landslide": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "unstable": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "rainfall_threshold_exceeded": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "lake_level_m": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Per lake."
+          },
+          "lake_volume_m3": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Per lake."
+          },
+          "storage_m3": {
+            "type": "object",
+            "required": [
+              "snow",
+              "surface",
+              "soil",
+              "groundwater",
+              "channels",
+              "lakes",
+              "total"
+            ],
+            "properties": {
+              "snow": {
+                "type": "number"
+              },
+              "surface": {
+                "type": "number"
+              },
+              "soil": {
+                "type": "number"
+              },
+              "groundwater": {
+                "type": "number"
+              },
+              "channels": {
+                "type": "number"
+              },
+              "lakes": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            }
+          },
+          "cumulative_m3": {
+            "type": "object",
+            "required": [
+              "precipitation",
+              "evapotranspiration",
+              "ocean_discharge",
+              "edge_outflow",
+              "infiltration",
+              "percolation",
+              "baseflow",
+              "snowmelt"
+            ],
+            "properties": {
+              "precipitation": {
+                "type": "number"
+              },
+              "evapotranspiration": {
+                "type": "number"
+              },
+              "ocean_discharge": {
+                "type": "number"
+              },
+              "edge_outflow": {
+                "type": "number"
+              },
+              "infiltration": {
+                "type": "number"
+              },
+              "percolation": {
+                "type": "number"
+              },
+              "baseflow": {
+                "type": "number"
+              },
+              "snowmelt": {
+                "type": "number"
+              }
+            }
+          },
+          "step_precipitation_m3": {
+            "type": "number",
+            "minimum": 0
+          },
+          "balance_error_m3": {
+            "type": "number",
+            "description": "stores_after - stores_before - precipitation + ET + ocean + edge for the last step."
+          },
+          "sediment_yield_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "landslide_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "landslide_volume_m3": {
+            "type": "number",
+            "minimum": 0
+          },
+          "landslide_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unstable_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "threshold_cells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "flooded_area_km2": {
+            "type": "number",
+            "minimum": 0
+          },
+          "flood_class_cells": {
+            "type": "object",
+            "required": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "extreme"
+            ],
+            "properties": {
+              "none": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "low": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "medium": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "high": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "extreme": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "max_discharge_m3_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "peak_discharge_cell": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "elapsed_seconds",
+          "cell",
+          "runout_cell",
+          "factor_of_safety",
+          "volume_m3",
+          "runout_length_m",
+          "deposited_in"
+        ],
+        "properties": {
+          "kind": {
+            "const": "landslide"
+          },
+          "elapsed_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cell": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "runout_cell": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "factor_of_safety": {
+            "type": "number",
+            "exclusiveMaximum": 1
+          },
+          "volume_m3": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "runout_length_m": {
+            "type": "number",
+            "minimum": 0
+          },
+          "deposited_in": {
+            "enum": [
+              "slope",
+              "channel",
+              "lake",
+              "ocean",
+              "edge"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

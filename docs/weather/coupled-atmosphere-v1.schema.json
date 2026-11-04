@@ -1,0 +1,537 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/coupled-atmosphere-v1.json",
+  "title": "TerraFlux coupled atmosphere timeline extension v1",
+  "description": "Carried as the coupled_atmosphere member of a terraflux.weather.timeline/v1 document whose frames are forecast/v1 snapshots written by terraflux-run-coupled-wind. Static arrays and every per-frame array are row-major nx * ny cell values; per-frame arrays have one entry per timeline frame, the first being the initial state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model",
+    "source_kind",
+    "request",
+    "pressure_source",
+    "temperature_source",
+    "humidity_source",
+    "pressure_pa",
+    "coriolis_parameter_s",
+    "specific_humidity_kg_kg_by_frame",
+    "relative_humidity_pct_by_frame",
+    "air_density_kg_m3_by_frame",
+    "supersaturated_cells_by_frame",
+    "scalar_stability_number_by_frame"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.coupled_atmosphere/v1"
+    },
+    "model": {
+      "const": "coupled_wind_moist_layer_v1"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time",
+        "grid",
+        "atmosphere",
+        "diffusion",
+        "pressure_gradient_boundary",
+        "scalar_boundary",
+        "density_mode",
+        "snapshot_every_steps"
+      ],
+      "properties": {
+        "time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_time_utc",
+            "timestep_seconds",
+            "steps"
+          ],
+          "properties": {
+            "start_time_utc": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "timestep_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nx",
+            "ny",
+            "origin_east_m",
+            "origin_north_m",
+            "spacing_east_m",
+            "spacing_north_m",
+            "geographic_anchor_longitude_deg",
+            "geographic_anchor_latitude_deg",
+            "coordinate_system",
+            "array_order"
+          ],
+          "properties": {
+            "nx": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "ny": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "origin_east_m": {
+              "type": "number"
+            },
+            "origin_north_m": {
+              "type": "number"
+            },
+            "spacing_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "spacing_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "geographic_anchor_longitude_deg": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "geographic_anchor_latitude_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "coordinate_system": {
+              "const": "local_azimuthal_equidistant_m"
+            },
+            "array_order": {
+              "const": "row_major_y_then_x"
+            }
+          }
+        },
+        "atmosphere": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "air_density_kg_m3",
+            "surface_friction_coefficient_s",
+            "coriolis_mode",
+            "coriolis_parameter_s",
+            "earth_angular_speed_rad_s",
+            "earth_radius_m"
+          ],
+          "properties": {
+            "air_density_kg_m3": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "surface_friction_coefficient_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "coriolis_mode": {
+              "enum": [
+                "none",
+                "f_plane",
+                "beta_plane",
+                "prescribed"
+              ]
+            },
+            "coriolis_parameter_s": {
+              "type": "number"
+            },
+            "earth_angular_speed_rad_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "earth_radius_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "diffusion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "temperature_m2_s",
+            "humidity_m2_s",
+            "momentum_m2_s"
+          ],
+          "properties": {
+            "temperature_m2_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "humidity_m2_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "momentum_m2_s": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Must satisfy 2 nu dt (1/dx^2 + 1/dy^2) <= 1."
+            }
+          },
+          "description": "Horizontal mixing diffusivities between the pressure systems; additional to the implicit numerical diffusion of first-order upwind transport."
+        },
+        "pressure_gradient_boundary": {
+          "enum": [
+            "one_sided",
+            "periodic"
+          ]
+        },
+        "scalar_boundary": {
+          "enum": [
+            "zero_gradient",
+            "periodic"
+          ]
+        },
+        "density_mode": {
+          "enum": [
+            "diagnosed",
+            "constant"
+          ]
+        },
+        "snapshot_every_steps": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pressure_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_gaussian_systems"
+          ]
+        }
+      }
+    },
+    "temperature_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_gaussian_anomalies"
+          ]
+        }
+      }
+    },
+    "humidity_source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prescribed_cell_values",
+            "synthetic_gaussian_anomalies"
+          ]
+        }
+      }
+    },
+    "pressure_pa": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    },
+    "coriolis_parameter_s": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "specific_humidity_kg_kg_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "relative_humidity_pct_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "air_density_kg_m3_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "supersaturated_cells_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "scalar_stability_number_by_frame": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "columns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "method",
+        "config",
+        "column_mass_kg_m2",
+        "top_pressure_pa",
+        "lcl_height_m_by_frame",
+        "lfc_height_m_by_frame",
+        "equilibrium_level_m_by_frame",
+        "cape_j_kg_by_frame",
+        "cin_j_kg_by_frame",
+        "convective_potential_by_frame",
+        "condensed_water_kg_m2_by_frame"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "terraflux.weather.column_diagnostics/v1"
+        },
+        "method": {
+          "const": "hydrostatic_layers_convective_adjustment_surface_parcel"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer_count",
+            "layer_thickness_m",
+            "environment_lapse_rate_k_m",
+            "tropopause_height_m",
+            "humidity_scale_height_m",
+            "parcel_step_m",
+            "inversion_base_m",
+            "inversion_depth_m",
+            "inversion_strength_k",
+            "lapse_rate_above_inversion_k_m"
+          ],
+          "properties": {
+            "layer_count": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "layer_thickness_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "environment_lapse_rate_k_m": {
+              "type": "number",
+              "minimum": -0.05,
+              "maximum": 0.05,
+              "description": "Environment T(z) = T_surface - lapse * min(z, tropopause); positive values cool with height."
+            },
+            "tropopause_height_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 11000
+            },
+            "humidity_scale_height_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "q(z) = q_surface exp(-z / scale height)."
+            },
+            "parcel_step_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 50,
+              "description": "Vertical step of the parcel ascent; at most the layer thickness."
+            },
+            "inversion_base_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Base of a capping temperature inversion."
+            },
+            "inversion_depth_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0
+            },
+            "inversion_strength_k": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Temperature rise through the layer; 0 disables the inversion. The environment above keeps the offset (loaded-gun profile)."
+            },
+            "lapse_rate_above_inversion_k_m": {
+              "type": "number",
+              "maximum": 0.05,
+              "default": -1,
+              "description": "Lapse rate above the inversion (elevated mixed layer); negative = same as the environment."
+            }
+          },
+          "description": "Vertical layers above each cell: hydrostatic profile from the cell's surface pressure, temperature and humidity, convective adjustment, and a lifted surface parcel."
+        },
+        "column_mass_kg_m2": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "top_pressure_pa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "lcl_height_m_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "lfc_height_m_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "equilibrium_level_m_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "cape_j_kg_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "cin_j_kg_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "convective_potential_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "weak",
+                "moderate",
+                "strong"
+              ]
+            }
+          }
+        },
+        "condensed_water_kg_m2_by_frame": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "description": "Per-cell vertical column diagnostics for every frame. Heights are metres above the cell surface; null means the level does not exist (no LCL within the column, or no positive buoyancy area). CAPE and CIN in J/kg from the surface parcel; convective_potential is a CAPE rule-of-thumb class, not a forecast."
+    },
+    "clouds": {
+      "$ref": "https://terraflux.example/schemas/weather/cloud-formation-v1.json"
+    },
+    "precipitation": {
+      "$ref": "https://terraflux.example/schemas/weather/precipitation-outcomes-v1.json"
+    },
+    "surface": {
+      "$ref": "https://terraflux.example/schemas/weather/surface-v1.json"
+    },
+    "storms": {
+      "$ref": "https://terraflux.example/schemas/weather/storm-systems-v1.json"
+    },
+    "severe": {
+      "$ref": "https://terraflux.example/schemas/weather/severe-convection-v1.json"
+    },
+    "orography": {
+      "$ref": "https://terraflux.example/schemas/weather/orography-v1.json"
+    }
+  }
+}

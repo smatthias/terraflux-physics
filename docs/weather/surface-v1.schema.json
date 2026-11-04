@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/surface-v1.json",
+  "title": "TerraFlux surface v1 (surface block of a coupled timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source",
+    "land",
+    "sea_surface_temperature_k"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.weather.surface/v1"
+    },
+    "source": {
+      "type": "object"
+    },
+    "land": {
+      "type": "array",
+      "items": {
+        "enum": [
+          0,
+          1
+        ]
+      }
+    },
+    "sea_surface_temperature_k": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    }
+  },
+  "description": "Row-major nx x ny land mask (1 land, 0 ocean) and sea-surface temperature in K with the request provenance."
+}
