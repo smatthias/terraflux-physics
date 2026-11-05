@@ -2,6 +2,7 @@ import { validateCoupledAtmosphere } from './coupledWind.js'
 import { validateHydrology } from './hydrology.js'
 import { validateOcean } from './ocean.js'
 import { validatePolar } from './polar.js'
+import { validateCoast } from './coastal.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 export function validate(input) {
@@ -162,6 +163,10 @@ export function validateSequence(input) {
   if(input.polar !== undefined){
     check(input.terrain !== undefined, 'Polar melt requires the terrain grid.')
     validatePolar(input.polar, frames, frames[0].terrain)
+  }
+  if(input.coast !== undefined){
+    check(input.terrain !== undefined, 'Coastal flooding requires the terrain grid.')
+    validateCoast(input.coast, frames, frames[0].terrain)
   }
   if(input.terrain_derivatives !== undefined){
     const d=input.terrain_derivatives, count=first.grid.nx*first.grid.ny

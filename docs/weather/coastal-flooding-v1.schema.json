@@ -1,0 +1,480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/coastal-flooding-v1.json",
+  "title": "TerraFlux coastal flooding block v1 (the `coast` block of a terraflux-run-coastal-flooding timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "request",
+    "reference_year",
+    "output_years",
+    "map_years",
+    "map_scenario",
+    "sea_cells",
+    "coast_type",
+    "defences",
+    "subsidence_mm_yr",
+    "population",
+    "region",
+    "region_names",
+    "rivers",
+    "today",
+    "design_storm",
+    "coast_source",
+    "sea_level_source",
+    "scenarios",
+    "map_frames",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.coastal.flooding/v1"
+    },
+    "method": {
+      "const": "bathtub_connectivity_attenuation_wind_setup_bruun_gumbel"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "request": {
+      "type": "object"
+    },
+    "reference_year": {
+      "type": "integer"
+    },
+    "output_years": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "map_years": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "map_scenario": {
+      "type": "string"
+    },
+    "sea_cells": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "description": "Today's sea (sorted cell indices)."
+    },
+    "coast_type": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2
+      },
+      "description": "0 rock, 1 sandy, 2 muddy."
+    },
+    "defences": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          }
+        ],
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "description": "[cell, crest elevation m] of flood defences."
+    },
+    "subsidence_mm_yr": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Land sinking (positive)."
+    },
+    "population": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "People per cell."
+    },
+    "region": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": -1
+      }
+    },
+    "region_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "cells"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Channel from the mouth upstream."
+          },
+          "discharge_m3_s": {
+            "type": "number"
+          },
+          "width_m": {
+            "type": "number"
+          },
+          "channel_depth_m": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "today": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intertidal_cells",
+        "storm_depth_m",
+        "setup_m"
+      ],
+      "properties": {
+        "intertidal_cells": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Land below today's high water reached by the sea (not counted as lost)."
+        },
+        "storm_depth_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Today's design-storm flood depth."
+        },
+        "setup_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Today's design-storm wind setup on the sea."
+        }
+      }
+    },
+    "design_storm": {
+      "type": "object",
+      "required": [
+        "return_period_years",
+        "high_tide_m",
+        "surge_m",
+        "offshore_level_m",
+        "wind_speed_m_s",
+        "wind_toward_deg",
+        "wind_stress_pa"
+      ]
+    },
+    "coast_source": {
+      "type": "object"
+    },
+    "sea_level_source": {
+      "type": "object"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "sea_level",
+          "totals",
+          "regions",
+          "rivers",
+          "islands",
+          "year_lost",
+          "year_storm_flooded"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "sea_level": {
+            "type": "object",
+            "required": [
+              "thermal_expansion_m",
+              "glaciers_m",
+              "antarctic_m",
+              "greenland_m",
+              "land_water_m",
+              "global_m",
+              "regional_m",
+              "global_warming_k"
+            ],
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "Per output year, counted from the reference year."
+            },
+            "description": "Budget per output year: components, the global mean (their sum) and the regional rise (with the fingerprints, before land motion)."
+          },
+          "totals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "series",
+                "events"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "series": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "events": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "design_flood_every_year",
+                    "lost_10pct",
+                    "defences_overtopped",
+                    "island_half_lost"
+                  ],
+                  "properties": {
+                    "design_flood_every_year": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Today's design flood comes every year (return period <= 1)."
+                    },
+                    "lost_10pct": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "A tenth of the region's land is lost."
+                    },
+                    "defences_overtopped": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The design storm reaches land below high water behind a defence."
+                    },
+                    "island_half_lost": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "An island of the region has lost half its land."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "rivers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "series"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "series": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "islands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "region",
+                "land_km2",
+                "population",
+                "highest_m",
+                "top_cell",
+                "lost_fraction"
+              ]
+            }
+          },
+          "year_lost": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer"
+              }
+            },
+            "description": "[cell, first year at least half of it is lost]."
+          },
+          "year_storm_flooded": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer"
+              }
+            },
+            "description": "[cell, first year the design storm floods it] (the reference year: already today)."
+          }
+        }
+      }
+    },
+    "map_frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "year",
+          "elapsed_seconds",
+          "regional_rise_m",
+          "lost_fraction",
+          "inundation_depth_m",
+          "storm_depth_m",
+          "erosion_retreat_m",
+          "protected_low_cells",
+          "river_salt_cells"
+        ],
+        "properties": {
+          "year": {
+            "type": "integer"
+          },
+          "elapsed_seconds": {
+            "type": "number"
+          },
+          "regional_rise_m": {
+            "type": "number"
+          },
+          "lost_fraction": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Share of each land cell lost (1 = newly under high water, partial = eroded)."
+          },
+          "inundation_depth_m": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "New permanent inundation: depth at high water."
+          },
+          "storm_depth_m": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Design-storm flood depth on land."
+          },
+          "erosion_retreat_m": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Bruun retreat of the sandy shoreline cells."
+          },
+          "protected_low_cells": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Land below high water kept dry by a defence."
+          },
+          "river_salt_cells": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Channel cells with salt above the limit."
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

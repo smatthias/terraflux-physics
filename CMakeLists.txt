@@ -31,6 +31,8 @@ add_library(terraflux_weather_map
     src/weather/sea_ice.cpp
     src/weather/overturning_box.cpp
     src/weather/marine_indicators.cpp
+    src/weather/sea_level.cpp
+    src/weather/coastal_flooding.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -94,6 +96,11 @@ target_link_libraries(terraflux-run-catchment-hydrology
 
 add_executable(terraflux-run-polar-melt src/weather/run_polar_melt.cpp)
 target_link_libraries(terraflux-run-polar-melt
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-coastal-flooding src/weather/run_coastal_flooding.cpp)
+target_link_libraries(terraflux-run-coastal-flooding
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -216,6 +223,15 @@ if(BUILD_TESTING)
     add_executable(terraflux-polar-melt-test tests/weather/polar_melt_test.cpp)
     target_link_libraries(terraflux-polar-melt-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.polar_melt COMMAND terraflux-polar-melt-test)
+    add_executable(terraflux-coastal-flooding-test tests/weather/coastal_flooding_test.cpp)
+    target_link_libraries(terraflux-coastal-flooding-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.coastal_flooding COMMAND terraflux-coastal-flooding-test)
+    add_test(NAME weather.coastal_flooding_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/coastal_flooding_check.py $<TARGET_FILE:terraflux-run-coastal-flooding>)
+    add_test(NAME weather.viewer_coastal_flooding
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --cli terraflux-run-coastal-flooding --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/coastal-flooding-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/coast/engine-timeline.json --check)
     add_test(NAME weather.polar_melt_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/polar_melt_check.py $<TARGET_FILE:terraflux-run-polar-melt>)
     add_test(NAME weather.viewer_polar_melt
@@ -277,6 +293,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-run-catchment-hydrology PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-ocean-circulation PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-polar-melt PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-coastal-flooding PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
@@ -294,6 +311,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-ocean-circulation-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-ocean-heat-rain-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-polar-melt-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-coastal-flooding-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

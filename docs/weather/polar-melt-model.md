@@ -11,6 +11,8 @@ Melting polar ice affects the ocean in two ways. It warms and freshens the surfa
 | Request / output | `terraflux.polar.melt-run/v1` ([schema](polar-melt-run-v1.schema.json)) → `polar` block `terraflux.polar.melt/v1` ([schema](polar-melt-v1.schema.json)) | `physics.sea_ice`, `ice_sheet`, `forcing.warming`, `forcing.hosing` in `terraflux.ocean.circulation-run/v1` |
 | Example | [examples/polar-melt-request.json](../../examples/polar-melt-request.json) → `viewer/public/polar/engine-timeline.json` (**🧊 Load polar melt & overturning example**, view **Polar melt**) | [examples/polar-ocean-request.json](../../examples/polar-ocean-request.json) → `viewer/public/polar-ocean/engine-timeline.json` (**❄ Load polar ocean (sea ice & hosing) example**, view **Ocean streams**) |
 
+The next step, the rising sea and what it does to coasts, is [coastal-flooding-model.md](coastal-flooding-model.md). It takes these scenarios and Greenland's melt.
+
 Kernels: `include/terraflux/weather/ice_sheet.hpp`, `sea_ice.hpp` (+ `sea_ice_physics.hpp`), `overturning_box.hpp`, `marine_indicators.hpp` and the sea-ice and glacial-water parts of `ocean_circulation.hpp`.
 
 ## 1. Components

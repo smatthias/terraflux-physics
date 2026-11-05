@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate (or check) an engine viewer fixture with a built CLI (terraflux-run-ocean-circulation by default,
-or --cli terraflux-run-polar-melt).
+or --cli terraflux-run-polar-melt / terraflux-run-coastal-flooding).
 
 The fixture is the CLI timeline written compactly with sorted keys, the format of the committed
 viewer/public/ocean*/engine-timeline.json files. --check regenerates into a temporary directory and
@@ -60,7 +60,7 @@ def main():
     parser.add_argument('--build-dir', type=Path, default=ROOT / 'build')
     parser.add_argument('--request', type=Path, default=ROOT / 'examples/ocean-heat-rain-request.json')
     parser.add_argument('--output', type=Path, default=ROOT / 'viewer/public/ocean-heat/engine-timeline.json')
-    parser.add_argument('--cli', default='terraflux-run-ocean-circulation', choices=['terraflux-run-ocean-circulation', 'terraflux-run-polar-melt'])
+    parser.add_argument('--cli', default='terraflux-run-ocean-circulation', choices=['terraflux-run-ocean-circulation', 'terraflux-run-polar-melt', 'terraflux-run-coastal-flooding'])
     parser.add_argument('--check', action='store_true', help='check that the committed fixture matches regeneration')
     args = parser.parse_args()
     cli = args.build_dir.resolve() / args.cli
@@ -75,7 +75,7 @@ def main():
         if difference:
             print(f'Fixture {args.output} differs from regeneration at {difference}. Regenerate it.', file=sys.stderr)
             return 1
-        print(f'Committed fixture {args.output.relative_to(ROOT)} matches regeneration')
+        print(f'Committed fixture {args.output.resolve()} matches regeneration')
         return 0
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(compact(document))

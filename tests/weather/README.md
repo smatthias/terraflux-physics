@@ -118,6 +118,20 @@ Related CTest cases:
 - `weather.polar_ocean_cli` runs one year of the polar ocean example with hosing and warming against a control. It checks budgets with sea-ice and glacial water, map–total identities, the hosing ramp, a weaker next-winter overturning, a glacial lens and rejections.
 - `weather.viewer_polar_melt` and `weather.viewer_polar_ocean` regenerate the two fixtures and compare them. The latter takes about 5 minutes and has the label `slow`.
 
+The coastal flooding suite (`weather.coastal_flooding`) covers:
+
+- the sea-level budget (thermal expansion against its closed form, the glacier store, Antarctica above its threshold, reference year, fingerprints);
+- Gumbel return levels and how a rise shortens return periods;
+- wind setup against the exact uniform-depth solution, deeper seas setting up less and shallow shelves more;
+- flooding with connectivity (a ridge protecting a depression), defences holding until overtopped, subsidence;
+- storm attenuation inland;
+- rivers carrying the storm far inland, tidal reach and salt intrusion growing with the rise;
+- the Bruun rule on sandy but not rocky shores;
+- islands drowning monotonically, with people and regions adding up;
+- contract rejections.
+
+`weather.coastal_flooding_cli` runs the example and a per-cell request: contract, map–total identities, AR6-range rise, expected regional behaviour and rejections. `weather.viewer_coastal_flooding` regenerates the fixture.
+
 Build and run the registered CTest case with:
 
 ~~~sh

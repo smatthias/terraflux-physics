@@ -31,6 +31,12 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `docs/weather/catchment-hydrology-model.md`, `catchment-run-v1.schema.json` and `catchment-hydrology-v1.schema.json` — where the rain goes: depression-filled D8 drainage network with lakes, basins and ocean/edge outlets, snow → surface → soil → groundwater stores with Darcy flow and baseflow, kinematic overland/channel routing with bankfull overflow, and the hazard layer (flood depth × velocity classes, stream-power erosion/deposition, infinite-slope landslides with runout, rainfall intensity–duration warnings)
 - `docs/weather/ocean-circulation-model.md`, `ocean-run-v1.schema.json` and `ocean-circulation-v1.schema.json` — rain on the sea and the coast, evaporation, the air–sea heat exchange and the layered temperature/salinity column (§7), and the ocean streams: a reduced-gravity upper layer on a β-plane (Sverdrup interior, Stommel western boundary current, separation and extension, subpolar gyre), salinity and temperature with density feedback, river exchange points with surface plumes and mixing fronts, deep-water formation and the overturning that fresh water weakens
 - `docs/weather/polar-melt-model.md`, `polar-melt-run-v1.schema.json` and `polar-melt-v1.schema.json`: melting polar ice and the Atlantic overturning. Covers a Greenland-like ice sheet (shallow-ice flow, degree-day melt with the melt–elevation feedback, ocean-driven frontal melt), thermodynamic sea ice, an Arctic column, and a two-box overturning calibrated to 17 Sv with its tipping point, hysteresis and critical slowing down. Warming scenarios from 1850 to 2300 answer when the currents collapse, with an uncertainty ensemble and ocean temperature and oxygen indicators. Sea ice, a coupled ice sheet, warming and meltwater hosing in the 2-D ocean are covered in `ocean-circulation-model.md` §8.
+- `docs/weather/coastal-flooding-model.md`, `coastal-flooding-run-v1.schema.json` and `coastal-flooding-v1.schema.json`: sea-level rise and its coastal impacts, the follow-up of the polar melt.
+  - A sea-level budget: thermal expansion with the deep-ocean lag, glaciers, Antarctica, land water, Greenland from the polar-melt run, regional fingerprints and subsidence.
+  - Land permanently lost below high water (bathtub with connectivity and defences).
+  - 100-year storm floods with wind setup over the shelf and attenuation inland.
+  - Storms pushing up rivers, salt intrusion, Bruun erosion, drowning islands.
+  - How often today's 100-year flood comes, per-region ranking and events to 2300.
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -51,6 +57,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
 - `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline, optionally with per-cell vertical column diagnostics
+- `terraflux-run-coastal-flooding`: a rising sea on a coast (land lost, storm floods, defences overtopped, rivers pushed back, salt intrusion, islands), year by year for the polar-melt scenarios; writes a viewer timeline with a `coast` block
 - `terraflux-run-polar-melt`: Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios over centuries; writes a viewer timeline with a `polar` block
 - `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
@@ -208,6 +215,29 @@ python3 tools/build_ocean_example.py --build-dir build --cli terraflux-run-polar
 ```
 
 **🧊 Load polar melt & overturning example** opens the **Polar melt** view. It shows Greenland's ice in relief (thickness, surface mass balance, melt or air temperature), the metrics of the scenario in focus, the **"When do the currents collapse?"** table with the ensemble range, scenario charts and the equilibrium diagram of the overturning. **❄ Load polar ocean (sea ice & hosing) example** opens the Ocean streams view with sea ice, the ice sheet on land and the hosing ring. It includes charts of overturning, sea ice, SMB, northern SST and oxygen, and a year-by-year table of when the overturning weakens.
+
+**Sea-level rise and the coasts.** `terraflux-run-coastal-flooding` takes the warming scenarios and Greenland's melt from the polar-melt run and turns them into a sea-level rise at the coast. The budget covers thermal expansion, glaciers and Antarctica, plus regional fingerprints and land subsidence. From that rise it maps, for every year to 2300:
+
+- which land goes permanently under the high water;
+- where the 100-year storm floods, with the wind setup over the shelf;
+- when defences are overtopped;
+- how far storms push up the rivers and salt intrudes;
+- how sandy shores retreat and low islands drown.
+
+It also ranks the regions by where it hits hardest. See [coastal-flooding-model.md](docs/weather/coastal-flooding-model.md).
+
+```sh
+./build/terraflux-run-coastal-flooding examples/coastal-flooding-request.json coast.json   # about 4 s; reads viewer/public/polar
+```
+
+**🏝 Load sea-level rise & coasts example** opens the **Sea level & coasts** view on a synthetic coast with a subsiding delta, an estuary city, barrier islands, cliffs and low islands. It shows:
+
+- land lost, storm flooding, land behind defences, defences, rivers and salt;
+- alternative land colours: the year the land is lost, flood frequency, population or subsidence;
+- the sea-level components, a "where does it hit hardest?" ranking and a "when?" event table;
+- charts over time and a rivers table.
+
+The field-layer list is folded into topic groups showing only layers with data, with a tooltip for every layer and example.
 
 **Load Atlantic streams example** opens the **Ocean streams** view: water coloured by surface salinity (or speed, temperature, thermocline depth, freshwater fraction), streams sized by transport and coloured by speed with labels, current arrows, river mouths ⊕ with discharge and plume salinity, fronts, formation sites ⇩, and time series of the overturning, the main stream and the river input — the example's meltwater pulse collapses the overturning.
 
