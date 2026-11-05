@@ -136,3 +136,46 @@ test('disk geometry, regions and colours', () => {
   assert.equal(img.pixels.length, 120 * 40 * 4)
   assert.ok(img.pixels.some((v, i) => i % 4 === 0 && v > 200), 'the wings are bright')
 })
+
+test('long term: grand minima and maxima from 1000 to the horizon, validated and summarised', async () => {
+  const { validateLongTerm, longTermWindow, yearlyPoints, longTermAt, epochBands, epochTable, dynamoExample, holoceneStrip, LONG_TERM_WINDOWS, EPOCH_COLORS } = await import('./solar.js')
+  const frames = validateSequence(fixture())
+  const lt = frames[0].solar.block.long_term
+  assert.ok(lt && lt.start_year === 1000 && lt.horizon_year === 2100)
+  assert.equal(lt.series.sunspot.length, 1101)
+  // Windows and points.
+  assert.deepEqual(longTermWindow(lt, 'maunder'), [1600, 1760])
+  assert.deepEqual(longTermWindow(lt, 'all'), [1000, 2101])
+  assert.ok(LONG_TERM_WINDOWS.every(w => longTermWindow(lt, w.key)[1] > longTermWindow(lt, w.key)[0]))
+  const pts = yearlyPoints(lt, lt.series.sunspot, [1600, 1760])
+  assert.equal(pts.length, 160)
+  assert.equal(pts[0][0], 1600.5)
+  // The Maunder Minimum: few spots, more cosmogenic isotopes, darker and (a little) colder than the Modern Maximum.
+  const mm = longTermAt(lt, 1680), modern = longTermAt(lt, 1990)
+  assert.ok(mm.sunspot < 25 && mm.source === 'envelope' && modern.source === 'record')
+  assert.ok(mm.production > modern.production * 1.2 && mm.tsi < modern.tsi - 0.5 && mm.solar_k < modern.solar_k)
+  assert.equal(longTermAt(lt, 900), null)
+  // Epochs and their detection.
+  const rows = epochTable(lt)
+  const maunder = rows.find(r => r.name === 'Maunder Minimum')
+  assert.ok(maunder.detected && maunder.color === EPOCH_COLORS.grand_minimum && maunder.cosmogenic_production_pct > 0)
+  assert.ok(maunder.tsi_vs_reference_w_m2.high < maunder.tsi_vs_reference_w_m2.central && maunder.tsi_vs_reference_w_m2.central < maunder.tsi_vs_reference_w_m2.low)
+  const dalton = rows.find(r => r.name === 'Dalton Minimum')
+  assert.ok(dalton.temperature_k.volcanic < dalton.temperature_k.solar_central, 'the Dalton-era cold was volcanic in this model')
+  const bands = epochBands(lt, [1600, 1760])
+  assert.ok(bands.some(b => b.name === 'Maunder Minimum' && b.from === 1645 && b.to === 1715) && bands.every(b => b.from >= 1600 && b.to <= 1760))
+  // The dynamo example: spots vanish inside the episode, a weak Babcock-Leighton source triggers it.
+  const ex = dynamoExample(lt)
+  assert.ok(ex.rows.filter(r => r.inside).every(r => r.low) && ex.rows.filter(r => r.inside).some(r => r.emergence < 0.2))
+  assert.ok(ex.trigger && ex.trigger.efficiency < 0.5 && ex.recovery && !ex.recovery.low)
+  const h = holoceneStrip(lt)
+  assert.ok(h.years > 11000 && h.minima > 10 && h.bands.every(b => b.to > b.from))
+  // Invalid long-term blocks are refused.
+  const t = fixture()
+  t.solar.long_term.series.sunspot.pop()
+  assert.throws(() => validateSequence(t), /Invalid long-term series/)
+  const u = fixture()
+  u.solar.long_term.dynamo.outlook.cycles[3].grand_minimum_begun = 0
+  assert.throws(() => validateSequence(u), /cumulative/)
+  assert.doesNotThrow(() => validateLongTerm(lt))
+})

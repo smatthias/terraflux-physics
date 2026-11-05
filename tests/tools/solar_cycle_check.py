@@ -38,6 +38,7 @@ schema_ok(RUN_SCHEMA, example, 'example request')
 fast = copy.deepcopy(example)
 fast['forecast']['members'] = 60
 fast['disk'].update(first_year=2012.5, last_year=2032.5, every_months=24, cells=32)
+fast['long_term']['dynamo'].update(statistics_cycles=30000, realizations=3000)
 schema_ok(RUN_SCHEMA, fast, 'fast request')
 
 with tempfile.TemporaryDirectory() as temporary:
@@ -231,6 +232,91 @@ with tempfile.TemporaryDirectory() as temporary:
     k0 = year0 * 12 - first
     close(ex['tsi_w_m2'][0], sum(rec['tsi_w_m2'][k0:k0 + 12]) / 12, 0.002, 'annual TSI of the record')
 
+
+    # ---- Long term: grand minima and maxima ---------------------------------------------------------------------
+    L = s['long_term']
+    Y0, Y1 = L['start_year'], L['horizon_year']
+    ser = L['series']
+    N = Y1 - Y0 + 1
+    assert all(len(ser[k]) == N for k in ['sunspot', 'decadal_sunspot', 'sunspot_grand_minimum_scenario', 'source', 'envelope', 'background_sunspot', 'uv_200_242_pct', 'cosmogenic_production', 'co2_ppm'])
+    order = {'envelope': 0, 'table': 1, 'record': 2, 'forecast': 3}
+    assert all(order[a] <= order[b] for a, b in zip(ser['source'], ser['source'][1:])), 'envelope, table, record, forecast in time order'
+    assert ser['source'][0] == 'envelope' and ser['source'][-1] == 'forecast'
+    k1850 = 1850 - Y0
+    for y in range(1850, 1850 + 20):
+        k = y - Y0
+        months = rec['sunspot_number'][(y - 1850) * 12:(y - 1849) * 12]
+        close(ser['sunspot'][k], sum(months) / 12, 0.06, 'annual sunspot number of the record')
+    # The slow background: an exponential moving average of the annual values.
+    tau = L['secular_background']['timescale_years']
+    m = sum(ser['sunspot'][:11]) / 11
+    for k in range(N):
+        m += (ser['sunspot'][k] - m) * (1 - math.exp(-1 / tau))
+        if k % 97 == 0:
+            close(ser['background_sunspot'][k], m, 0.2, 'background: moving average of the activity')
+    sec = L['secular_background']
+    m_ref = sec['reference_background_sunspot']
+    for k in range(0, N, 61):
+        x = (p['f107_per_sunspot'] * ser['sunspot'][k] + p['f107_per_sunspot_squared'] * ser['sunspot'][k] ** 2) / (f_ref - p['f107_base_sfu'])
+        for scenario in ['low', 'central', 'high']:
+            kk = sec['facular_index_per_sunspot'][scenario]
+            tsi = p['tsi_quiet_w_m2'] + p['facular_brightening_w_m2'] * (x + kk * (ser['background_sunspot'][k] - m_ref) / p['reference_sunspot_number']) - p['spot_darkening_w_m2_per_sunspot'] * ser['sunspot'][k]
+            close(ser['tsi_w_m2'][scenario][k], tsi, 0.003, f'TSI with the {scenario} background')
+    cr = L['cosmic_rays']
+    phi_ref = cr['reference_phi_mv']
+    for k in range(0, N, 53):
+        q = ((phi_ref + cr['production_offset_mv']) / (ser['modulation_potential_mv'][k] + cr['production_offset_mv'])) ** cr['production_exponent']
+        close(ser['cosmogenic_production'][k], q, 0.003, 'cosmogenic production from the modulation potential')
+    # Forcings are anomalies about their pre-industrial means; the temperatures follow the energy balance.
+    pre = 1849 - Y0 + 1
+    for key in ['solar_low', 'solar_central', 'solar_high', 'volcanic']:
+        assert abs(sum(ser['forcing_w_m2'][key][:pre]) / pre) < 2e-3, f'{key} forcing averages to zero before 1850'
+    T = D = 0.0
+    for k in range(N):
+        F = ser['forcing_w_m2']['solar_central'][k]
+        a11, a12 = c['upper_heat_capacity'] + c['feedback_w_m2_k'] + c['exchange_w_m2_k'], -c['exchange_w_m2_k']
+        a21, a22 = -c['exchange_w_m2_k'], c['deep_heat_capacity'] + c['exchange_w_m2_k']
+        b1, b2 = c['upper_heat_capacity'] * T + F, c['deep_heat_capacity'] * D
+        det = a11 * a22 - a12 * a21
+        T, D = (b1 * a22 - a12 * b2) / det, (a11 * b2 - a21 * b1) / det
+        if k % 89 == 0:
+            close(ser['temperature_k']['solar_central'][k], T, 3e-4 + 3e-3 * abs(T), 'annual energy balance of the solar forcing')
+    tk = ser['temperature_k']
+    for k in range(0, N, 37):
+        parts = [tk['solar_central'][k], tk['volcanic'][k], tk['co2'][k]]
+        close(tk['total'][k], sum(parts), 1e-3 + 5e-3 * (abs(tk['total'][k]) + sum(abs(v) for v in parts)), 'total = solar + volcanic + CO2 (each rounded to 3 digits)')
+    # Epochs: the grand minima are dark, cosmic-ray rich and (a little) cold; the uncertainty scenarios are ordered.
+    epochs = {e['name']: e for e in L['epochs']}
+    mm = epochs['Maunder Minimum']
+    assert mm['mean_sunspot'] < 25 and mm['cosmogenic_production_pct'] > 0
+    r_ = mm['tsi_vs_reference_w_m2']
+    assert r_['high'] < r_['central'] < r_['low'] < 0, 'the Maunder Minimum is darker than today in every background scenario'
+    t_ = mm['temperature_k']
+    assert t_['solar_high'] < t_['solar_central'] < t_['solar_low'] < 0 and t_['solar_high'] > -0.5, 'a cooling of a few hundredths to tenths of a kelvin'
+    assert epochs['Modern Maximum']['temperature_k']['co2'] > 5 * abs(epochs['Modern Maximum']['temperature_k']['solar_central']), 'the modern warming is not solar'
+    kinds = {(e['epoch'], e['kind']) for e in L['episodes']}
+    assert ('Maunder Minimum', 'grand_minimum') in kinds and ('Spörer Minimum', 'grand_minimum') in kinds, 'the grand minima are detected'
+    assert all(e['years'] >= L['episode_definition']['min_years'] for e in L['episodes'])
+    # Cycles run continuously from the envelope to the forecast.
+    cyc = L['cycles']
+    assert all(b['number'] == a['number'] + 1 for a, b in zip(cyc, cyc[1:])), 'consecutive cycle numbers'
+    assert [c_['source'] for c_ in cyc][0] == 'envelope' and any(c_['source'] == 'table' for c_ in cyc) and cyc[-1]['source'] == 'mean_continuation'
+    gm = L['future']['grand_minimum']
+    assert all(c_['grand_minimum_scenario_amplitude'] == gm['amplitude'] for c_ in cyc if gm['first_cycle'] <= c_['number'] < gm['first_cycle'] + gm['cycles'])
+    assert all(row['tsi_difference_w_m2'] <= 1e-3 and row['global_difference_k'] <= 1e-3 for row in L['future']['rows']), 'a grand minimum only cools'
+    assert -0.4 < L['future']['largest_global_difference_k'] < -0.02
+    # The dynamo map: calibrated to the Holocene statistics, an example grand minimum, a monotone outlook.
+    dy = L['dynamo']
+    st_ = dy['statistics']
+    assert abs(st_['grand_minimum_fraction'] - 0.17) < 0.04 and abs(st_['grand_minima_per_11400_years'] - 27) < 6, 'calibrated grand minima'
+    ex = dy['example']
+    start, length = ex['episode_start'], ex['episode_cycles']
+    assert min(ex['emergence'][start:start + length]) < 0.2 and max(ex['amplitude'][start:start + length]) * 0.45 < 25 + 1e-9, 'spots vanish in the example grand minimum'
+    assert ex['emergence'][start - 1] > 0.5 or ex['amplitude'][start - 1] * 0.45 >= 25, 'it begins after a normal cycle'
+    rows = dy['outlook']['cycles']
+    assert all(b['grand_minimum_begun'] >= a['grand_minimum_begun'] for a, b in zip(rows, rows[1:])) and rows[0]['grand_minimum_begun'] == 0
+    assert 0 < dy['outlook']['grand_minimum_by_horizon'] < 0.5 and len(dy['holocene']['amplitudes']) > 1000
+
     # ---- The same record given month by month gives the same forecast ---------------------------------------------
     monthly = copy.deepcopy(fast)
     monthly['record'] = {'kind': 'monthly', 'data_origin': 'the synthetic record of the check', 'first_cycle_number': fast['record']['first_cycle_number'],
@@ -260,5 +346,10 @@ with tempfile.TemporaryDirectory() as temporary:
     broken(lambda d: d['uv_sites'].append(dict(d['uv_sites'][0])), 'duplicate UV sites')
     broken(lambda d: d['flares'].update(size_index=1.0), 'a flare size index without a finite rate')
     broken(lambda d: d.update(record={**monthly['record'], 'values': sn[:-1] + [-3.0]}), 'a negative monthly value')
+    broken(lambda d: d['long_term']['epochs'].append({'name': 'overlap', 'kind': 'grand_minimum', 'start_year': 1700, 'end_year': 1720, 'cycle_amplitude': 10}), 'overlapping epochs')
+    broken(lambda d: d['long_term']['future']['grand_minimum'].update(first_cycle=25), 'a future grand minimum in the cycle in progress')
+    broken(lambda d: d['long_term']['case_study'].update(epoch='Unknown Minimum'), 'a case study of an unknown epoch')
+    broken(lambda d: d['long_term']['secular_background'].update(low=1.0), 'background scenarios out of order')
+    broken(lambda d: d['long_term'].update(start_year=1790), 'a long-term start after 1750')
 
 print('solar cycle CLI check passed')

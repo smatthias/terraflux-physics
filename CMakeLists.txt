@@ -39,6 +39,7 @@ add_library(terraflux_weather_map
     src/weather/solar_cycle.cpp
     src/weather/solar_irradiance.cpp
     src/weather/solar_forcing.cpp
+    src/weather/solar_long_term.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp

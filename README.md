@@ -48,6 +48,11 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
   - TSI, F10.7, Mg II and UV bands from Lyman-α to UV-A; ozone, the stratosphere and the surface UV index.
   - Flare rates and sizes, NOAA radio-blackout levels and flare energy; the global temperature response; the solar disk and the butterfly diagram.
   - A forcing export that the ocean shortwave and the polar-melt scenarios can take.
+- `docs/weather/solar-grand-minima-model.md`: grand solar minima and maxima since 1000 AD (the `long_term` section of the solar request).
+  - A catalogue of epochs (Oort, Wolf, Spörer, Maunder, Dalton, Medieval and Modern Maximum), episodes detected in the series, a case study of the Maunder Minimum.
+  - The slow brightening of the quiet Sun (low / central / high TSI), UV and ozone, cosmic rays and ¹⁴C/¹⁰Be production.
+  - The climate with volcanic and CO₂ forcing for comparison, an illustrative regional winter response, and a future grand minimum.
+  - A stochastic Babcock–Leighton dynamo map in which grand minima arise by chance, calibrated to the Holocene statistics, with the risk of a new one.
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -286,13 +291,16 @@ See [solar-cycle-model.md](docs/weather/solar-cycle-model.md).
 python3 tools/silso_to_request.py SN_m_tot_V2.0.csv --start 1850-01 --first-cycle 10 --output my-solar-request.json
 ```
 
-The example's record is synthesised from an approximate, hand-entered table of the SILSO cycles 9–25 (not verified against the SILSO files) with monthly noise; its dates illustrate the method rather than forecast the real Sun.
+The example's record is synthesised from an approximate, hand-entered table of the SILSO cycles 1–25 (not verified against the SILSO files) with monthly noise; its dates illustrate the method rather than forecast the real Sun.
+
+**Grand minima and maxima.** The request's `long_term` section extends the Sun back to 1000 AD: cycles synthesised around a catalogue of documented epochs before 1755, then the table, the record and the forecast to 2100. It maps the grand minima (Oort, Wolf, Spörer, Maunder) and maxima, the slow brightening of the quiet Sun, the ¹⁴C/¹⁰Be production of cosmic rays, and the global temperature with volcanic and CO₂ forcing for comparison. A stochastic dynamo map shows how grand minima arise (a weak Babcock–Leighton source leaves the field below the spot-emergence threshold; a weak α effect keeps a faint cycle until it recovers) and gives the probability of a new one (about 12 % by 2100 in the example). In the model the Maunder Minimum's dimmer Sun cools the globe by about 0.05 K (0.03–0.16 K across the background scenarios), volcanic eruptions matter more for the Little Ice Age, and a new grand minimum would offset at most about 0.13 K of this century's warming. See [solar-grand-minima-model.md](docs/weather/solar-grand-minima-model.md).
 
 **☀ Load solar cycle & space weather example** opens the **Sun & solar cycle** view. It shows:
 
 - the solar disk as a dome: limb-darkened photosphere, spot groups at the latitudes of their cycle's zone, faculae, and the month's flares coloured by radio-blackout level; the disk can be coloured by brightness, by contrast to the quiet Sun, or by cycle;
 - the sunspot chart with record, smoothed series, fitted curves and the forecast's 50 % and 90 % ranges, and a table of minima and maxima with the predicted ones;
-- the backtest skill by cycle age, the UV spectrum of the cycle, TSI, UV at the top against the UV index at the ground with a site table, flare counts, the radio-blackout table and an annual flare outlook, the climate response, and the butterfly diagram.
+- the backtest skill by cycle age, the UV spectrum of the cycle, TSI, UV at the top against the UV index at the ground with a site table, flare counts, the radio-blackout table and an annual flare outlook, the climate response, and the butterfly diagram;
+- grand minima and maxima since 1000 AD with the epochs and detected episodes, long-term TSI and cosmic rays, the climate contributions with an epoch table, a Maunder Minimum case study, the dynamo map with a synthetic Holocene, and the outlook for a new grand minimum.
 
 The field-layer list is folded into topic groups showing only layers with data, with a tooltip for every layer and example.
 

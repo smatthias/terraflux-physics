@@ -8,6 +8,8 @@ The Sun's activity rises and falls in a cycle of about eleven years (the Schwabe
 
 Two existing models can take its output: the ocean's air–sea shortwave and the polar-melt warming scenarios.
 
+The slower changes — grand minima such as the Maunder Minimum (1645–1715) and grand maxima, over centuries since 1000 AD, their cause in the solar dynamo and their effects — are the request's optional `long_term` section: see [solar-grand-minima-model.md](solar-grand-minima-model.md).
+
 | | |
 |---|---|
 | Question | When are the next minimum and maximum, and how large? How much do TSI, UV, ozone and the UV index change over the cycle? How many flares and radio blackouts should we expect? How much does the cycle change the global temperature? |
@@ -30,7 +32,7 @@ The record is the monthly mean total sunspot number, version 2 (SILSO; Clette et
 
   With `calibrate_widths` the widths are also scaled until each maximum falls on the table's date. This is off by default: one smooth curve cannot represent a double peak (cycles 23 and 24), and stretching it to a late second peak lifts the following minimum far above the observed one (about 45 instead of 2–6).
 
-**The example's data.** The table covers cycles 9–25 with approximate SILSO v2 values: minima, maxima and their dates, rounded, with cycle 25's maximum (160.9 in late 2024) provisional. The values were entered by hand and **have not been verified against the SILSO files**; the request's `data_origin` says so, and the viewer shows it. The monthly values after the last table entry continue the curve of cycle 25 to the issue date (October 2026); they are synthetic, not observations. For quantitative work, convert the SILSO file and run the same request with a `monthly` record: the check `weather.solar_cycle_cli` verifies that a monthly record reproduces the forecast of the same values exactly.
+**The example's data.** The table covers cycles 1–25 (1755 onward; the record starts in 1850 with cycle 9's decline, earlier cycles serve the long-term section) with approximate SILSO v2 values: minima, maxima and their dates, rounded, with cycle 25's maximum (160.9 in late 2024) provisional. The values were entered by hand and **have not been verified against the SILSO files**; the request's `data_origin` says so, and the viewer shows it. The monthly values after the last table entry continue the curve of cycle 25 to the issue date (October 2026); they are synthetic, not observations. For quantitative work, convert the SILSO file and run the same request with a `monthly` record: the check `weather.solar_cycle_cli` verifies that a monthly record reproduces the forecast of the same values exactly.
 
 The noise has visible consequences in the synthetic record:
 

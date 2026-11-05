@@ -56,6 +56,7 @@ export function validateSolar(block, frames) {
   const d = b.disk, count = grid.nx * grid.ny
   check(d && d.cells === grid.nx && d.cells === grid.ny && nullable(d.quiet_brightness_k, count) && Array.isArray(d.frames) && d.frames.length === frames.length, 'Solar disk frames must match the timeline grid and frames.')
   check(Array.isArray(b.flares?.rates) && b.flares.rates.length > 0 && b.flares.rates.every(x => finite(x.x1_per_year) && x.x1_per_year > 0), 'Invalid flare rates.')
+  if (b.long_term !== undefined) validateLongTerm(b.long_term)
   frames.forEach((frame, k) => {
     const x = d.frames[k]
     check(x.elapsed_seconds === frame.forecast.elapsed_seconds && /^\d{4}-\d{2}$/.test(x.month) && ['record', 'forecast'].includes(x.source), 'Solar disk frame times must match the timeline.')
@@ -297,3 +298,91 @@ export const flareLabel = s => {
 }
 
 export const fmtYear = y => y === null || y === undefined ? '—' : `${Math.floor(y)}-${String(Math.floor((y - Math.floor(y)) * 12) + 1).padStart(2, '0')}`
+
+// ---- Long term: grand minima and maxima ----------------------------------------------------------------------------
+
+export const EPOCH_COLORS = { grand_minimum: '#4f8bd6', grand_maximum: '#ff9f43', minimum: '#8fb8de', maximum: '#ffc98a' }
+export const EPOCH_LABELS = { grand_minimum: 'grand minimum', grand_maximum: 'grand maximum', minimum: 'minimum', maximum: 'maximum' }
+export const LONG_TERM_WINDOWS = [
+  { key: 'all', label: 'Whole span' },
+  { key: 'telescopic', label: 'Telescopic era (1600–)' },
+  { key: 'maunder', label: 'Maunder Minimum (1600–1760)' },
+  { key: 'future', label: '1900 to the horizon' },
+]
+const SOURCES = ['envelope', 'table', 'record_fit', 'record', 'forecast']
+
+export function validateLongTerm(lt) {
+  check(lt && Number.isInteger(lt.start_year) && Number.isInteger(lt.horizon_year) && lt.horizon_year > lt.start_year, 'Invalid long-term span.')
+  const n = lt.horizon_year - lt.start_year + 1, s = lt.series
+  check(s && ['sunspot', 'decadal_sunspot', 'sunspot_grand_minimum_scenario', 'envelope', 'background_sunspot', 'uv_200_242_pct', 'ozone_pct', 'cosmogenic_production', 'co2_ppm'].every(k => series(s[k], n)), 'Invalid long-term series.')
+  check(Array.isArray(s.source) && s.source.length === n && s.source.every(v => SOURCES.includes(v)), 'Invalid long-term sources.')
+  check(['low', 'central', 'high', 'grand_minimum_scenario'].every(k => series(s.tsi_w_m2?.[k], n)), 'Invalid long-term TSI.')
+  check(['solar_low', 'solar_central', 'solar_high', 'solar_grand_minimum', 'volcanic', 'co2'].every(k => series(s.forcing_w_m2?.[k], n)), 'Invalid long-term forcings.')
+  check(['solar_low', 'solar_central', 'solar_high', 'solar_grand_minimum', 'volcanic', 'co2', 'total', 'total_grand_minimum', 'regional_winter', 'regional_winter_grand_minimum'].every(k => series(s.temperature_k?.[k], n)), 'Invalid long-term temperatures.')
+  check(Array.isArray(lt.epochs) && lt.epochs.every(e => typeof e.name === 'string' && EPOCH_COLORS[e.kind] && finite(e.start_year) && e.end_year > e.start_year && finite(e.mean_sunspot)), 'Invalid long-term epochs.')
+  check(Array.isArray(lt.episodes) && lt.episodes.every(e => ['grand_minimum', 'grand_maximum'].includes(e.kind) && e.end_year >= e.start_year), 'Invalid long-term episodes.')
+  check(Array.isArray(lt.cycles) && lt.cycles.every((c, k) => Number.isInteger(c.number) && finite(c.amplitude) && (k === 0 || c.number === lt.cycles[k - 1].number + 1)), 'Invalid long-term cycles.')
+  const d = lt.dynamo
+  check(d && d.statistics && finite(d.statistics.grand_minimum_fraction) && Array.isArray(d.outlook?.cycles) && Array.isArray(d.holocene?.amplitudes), 'Invalid dynamo block.')
+  check(d.outlook.cycles.every((c, k) => c.grand_minimum_begun >= 0 && c.grand_minimum_begun <= 1 && (k === 0 || c.grand_minimum_begun >= d.outlook.cycles[k - 1].grand_minimum_begun)), 'Dynamo outlook shares must be cumulative.')
+  if (d.example) check(['field', 'emergence', 'efficiency', 'amplitude'].every(k => series(d.example[k], d.example.amplitude.length)), 'Invalid dynamo example.')
+  return lt
+}
+
+export function longTermWindow(lt, key) {
+  const a = lt.start_year, b = lt.horizon_year + 1
+  if (key === 'telescopic') return [Math.max(a, 1600), b]
+  if (key === 'maunder') return [Math.max(a, 1600), Math.min(b, 1760)]
+  if (key === 'future') return [Math.max(a, 1900), b]
+  return [a, b]
+}
+
+// [[year + 0.5, value], ...] of an annual long-term series inside [x0, x1].
+export function yearlyPoints(lt, values, [x0, x1], stride = 1) {
+  const out = []
+  for (let k = 0; k < values.length; k += stride) { const y = lt.start_year + k + 0.5; if (y >= x0 && y <= x1) out.push([y, values[k]]) }
+  return out
+}
+
+// The value of every long-term series at a calendar year (the frame's year), or null outside the span.
+export function longTermAt(lt, year) {
+  const k = Math.floor(year) - lt.start_year
+  if (k < 0 || k >= lt.series.sunspot.length) return null
+  const s = lt.series
+  return { year: Math.floor(year), sunspot: s.sunspot[k], background: s.background_sunspot[k], tsi: s.tsi_w_m2.central[k], production: s.cosmogenic_production[k], source: s.source[k],
+    solar_k: s.temperature_k.solar_central[k], volcanic_k: s.temperature_k.volcanic[k], co2_k: s.temperature_k.co2[k], total_k: s.temperature_k.total[k] }
+}
+
+// Epoch bands (clipped to the window) and the episodes found in the series.
+export function epochBands(lt, [x0, x1]) {
+  return lt.epochs.filter(e => e.end_year > x0 && e.start_year < x1).map(e => ({ ...e, from: Math.max(x0, e.start_year), to: Math.min(x1, e.end_year), color: EPOCH_COLORS[e.kind] }))
+}
+
+// Catalogue epochs with what the model makes of them, and whether the series shows them as episodes.
+export function epochTable(lt) {
+  return lt.epochs.map(e => {
+    const found = lt.episodes.filter(x => x.epoch === e.name)
+    return { ...e, detected: found.length ? found.map(x => `${x.start_year}–${x.end_year}`).join(', ') : null, label: EPOCH_LABELS[e.kind], color: EPOCH_COLORS[e.kind] }
+  })
+}
+
+// The dynamo example: per cycle its amplitude, emergence and Babcock-Leighton efficiency, and where the episode lies.
+export function dynamoExample(lt) {
+  const x = lt.dynamo.example
+  if (!x) return null
+  const c = lt.dynamo.config, threshold = c.grand_minimum_mean / c.cycle_mean_fraction
+  const rows = x.amplitude.map((a, k) => ({ k, cycle: x.first_cycle + k, amplitude: a, field: x.field[k], emergence: x.emergence[k], efficiency: x.efficiency[k],
+    inside: k >= x.episode_start && k < x.episode_start + x.episode_cycles, low: a < threshold }))
+  // The trigger: the cycle before the episode whose Babcock-Leighton source was weakest.
+  const before = rows.slice(Math.max(0, x.episode_start - 2), x.episode_start)
+  const trigger = before.reduce((best, r) => (best === null || r.efficiency < best.efficiency ? r : best), null)
+  const recovery = rows.find(r => r.k >= x.episode_start + x.episode_cycles) ?? null
+  return { rows, threshold, trigger, recovery, start: x.episode_start, cycles: x.episode_cycles, maxAmplitude: Math.max(...x.amplitude) }
+}
+
+// The synthetic Holocene of the dynamo map: cycle amplitudes in years and the grand-minimum bands.
+export function holoceneStrip(lt) {
+  const h = lt.dynamo.holocene, years = h.amplitudes.length * h.years_per_cycle
+  return { years, points: h.amplitudes.map((a, k) => [k * h.years_per_cycle, a]), bands: h.episodes.map(e => ({ kind: e.kind, from: e.start * h.years_per_cycle, to: (e.start + e.cycles) * h.years_per_cycle })),
+    minima: h.episodes.filter(e => e.kind === 'grand_minimum').length, maxima: h.episodes.filter(e => e.kind === 'grand_maximum').length }
+}

@@ -1196,6 +1196,151 @@
       "items": {
         "type": "string"
       }
+    },
+    "long_term": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_year": {
+          "type": "integer"
+        },
+        "horizon_year": {
+          "type": "integer"
+        },
+        "preindustrial_end_year": {
+          "type": "integer"
+        },
+        "issue_year": {
+          "type": "number"
+        },
+        "series": {
+          "type": "object",
+          "required": [
+            "sunspot",
+            "decadal_sunspot",
+            "sunspot_grand_minimum_scenario",
+            "source",
+            "envelope",
+            "background_sunspot",
+            "tsi_w_m2",
+            "uv_200_242_pct",
+            "ozone_pct",
+            "cosmogenic_production",
+            "co2_ppm",
+            "forcing_w_m2",
+            "temperature_k"
+          ],
+          "description": "Annual values from start_year to horizon_year; forcings and temperatures are anomalies about their pre-industrial means (start_year-1849)."
+        },
+        "epochs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "kind",
+              "start_year",
+              "end_year",
+              "mean_sunspot",
+              "tsi_vs_preindustrial_w_m2",
+              "tsi_vs_reference_w_m2",
+              "cosmogenic_production_pct",
+              "temperature_k"
+            ]
+          }
+        },
+        "episodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "start_year",
+              "end_year",
+              "years",
+              "mean_sunspot",
+              "epoch"
+            ]
+          }
+        },
+        "cycles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "number",
+              "onset_year",
+              "peak_year",
+              "amplitude",
+              "source"
+            ]
+          }
+        },
+        "episode_definition": {
+          "type": "object"
+        },
+        "envelope": {
+          "type": "object"
+        },
+        "secular_background": {
+          "type": "object"
+        },
+        "cosmic_rays": {
+          "type": "object"
+        },
+        "volcanic": {
+          "type": "object"
+        },
+        "co2": {
+          "type": "object"
+        },
+        "regional_winter": {
+          "type": "object"
+        },
+        "future": {
+          "type": "object",
+          "required": [
+            "grand_minimum",
+            "rows",
+            "largest_global_difference_k"
+          ]
+        },
+        "dynamo": {
+          "type": "object",
+          "required": [
+            "config",
+            "statistics",
+            "targets",
+            "example",
+            "holocene",
+            "outlook"
+          ]
+        },
+        "case_study": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "start_year",
+        "horizon_year",
+        "series",
+        "epochs",
+        "episodes",
+        "cycles",
+        "dynamo",
+        "future",
+        "limitations"
+      ],
+      "description": "Present when the request had a long_term section."
     }
   }
 }

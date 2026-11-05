@@ -2,6 +2,7 @@
 #include "terraflux/weather/solar_cycle.hpp"
 #include "terraflux/weather/solar_forcing.hpp"
 #include "terraflux/weather/solar_irradiance.hpp"
+#include "terraflux/weather/solar_long_term.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -426,6 +427,143 @@ void disk() {
     require_near(std::abs(lat[static_cast<std::size_t>(peak)]), spot_zone_latitude_deg(3.0, c), "the bands lie at the zone latitude", 1.0);
 }
 
+
+// ---- Long-term activity: grand minima and maxima ----------------------------------------------------------------
+
+void long_term_envelope() {
+    const SolarEnvelopeConfig c{120.0, 10.0};
+    const std::vector<SolarEpoch> epochs = {{"Maunder", SolarEpochKind::grand_minimum, 1645.0, 1715.0, 8.0, ""},
+                                            {"Annotation", SolarEpochKind::minimum, 1790.0, 1830.0, 0.0, ""},
+                                            {"High", SolarEpochKind::grand_maximum, 1100.0, 1250.0, 190.0, ""}};
+    validate_solar_epochs(epochs, c);
+    require_near(solar_envelope(1680.0, epochs, c), 8.0, "deep inside an epoch: its amplitude", 0.05);
+    require_near(solar_envelope(1500.0, epochs, c), 120.0, "outside the epochs: the normal amplitude", 1e-4);
+    require_near(solar_envelope(1810.0, epochs, c), 120.0, "an annotation epoch does not shape the envelope (the tanh tails reach far but faintly)", 1e-4);
+    require_near(solar_envelope(1175.0, epochs, c), 190.0, "a grand maximum raises it", 0.05);
+    require_near(solar_envelope(1645.0, epochs, c), std::sqrt(120.0 * 8.0), "half way in the logarithm at the boundary", 0.5);
+    double previous = solar_envelope(1600.0, epochs, c);
+    for (double y = 1601.0; y <= 1680.0; y += 1.0) { const double v = solar_envelope(y, epochs, c); require(v <= previous + 1e-12, "the envelope falls into the minimum"); previous = v; }
+    auto overlapping = epochs;
+    overlapping.push_back({"Overlap", SolarEpochKind::grand_minimum, 1700.0, 1720.0, 20.0, ""});
+    require_rejected([&] { validate_solar_epochs(overlapping, c); }, "epochs that set amplitudes must not overlap");
+    auto unnamed = epochs;
+    unnamed[0].name.clear();
+    require_rejected([&] { validate_solar_epochs(unnamed, c); }, "epochs need names");
+
+    const auto h = synthesize_historical_cycles(1754.9, 1, 1000.0, epochs, c, {});
+    require(h.curves.size() == h.numbers.size() && h.curves.size() > 60, "cycles back to 1000");
+    require(h.numbers.back() == 0 && h.numbers.front() == -static_cast<int>(h.curves.size()) + 1, "numbered backwards from the table's first cycle");
+    require(h.curves.front().onset_year < 1000.0 - 5.0 && h.curves.back().onset_year < 1754.9 - 7.9, "they cover the start and end before the table");
+    for (std::size_t k = 1; k < h.curves.size(); ++k) {
+        const double period = h.curves[k].onset_year - h.curves[k - 1].onset_year;
+        require(period >= 8.0 - 1e-9 && period <= 15.0 + 1e-9, "cycle lengths within 8-15 years");
+    }
+    for (const auto& curve : h.curves) {
+        if (curve.onset_year > 1655.0 && curve.onset_year < 1700.0) require(curve.amplitude < 30.0, "weak cycles in the Maunder Minimum");
+        if (curve.onset_year > 1300.0 && curve.onset_year < 1600.0) require(curve.amplitude > 30.0 && curve.amplitude < 400.0, "normal cycles between the epochs");
+    }
+    const auto annual = annual_cycle_means(h.curves, 1600, 1602);
+    double monthly = 0.0;
+    for (int m = 0; m < 12; ++m) monthly += cycles_value(h.curves, 1601.0 + (m + 0.5) / 12.0) / 12.0;
+    require(annual.size() == 3 && std::abs(annual[1] - monthly) < 1e-12, "annual means of the monthly values");
+}
+
+void long_term_series() {
+    // Moving average: constant stays, a step reaches 1 - 1/e after tau samples.
+    std::vector<double> step(60, 0.0);
+    for (std::size_t k = 20; k < step.size(); ++k) step[k] = 1.0;
+    const auto ema = exponential_moving_average(step, 15.0, 5);
+    require(ema[19] == 0.0, "nothing before the step");
+    require_near(ema[34], 1.0 - std::exp(-1.0), "after tau samples", 1e-12);
+    require(exponential_moving_average(std::vector<double>(10, 3.0), 7.0)[9] == 3.0, "a constant stays");
+    const auto rm = running_mean({1.0, 2.0, 3.0, 4.0, 5.0}, 3);
+    require(rm[0] == 1.5 && rm[2] == 3.0 && rm[4] == 4.5, "centred running mean, shorter at the ends");
+    // Episodes: a 40-year low and a 30-year high stretch; a 10-year dip is too short.
+    std::vector<double> annual(200, 60.0);
+    for (int y = 50; y < 90; ++y) annual[static_cast<std::size_t>(y)] = 5.0;
+    for (int y = 120; y < 150; ++y) annual[static_cast<std::size_t>(y)] = 150.0;
+    for (int y = 170; y < 180; ++y) annual[static_cast<std::size_t>(y)] = 0.0;
+    const auto episodes = detect_solar_episodes(annual, 1000, 25.0, 83.0, 11, 20);
+    require(episodes.size() == 2 && episodes[0].grand_minimum && !episodes[1].grand_minimum, "one grand minimum, one grand maximum");
+    require(std::abs(episodes[0].start_year - 1050) <= 5 && std::abs(episodes[0].end_year - 1089) <= 5, "the grand minimum's years (within half the window)");
+    require(episodes[1].mean_sunspot > 120.0, "the grand maximum's mean");
+    // Cosmic rays: the reference makes 1; more activity, less production.
+    const CosmicRayConfig cr;
+    validate_cosmic_rays(cr);
+    const double phi_low = modulation_potential_mv(5.0, 5.0, cr), phi_high = modulation_potential_mv(150.0, 100.0, cr);
+    require(phi_low < phi_high, "the modulation potential follows the activity");
+    require_near(relative_cosmogenic_production(phi_high, phi_high, cr), 1.0, "the reference production", 1e-12);
+    require(relative_cosmogenic_production(phi_low, phi_high, cr) > 1.2, "a grand minimum makes more 14C and 10Be");
+    // Volcanoes: the pulse peaks at the rise time and integrates to peak r e.
+    const std::vector<VolcanicEruption> eruption = {{"test", 1815.3, -6.0}};
+    require_near(volcanic_forcing_w_m2(1815.3 + 0.75, eruption, 0.75), -6.0, "peak forcing at the rise time", 1e-12);
+    require(volcanic_forcing_w_m2(1815.0, eruption, 0.75) == 0.0, "nothing before the eruption");
+    double integral = 0.0;
+    for (double y = 1815.3; y < 1835.0; y += 0.001) integral += volcanic_forcing_w_m2(y + 0.0005, eruption, 0.75) * 0.001;
+    require_near(integral, -6.0 * 0.75 * std::exp(1.0), "time integral of the pulse", 1e-3);
+    double annual_sum = 0.0;
+    for (int y = 1815; y < 1835; ++y) annual_sum += annual_volcanic_forcing_w_m2(y, eruption, 0.75);
+    require_near(annual_sum, integral, "annual means keep the integral", 0.02);
+    require_near(co2_forcing_w_m2(556.0, 278.0), 5.35 * std::log(2.0), "doubled CO2", 1e-12);
+}
+
+void dynamo_map() {
+    SolarDynamoConfig c;
+    validate_solar_dynamo(c);
+    require_near(dynamo_emergence(c.emergence_threshold, c), 0.5, "half the field emerges at the threshold", 1e-12);
+    require(dynamo_emergence(0.1, c) < 1e-6 && dynamo_emergence(1.0, c) > 1.0 - 1e-6, "no spots from a weak field, all from a strong one");
+    for (double a : {0.5, 20.0, 121.0, 250.0}) require_near(dynamo_amplitude(dynamo_field_for_amplitude(a, c), c), a, "field for an amplitude", 1e-6 * a + 1e-9);
+    require_near(dynamo_amplitude(1.0, c), c.amplitude_scale, "the mean state b = 1 has the amplitude scale", 1e-6);
+    // b = 1 is the fixed point of the mean map: alpha_BL + alpha_w = 1 + 1/b_q^2.
+    require_near(c.babcock_leighton_efficiency() + c.weak_alpha, 1.0 + 1.0 / (c.quenching_field * c.quenching_field), "alpha_BL puts the mean state at b = 1", 1e-12);
+    NormalSequence a(3), b(3);
+    const auto s1 = simulate_solar_dynamo(c, 1.0, 500, a), s2 = simulate_solar_dynamo(c, 1.0, 500, b);
+    require(s1.size() == 500 && s1.back().amplitude == s2.back().amplitude, "reproducible");
+    for (std::size_t k = 0; k + 1 < s1.size(); ++k) {
+        const double b0 = s1[k].field, expected = std::abs(c.babcock_leighton_efficiency() * s1[k].efficiency * dynamo_emergence(b0, c) + c.weak_alpha) * b0 / (1.0 + (b0 / c.quenching_field) * (b0 / c.quenching_field));
+        require(s1[k + 1].field >= expected - 1e-12 && s1[k + 1].field <= expected + 0.2, "the map plus a small non-negative floor");
+    }
+    // Without the floor a dead field stays dead; with it the weak alpha effect brings it back.
+    auto dead = c;
+    dead.floor_noise = 0.0;
+    NormalSequence r1(5), r2(5);
+    require(simulate_solar_dynamo(dead, 0.0, 50, r1).back().field == 0.0, "a dead dynamo stays dead without the floor");
+    bool revived = false;
+    for (const auto& s : simulate_solar_dynamo(c, 0.0, 400, r2)) revived = revived || s.amplitude > 60.0;
+    require(revived, "the weak alpha effect revives a dead field");
+    // Episodes and statistics of a hand-made sequence (cycle means 0.45 A; thresholds 25 and 83).
+    const std::vector<double> seq = {120, 10, 12, 120, 30, 120, 200, 210, 120, 5, 6, 7, 120};
+    const auto ep = dynamo_episodes(seq, c);
+    require(ep.size() == 3 && ep[0].grand_minimum && ep[0].start == 1 && ep[0].length == 2 && !ep[1].grand_minimum && ep[1].start == 6 && ep[2].length == 3,
+            "two grand minima and a grand maximum (single low cycles do not count)");
+    const auto st = dynamo_statistics(seq, c, 11.0);
+    require_near(st.grand_minimum_fraction, 5.0 / 13.0, "share of cycles in grand minima", 1e-12);
+    require_near(st.grand_minimum_mean_years, 2.5 * 11.0, "mean grand-minimum length", 1e-12);
+    require_near(st.mean_waiting_years, 6.0 * 11.0, "waiting time from the end of one to the next", 1e-12);
+    require(st.grand_minimum_lengths.size() == 4 && st.grand_minimum_lengths[2] == 1 && st.grand_minimum_lengths[3] == 1, "length histogram");
+    // The calibration: the Holocene statistics of the isotope records.
+    NormalSequence r3(11);
+    std::vector<double> amps;
+    for (const auto& s : simulate_solar_dynamo(c, 1.0, 60000, r3)) amps.push_back(s.amplitude);
+    const auto cal = dynamo_statistics(amps, c, 10.93);
+    require_near(cal.grand_minimum_fraction, 0.17, "grand minima 17 % of the time", 0.03);
+    require_near(cal.grand_minima_per_11400_years, 27.0, "27 grand minima per 11 400 years", 4.0);
+    require_near(cal.grand_minimum_mean_years, 70.0, "mean grand-minimum length", 15.0);
+    require(cal.mean_amplitude_outside_minima > 100.0 && cal.mean_amplitude_outside_minima < 150.0, "normal cycles like the record's");
+    // Outlook: cumulative shares never fall, percentiles are ordered; two observed low cycles mean it has begun.
+    const auto o = dynamo_outlook(c, {116.0, 160.0}, 8, 4000, 7);
+    for (std::size_t k = 0; k < 8; ++k) {
+        require(o.grand_minimum_begun[k] >= 0.0 && o.grand_minimum_begun[k] <= 1.0 && (k == 0 || o.grand_minimum_begun[k] >= o.grand_minimum_begun[k - 1]), "cumulative onset share");
+        require(o.amplitude_p5[k] <= o.amplitude_p50[k] && o.amplitude_p50[k] <= o.amplitude_p95[k], "ordered amplitudes");
+    }
+    require(o.grand_minimum_begun[0] == 0.0 && o.grand_minimum_begun[7] > 0.05 && o.grand_minimum_begun[7] < 0.4, "a grand minimum needs two low cycles; within eight cycles it is possible");
+    require(dynamo_outlook(c, {10.0, 12.0}, 3, 500, 7).grand_minimum_begun[0] == 1.0, "already in a grand minimum");
+    auto bad = c;
+    bad.weak_alpha = 1.5;
+    bad.quenching_field = 2.0;   // 1 + 1/4 - 1.5 < 0
+    require_rejected([&] { validate_solar_dynamo(bad); }, "a weak alpha that leaves no room for the Babcock-Leighton source");
+}
+
 void forcing_export() {
     // decimal years from epoch seconds
     require_near(decimal_year_from_epoch(0.0), 1970.0, "the epoch", 1e-12);
@@ -473,6 +611,9 @@ int main() {
         climate();
         disk();
         forcing_export();
+        long_term_envelope();
+        long_term_series();
+        dynamo_map();
         std::cout << "solar cycle tests passed\n";
         return 0;
     } catch (const std::exception& error) {

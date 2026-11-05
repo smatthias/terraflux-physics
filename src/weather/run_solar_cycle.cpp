@@ -18,6 +18,7 @@
 // runs can read.
 #include "terraflux/weather/solar_cycle.hpp"
 #include "terraflux/weather/solar_irradiance.hpp"
+#include "terraflux/weather/solar_long_term.hpp"
 #include "utc_time.hpp"
 
 #include <nlohmann/json.hpp>
@@ -133,6 +134,191 @@ std::string month_label(int month_index) {
 // Day of the year at the middle of a month.
 double mid_month_day(int month_index) { return (static_cast<double>(month_index % 12) + 0.5) * 365.25 / 12.0; }
 
+// ---- Long-term request (grand minima and maxima) -----------------------------------------------------------------
+
+struct LongTermRequest {
+    bool enabled{false};
+    int start_year{1000}, horizon_year{2100};
+    SolarEnvelopeConfig envelope;
+    HistoricalCycleConfig historical;
+    std::vector<SolarEpoch> epochs;
+    std::size_t episode_window{11};
+    int episode_min_years{20};
+    double episode_low{25.0}, episode_high{83.0};
+    double secular_timescale{15.0};
+    int reference_start{1976}, reference_end{2019};
+    double secular_low{0.0}, secular_central{0.7}, secular_high{3.5};
+    CosmicRayConfig cosmic;
+    double volcanic_rise{0.75};
+    std::vector<VolcanicEruption> eruptions;
+    std::vector<std::pair<double, double>> co2;
+    std::string regional_name{"Northern and central Europe, winter (illustrative)"};
+    double regional_amplification{2.0}, regional_top_down_k_per_uv_pct{0.1};
+    int gm_first_cycle{26}, gm_cycles{6};
+    double gm_amplitude{8.0};
+    SolarDynamoConfig dynamo;
+    std::size_t dynamo_statistics_cycles{100000}, dynamo_realizations{20000}, dynamo_cycles_ahead{10};
+    std::uint64_t dynamo_seed{13};
+    Json dynamo_targets = Json::object();
+    std::string case_epoch;
+    int case_from{1600}, case_to{1760};
+};
+
+SolarEpochKind epoch_kind(const std::string& s) {
+    if (s == "grand_minimum") return SolarEpochKind::grand_minimum;
+    if (s == "grand_maximum") return SolarEpochKind::grand_maximum;
+    if (s == "minimum") return SolarEpochKind::minimum;
+    if (s == "maximum") return SolarEpochKind::maximum;
+    throw std::invalid_argument("long_term epoch kind must be grand_minimum, grand_maximum, minimum or maximum");
+}
+
+LongTermRequest parse_long_term(const Json& l) {
+    LongTermRequest t;
+    t.enabled = true;
+    only_keys(l, "long_term", {"start_year", "horizon_year", "normal_amplitude", "transition_years", "historical_cycles", "epochs", "episodes", "secular_background",
+                               "cosmic_rays", "volcanic", "co2_ppm", "regional_winter", "future", "dynamo", "case_study"});
+    t.start_year = static_cast<int>(optional_integer(l, "start_year", t.start_year, -10000, 1800));
+    t.horizon_year = static_cast<int>(optional_integer(l, "horizon_year", t.horizon_year, 1900, 2500));
+    read_into(l, "normal_amplitude", t.envelope.normal_amplitude);
+    read_into(l, "transition_years", t.envelope.transition_years);
+    if (l.contains("historical_cycles")) {
+        const Json& h = required(l, "historical_cycles");
+        only_keys(h, "long_term.historical_cycles", {"period_years", "period_sd_years", "amplitude_log_sd", "lead_years", "seed"});
+        read_into(h, "period_years", t.historical.period_years);
+        read_into(h, "period_sd_years", t.historical.period_sd_years);
+        read_into(h, "amplitude_log_sd", t.historical.amplitude_log_sd);
+        read_into(h, "lead_years", t.historical.lead_years);
+        t.historical.seed = static_cast<std::uint64_t>(optional_integer(h, "seed", 7, 1, 1LL << 40));
+    }
+    const Json& epochs = required(l, "epochs");
+    if (!epochs.is_array()) throw std::invalid_argument("long_term.epochs must be an array");
+    for (const Json& e : epochs) {
+        only_keys(e, "long_term.epochs[]", {"name", "kind", "start_year", "end_year", "cycle_amplitude", "evidence"});
+        SolarEpoch x;
+        x.name = optional_string(e, "name", "");
+        x.kind = epoch_kind(optional_string(e, "kind", "grand_minimum"));
+        x.start_year = required_number(e, "start_year");
+        x.end_year = required_number(e, "end_year");
+        x.cycle_amplitude = optional_number(e, "cycle_amplitude", 0.0);
+        x.evidence = e.contains("evidence") ? optional_string(e, "evidence", "") : "";
+        t.epochs.push_back(x);
+    }
+    validate_solar_epochs(t.epochs, t.envelope);
+    if (l.contains("episodes")) {
+        const Json& e = required(l, "episodes");
+        only_keys(e, "long_term.episodes", {"window_years", "min_years", "grand_minimum_mean", "grand_maximum_mean"});
+        t.episode_window = static_cast<std::size_t>(optional_integer(e, "window_years", 11, 1, 101));
+        t.episode_min_years = static_cast<int>(optional_integer(e, "min_years", 20, 1, 500));
+        read_into(e, "grand_minimum_mean", t.episode_low);
+        read_into(e, "grand_maximum_mean", t.episode_high);
+        if (!(t.episode_low >= 0.0 && t.episode_low < t.episode_high && t.episode_high < 500.0)) throw std::invalid_argument("long_term.episodes needs 0 <= grand_minimum_mean < grand_maximum_mean < 500");
+    }
+    if (l.contains("secular_background")) {
+        const Json& s = required(l, "secular_background");
+        only_keys(s, "long_term.secular_background", {"timescale_years", "reference_start_year", "reference_end_year", "low", "central", "high"});
+        read_into(s, "timescale_years", t.secular_timescale);
+        t.reference_start = static_cast<int>(optional_integer(s, "reference_start_year", t.reference_start, 1600, 2500));
+        t.reference_end = static_cast<int>(optional_integer(s, "reference_end_year", t.reference_end, 1600, 2500));
+        read_into(s, "low", t.secular_low);
+        read_into(s, "central", t.secular_central);
+        read_into(s, "high", t.secular_high);
+    }
+    if (!(t.secular_timescale >= 1.0 && t.secular_timescale <= 200.0)) throw std::invalid_argument("long_term.secular_background.timescale_years must lie within 1-200");
+    if (!(t.secular_low >= 0.0 && t.secular_low <= t.secular_central && t.secular_central <= t.secular_high && t.secular_high <= 10.0))
+        throw std::invalid_argument("long_term.secular_background needs 0 <= low <= central <= high <= 10");
+    if (l.contains("cosmic_rays")) {
+        const Json& c = required(l, "cosmic_rays");
+        only_keys(c, "long_term.cosmic_rays", {"phi_min_mv", "phi_per_sunspot_mv", "background_weight", "production_offset_mv", "production_exponent"});
+        read_into(c, "phi_min_mv", t.cosmic.phi_min_mv);
+        read_into(c, "phi_per_sunspot_mv", t.cosmic.phi_per_sunspot_mv);
+        read_into(c, "background_weight", t.cosmic.background_weight);
+        read_into(c, "production_offset_mv", t.cosmic.production_offset_mv);
+        read_into(c, "production_exponent", t.cosmic.production_exponent);
+    }
+    validate_cosmic_rays(t.cosmic);
+    if (l.contains("volcanic")) {
+        const Json& v = required(l, "volcanic");
+        only_keys(v, "long_term.volcanic", {"rise_years", "eruptions", "note"});
+        read_into(v, "rise_years", t.volcanic_rise);
+        if (!(t.volcanic_rise >= 0.1 && t.volcanic_rise <= 5.0)) throw std::invalid_argument("long_term.volcanic.rise_years must lie within 0.1-5");
+        const Json& list = required(v, "eruptions");
+        if (!list.is_array() || list.size() > 200) throw std::invalid_argument("long_term.volcanic.eruptions must list at most 200 eruptions");
+        for (const Json& e : list) {
+            only_keys(e, "long_term.volcanic.eruptions[]", {"name", "year", "peak_forcing_w_m2"});
+            VolcanicEruption x{optional_string(e, "name", "eruption"), required_number(e, "year"), required_number(e, "peak_forcing_w_m2")};
+            if (!(x.peak_forcing_w_m2 <= 0.0 && x.peak_forcing_w_m2 >= -30.0)) throw std::invalid_argument("volcanic peak forcing must lie within -30-0 W/m2");
+            t.eruptions.push_back(x);
+        }
+    }
+    const Json& co2 = required(l, "co2_ppm");
+    if (!co2.is_array() || co2.size() < 2) throw std::invalid_argument("long_term.co2_ppm needs [year, ppm] points");
+    for (const Json& p : co2) {
+        if (!p.is_array() || p.size() != 2 || !p[0].is_number() || !p[1].is_number()) throw std::invalid_argument("long_term.co2_ppm points are [year, ppm]");
+        const double y = p[0].get<double>(), c = p[1].get<double>();
+        if (!t.co2.empty() && y <= t.co2.back().first) throw std::invalid_argument("long_term.co2_ppm years must increase");
+        if (!(c >= 150.0 && c <= 2000.0)) throw std::invalid_argument("long_term.co2_ppm values must lie within 150-2000 ppm");
+        t.co2.emplace_back(y, c);
+    }
+    if (l.contains("regional_winter")) {
+        const Json& g = required(l, "regional_winter");
+        only_keys(g, "long_term.regional_winter", {"name", "global_amplification", "top_down_k_per_uv_pct"});
+        t.regional_name = optional_string(g, "name", t.regional_name);
+        read_into(g, "global_amplification", t.regional_amplification);
+        read_into(g, "top_down_k_per_uv_pct", t.regional_top_down_k_per_uv_pct);
+        if (!(t.regional_amplification >= 0.0 && t.regional_amplification <= 5.0 && t.regional_top_down_k_per_uv_pct >= 0.0 && t.regional_top_down_k_per_uv_pct <= 1.0))
+            throw std::invalid_argument("long_term.regional_winter needs global_amplification within 0-5 and top_down_k_per_uv_pct within 0-1");
+    }
+    if (l.contains("future")) {
+        const Json& f = required(l, "future");
+        only_keys(f, "long_term.future", {"grand_minimum"});
+        const Json& g = required(f, "grand_minimum");
+        only_keys(g, "long_term.future.grand_minimum", {"first_cycle", "cycles", "amplitude"});
+        t.gm_first_cycle = static_cast<int>(optional_integer(g, "first_cycle", t.gm_first_cycle, -100, 1000));
+        t.gm_cycles = static_cast<int>(optional_integer(g, "cycles", t.gm_cycles, 1, 30));
+        read_into(g, "amplitude", t.gm_amplitude);
+        if (!(t.gm_amplitude >= 1.0 && t.gm_amplitude <= 100.0)) throw std::invalid_argument("long_term.future.grand_minimum.amplitude must lie within 1-100");
+    }
+    if (l.contains("dynamo")) {
+        const Json& d = required(l, "dynamo");
+        only_keys(d, "long_term.dynamo", {"weak_alpha", "babcock_leighton_noise", "emergence_threshold", "emergence_width", "quenching_field", "floor_noise", "amplitude_scale",
+                                          "cycle_mean_fraction", "episode_cycles", "statistics_cycles", "realizations", "cycles_ahead", "seed", "targets"});
+        auto& c = t.dynamo;
+        read_into(d, "weak_alpha", c.weak_alpha);
+        read_into(d, "babcock_leighton_noise", c.babcock_leighton_noise);
+        read_into(d, "emergence_threshold", c.emergence_threshold);
+        read_into(d, "emergence_width", c.emergence_width);
+        read_into(d, "quenching_field", c.quenching_field);
+        read_into(d, "floor_noise", c.floor_noise);
+        read_into(d, "amplitude_scale", c.amplitude_scale);
+        read_into(d, "cycle_mean_fraction", c.cycle_mean_fraction);
+        c.episode_cycles = static_cast<std::size_t>(optional_integer(d, "episode_cycles", 2, 1, 10));
+        t.dynamo_statistics_cycles = static_cast<std::size_t>(optional_integer(d, "statistics_cycles", 100000, 1000, 2000000));
+        t.dynamo_realizations = static_cast<std::size_t>(optional_integer(d, "realizations", 20000, 100, 1000000));
+        t.dynamo_cycles_ahead = static_cast<std::size_t>(optional_integer(d, "cycles_ahead", 10, 2, 50));
+        t.dynamo_seed = static_cast<std::uint64_t>(optional_integer(d, "seed", 13, 1, 1LL << 40));
+        if (d.contains("targets")) {
+            t.dynamo_targets = required(d, "targets");
+            only_keys(t.dynamo_targets, "long_term.dynamo.targets", {"source", "grand_minima_per_11400_years", "grand_minimum_fraction", "grand_minimum_mean_years",
+                                                                    "grand_maxima_per_11400_years", "grand_maximum_fraction", "grand_maximum_mean_years"});
+        }
+    }
+    // The episode thresholds of the dynamo follow the annual ones (decadal means).
+    t.dynamo.grand_minimum_mean = t.episode_low;
+    t.dynamo.grand_maximum_mean = t.episode_high;
+    validate_solar_dynamo(t.dynamo);
+    if (l.contains("case_study")) {
+        const Json& c = required(l, "case_study");
+        only_keys(c, "long_term.case_study", {"epoch", "from_year", "to_year"});
+        t.case_epoch = optional_string(c, "epoch", "");
+        t.case_from = static_cast<int>(optional_integer(c, "from_year", t.case_from, -10000, 2500));
+        t.case_to = static_cast<int>(optional_integer(c, "to_year", t.case_to, -10000, 2500));
+        if (std::none_of(t.epochs.begin(), t.epochs.end(), [&](const SolarEpoch& e) { return e.name == t.case_epoch; })) throw std::invalid_argument("long_term.case_study.epoch must name an epoch");
+        if (!(t.case_from < t.case_to)) throw std::invalid_argument("long_term.case_study needs from_year < to_year");
+    }
+    if (!(t.reference_start < t.reference_end)) throw std::invalid_argument("long_term.secular_background needs reference_start_year < reference_end_year");
+    return t;
+}
+
 // ---- Request -------------------------------------------------------------------------------------------------------
 
 struct Request {
@@ -170,12 +356,13 @@ struct Request {
     double butterfly_start_year{0.0};
     int butterfly_step_months{3};
     double butterfly_latitude_step{2.5}, butterfly_max_latitude{45.0};
+    LongTermRequest long_term;
 };
 
 Request parse_request(const Json& j) {
     Request r;
     r.echo = j;
-    only_keys(j, "request", {"schema_version", "record", "forecast", "irradiance", "atmosphere", "uv_sites", "flares", "climate", "disk", "butterfly"});
+    only_keys(j, "request", {"schema_version", "record", "forecast", "irradiance", "atmosphere", "uv_sites", "flares", "climate", "disk", "butterfly", "long_term"});
 
     const Json& rec = required(j, "record");
     r.kind = optional_string(rec, "kind", "cycle_table");
@@ -205,9 +392,11 @@ Request parse_request(const Json& j) {
             read_into(n, "autocorrelation", r.noise.autocorrelation);
             r.noise.seed = static_cast<std::uint64_t>(optional_integer(n, "seed", 1, 1, 1LL << 40));
         }
-        if (!(r.start_year >= 1600.0 && r.start_year <= r.table.front().minimum_year + 8.0)) throw std::invalid_argument("record.start_year must lie after 1600 and before the first table minimum + 8 years");
-        const bool listed = std::any_of(r.table.begin(), r.table.end(), [&](const SolarCycleTableEntry& e) { return e.number == r.first_cycle_number; });
-        if (!listed) throw std::invalid_argument("record.first_cycle_number must be a cycle of the table");
+        const auto first = std::find_if(r.table.begin(), r.table.end(), [&](const SolarCycleTableEntry& e) { return e.number == r.first_cycle_number; });
+        if (first == r.table.end()) throw std::invalid_argument("record.first_cycle_number must be a cycle of the table");
+        // The record must start early enough to detect that cycle's minimum (a 30-month window and 6 months of smoothing).
+        if (!(r.start_year >= 1600.0 && r.start_year >= r.table.front().minimum_year - 15.0 && r.start_year <= first->minimum_year - 3.0))
+            throw std::invalid_argument("record.start_year must lie after 1600, at most 15 years before the first table minimum and at least 3 years before the minimum of first_cycle_number");
     } else if (r.kind == "monthly") {
         only_keys(rec, "record", {"kind", "data_origin", "first_cycle_number", "first_year", "first_month", "values"});
         const int year = static_cast<int>(optional_integer(rec, "first_year", 0, 1600, 3000));
@@ -368,6 +557,10 @@ Request parse_request(const Json& j) {
     }
     if (!(r.butterfly_latitude_step >= 0.5 && r.butterfly_latitude_step <= 10.0) || !(r.butterfly_max_latitude >= 10.0 && r.butterfly_max_latitude <= 90.0))
         throw std::invalid_argument("butterfly latitudes need a step within 0.5-10 and a maximum within 10-90 degrees");
+    if (j.contains("long_term")) {
+        r.long_term = parse_long_term(required(j, "long_term"));
+        if (r.long_term.horizon_year < static_cast<int>(r.issue_year) + 1) throw std::invalid_argument("long_term.horizon_year must lie after the issue year");
+    }
     return r;
 }
 
@@ -402,6 +595,317 @@ Derived derive(const std::vector<double>& sn, const Request& r, double reference
 struct Flare {
     double peak_flux;
 };
+
+// ---- Long-term block -----------------------------------------------------------------------------------------------
+
+double mean_over(const std::vector<double>& v, int first_year, int from, int to) {
+    double s = 0.0;
+    int n = 0;
+    for (int y = std::max(from, first_year); y <= to && y - first_year < static_cast<int>(v.size()); ++y) { s += v[static_cast<std::size_t>(y - first_year)]; ++n; }
+    return n ? s / n : kNaN;
+}
+
+double interpolate_points(const std::vector<std::pair<double, double>>& p, double x) {
+    if (x <= p.front().first) return p.front().second;
+    if (x >= p.back().first) return p.back().second;
+    std::size_t k = 1;
+    while (p[k].first < x) ++k;
+    const double w = (x - p[k - 1].first) / (p[k].first - p[k - 1].first);
+    return p[k - 1].second + (p[k].second - p[k - 1].second) * w;
+}
+
+std::vector<double> run_climate(const std::vector<double>& forcing, const SolarClimateConfig& c) {
+    std::vector<double> out;
+    SolarClimateState s;
+    for (double f : forcing) { s = step_solar_climate(s, f, 1.0, c); out.push_back(s.surface_k); }
+    return out;
+}
+
+Json build_long_term(const Request& r, const MonthlySeries& record, const std::vector<SolarCycleCurve>& table_curves, const SolarCycleAnalysis& analysis,
+                     const SolarCycleForecast& forecast, int issue_month) {
+    const auto& t = r.long_term;
+    const auto& st = analysis.statistics;
+    const int Y0 = t.start_year, Y1 = t.horizon_year;
+    if (Y0 > 1800) throw std::invalid_argument("long_term.start_year must lie before 1800 (the pre-industrial reference ends in 1849)");
+    // Curves known before the record: the cycle table (or the fits of a monthly record), and before them the
+    // cycles synthesised from the epoch envelope.
+    std::vector<SolarCycleCurve> known;
+    std::vector<int> known_numbers;
+    if (!table_curves.empty()) {
+        known = table_curves;
+        for (const auto& e : r.table) known_numbers.push_back(e.number);
+    } else {
+        for (std::size_t k = 0; k < analysis.fits.size(); ++k) { known.push_back(analysis.fits[k].curve); known_numbers.push_back(analysis.cycles[k].number); }
+    }
+    const double first_onset = known.front().onset_year;
+    if (!(Y0 < first_onset - 11.0)) throw std::invalid_argument("long_term.start_year must lie at least a cycle before the first known cycle");
+    const HistoricalCycles hist = synthesize_historical_cycles(first_onset, known_numbers.front(), Y0, t.epochs, t.envelope, t.historical);
+    std::vector<SolarCycleCurve> before = hist.curves;
+    before.insert(before.end(), known.begin(), known.end());
+    // The future: the central forecast continued with the record's mean cycle, and a grand-minimum scenario.
+    std::vector<SolarCycleCurve> regular = forecast.central_curves;
+    std::vector<int> regular_numbers = forecast.central_cycle_numbers;
+    while (regular.back().onset_year < Y1 + 2.0) {
+        regular.push_back(make_solar_cycle_curve(regular.back().onset_year + st.mean_period_years, std::clamp(st.mean_amplitude, 1.0, 1000.0), st.mean_width_scale));
+        regular_numbers.push_back(regular_numbers.back() + 1);
+    }
+    if (t.gm_first_cycle <= analysis.current_cycle) throw std::invalid_argument("long_term.future.grand_minimum.first_cycle must be a cycle after the one in progress");
+    std::vector<SolarCycleCurve> minimum = regular;
+    for (std::size_t k = 0; k < regular.size(); ++k)
+        if (regular_numbers[k] >= t.gm_first_cycle && regular_numbers[k] < t.gm_first_cycle + t.gm_cycles)
+            minimum[k] = make_solar_cycle_curve(regular[k].onset_year, t.gm_amplitude, regular[k].width_scale);
+
+    // Annual series.
+    const std::size_t n = static_cast<std::size_t>(Y1 - Y0 + 1);
+    std::vector<double> sn(n), sn_gm(n), envelope(n);
+    Json source = Json::array();
+    for (int y = Y0; y <= Y1; ++y) {
+        double a = 0.0, g = 0.0;
+        int from_record = 0, from_future = 0;
+        for (int m = 0; m < 12; ++m) {
+            const int idx = y * 12 + m;
+            const double year = month_mid_year(idx);
+            double v, vg;
+            if (idx < record.first_month) { v = vg = cycles_value(before, year); }
+            else if (idx < issue_month) { v = vg = record.values[static_cast<std::size_t>(idx - record.first_month)]; ++from_record; }
+            else { v = cycles_value(regular, year); vg = cycles_value(minimum, year); ++from_future; }
+            a += v / 12.0;
+            g += vg / 12.0;
+        }
+        const std::size_t k = static_cast<std::size_t>(y - Y0);
+        sn[k] = a;
+        sn_gm[k] = g;
+        envelope[k] = solar_envelope(y + 0.5, t.epochs, t.envelope);
+        source.push_back(from_future >= 6 ? "forecast" : from_record >= 6 ? "record" : (y + 0.5 < first_onset ? "envelope" : (table_curves.empty() ? "record_fit" : "table")));
+    }
+    // The slow background and the irradiance.
+    const auto background = exponential_moving_average(sn, t.secular_timescale), background_gm = exponential_moving_average(sn_gm, t.secular_timescale);
+    if (t.reference_start < Y0 || t.reference_end > Y1) throw std::invalid_argument("long_term.secular_background reference years must lie within the long-term span");
+    const double m_ref = mean_over(background, Y0, t.reference_start, t.reference_end);
+    const auto& p = r.proxies;
+    const double sn_ref = p.reference_sunspot_number;
+    auto tsi_of = [&](double s, double m, double k) { return p.tsi_quiet_w_m2 + p.facular_brightening_w_m2 * (solar_facular_index(s, p) + k * (m - m_ref) / sn_ref) - p.spot_darkening_w_m2_per_sunspot * std::max(0.0, s); };
+    std::size_t uv_band = 0;
+    for (std::size_t b = 0; b < r.bands.size(); ++b) if (r.bands[b].key == "o2_herzberg") uv_band = b;
+    std::vector<double> tsi_low(n), tsi_central(n), tsi_high(n), tsi_gm(n), uv(n), uv_gm(n), ozone(n), strat(n), x_total(n);
+    for (std::size_t k = 0; k < n; ++k) {
+        tsi_low[k] = tsi_of(sn[k], background[k], t.secular_low);
+        tsi_central[k] = tsi_of(sn[k], background[k], t.secular_central);
+        tsi_high[k] = tsi_of(sn[k], background[k], t.secular_high);
+        tsi_gm[k] = tsi_of(sn_gm[k], background_gm[k], t.secular_central);
+        x_total[k] = solar_facular_index(sn[k], p) + t.secular_central * (background[k] - m_ref) / sn_ref;
+        const double xg = solar_facular_index(sn_gm[k], p) + t.secular_central * (background_gm[k] - m_ref) / sn_ref;
+        uv[k] = 100.0 * r.bands[uv_band].variability * x_total[k];
+        uv_gm[k] = 100.0 * r.bands[uv_band].variability * xg;
+        ozone[k] = 100.0 * r.atmosphere.ozone_change_at_reference * x_total[k];
+        strat[k] = r.atmosphere.stratosphere_warming_at_reference_k * x_total[k];
+    }
+    // Cosmic rays.
+    const auto sn3 = running_mean(sn, 3), sn3_gm = running_mean(sn_gm, 3);
+    std::vector<double> phi(n), phi_gm(n), production(n), production_gm(n);
+    for (std::size_t k = 0; k < n; ++k) { phi[k] = modulation_potential_mv(sn3[k], background[k], t.cosmic); phi_gm[k] = modulation_potential_mv(sn3_gm[k], background_gm[k], t.cosmic); }
+    const double phi_ref = mean_over(phi, Y0, t.reference_start, t.reference_end);
+    for (std::size_t k = 0; k < n; ++k) { production[k] = relative_cosmogenic_production(phi[k], phi_ref, t.cosmic); production_gm[k] = relative_cosmogenic_production(phi_gm[k], phi_ref, t.cosmic); }
+    // Forcings as anomalies about their pre-industrial means (Y0-1849), and the energy balance of each.
+    const int pre_end = 1849;
+    std::vector<double> volcanic(n), co2(n);
+    for (std::size_t k = 0; k < n; ++k) {
+        volcanic[k] = annual_volcanic_forcing_w_m2(Y0 + static_cast<int>(k), t.eruptions, t.volcanic_rise);
+        co2[k] = interpolate_points(t.co2, Y0 + static_cast<int>(k) + 0.5);
+    }
+    const double co2_pre = mean_over(co2, Y0, Y0, pre_end), volcanic_pre = mean_over(volcanic, Y0, Y0, pre_end);
+    const double albedo_factor = (1.0 - r.climate.albedo) / 4.0;
+    auto solar_forcing = [&](const std::vector<double>& tsi, double pre) { std::vector<double> f(n); for (std::size_t k = 0; k < n; ++k) f[k] = (tsi[k] - pre) * albedo_factor; return f; };
+    const double pre_low = mean_over(tsi_low, Y0, Y0, pre_end), pre_central = mean_over(tsi_central, Y0, Y0, pre_end), pre_high = mean_over(tsi_high, Y0, Y0, pre_end);
+    const auto f_low = solar_forcing(tsi_low, pre_low), f_central = solar_forcing(tsi_central, pre_central), f_high = solar_forcing(tsi_high, pre_high), f_gm = solar_forcing(tsi_gm, pre_central);
+    std::vector<double> f_volcanic(n), f_co2(n);
+    for (std::size_t k = 0; k < n; ++k) { f_volcanic[k] = volcanic[k] - volcanic_pre; f_co2[k] = co2_forcing_w_m2(co2[k], co2_pre); }
+    const auto t_low = run_climate(f_low, r.climate), t_central = run_climate(f_central, r.climate), t_high = run_climate(f_high, r.climate), t_gm = run_climate(f_gm, r.climate);
+    const auto t_volcanic = run_climate(f_volcanic, r.climate), t_co2 = run_climate(f_co2, r.climate);
+    std::vector<double> total(n), total_gm(n), regional(n), regional_gm(n);
+    const double uv_pre = mean_over(uv, Y0, Y0, pre_end);
+    for (std::size_t k = 0; k < n; ++k) {
+        total[k] = t_central[k] + t_volcanic[k] + t_co2[k];
+        total_gm[k] = t_gm[k] + t_volcanic[k] + t_co2[k];
+        regional[k] = t.regional_amplification * total[k] + t.regional_top_down_k_per_uv_pct * (uv[k] - uv_pre);
+        regional_gm[k] = t.regional_amplification * total_gm[k] + t.regional_top_down_k_per_uv_pct * (uv_gm[k] - uv_pre);
+    }
+
+    // Epochs: what the catalogue's epochs looked like, against the pre-industrial mean.
+    auto anomaly = [&](const std::vector<double>& v, int from, int to) { return mean_over(v, Y0, from, to) - mean_over(v, Y0, Y0, pre_end); };
+    Json epochs = Json::array();
+    for (const auto& e : t.epochs) {
+        const int from = std::max(Y0, static_cast<int>(std::ceil(e.start_year))), to = std::min(Y1, static_cast<int>(std::floor(e.end_year)));
+        if (from > to) continue;
+        epochs.push_back({{"name", e.name}, {"kind", solar_epoch_kind_name(e.kind)}, {"start_year", e.start_year}, {"end_year", e.end_year},
+                          {"cycle_amplitude", e.cycle_amplitude > 0.0 ? Json(e.cycle_amplitude) : Json(nullptr)}, {"evidence", e.evidence},
+                          {"mean_sunspot", fixed(mean_over(sn, Y0, from, to), 1)},
+                          {"tsi_vs_preindustrial_w_m2", {{"low", tidy(anomaly(tsi_low, from, to), 3)}, {"central", tidy(anomaly(tsi_central, from, to), 3)}, {"high", tidy(anomaly(tsi_high, from, to), 3)}}},
+                          {"tsi_vs_reference_w_m2", {{"low", tidy(mean_over(tsi_low, Y0, from, to) - mean_over(tsi_low, Y0, t.reference_start, t.reference_end), 3)},
+                                                     {"central", tidy(mean_over(tsi_central, Y0, from, to) - mean_over(tsi_central, Y0, t.reference_start, t.reference_end), 3)},
+                                                     {"high", tidy(mean_over(tsi_high, Y0, from, to) - mean_over(tsi_high, Y0, t.reference_start, t.reference_end), 3)}}},
+                          {"uv_200_242_pct", tidy(anomaly(uv, from, to), 3)}, {"ozone_pct", tidy(anomaly(ozone, from, to), 3)}, {"stratosphere_k", tidy(anomaly(strat, from, to), 3)},
+                          {"cosmogenic_production_pct", tidy(100.0 * (mean_over(production, Y0, from, to) / mean_over(production, Y0, Y0, pre_end) - 1.0), 3)},
+                          {"temperature_k", {{"solar_low", tidy(anomaly(t_low, from, to), 3)}, {"solar_central", tidy(anomaly(t_central, from, to), 3)}, {"solar_high", tidy(anomaly(t_high, from, to), 3)},
+                                             {"volcanic", tidy(anomaly(t_volcanic, from, to), 3)}, {"co2", tidy(anomaly(t_co2, from, to), 3)}, {"total", tidy(anomaly(total, from, to), 3)},
+                                             {"regional_winter", tidy(anomaly(regional, from, to), 3)}}}});
+    }
+    // Episodes detected in the series (up to the last year of the record).
+    const int last_record_year = issue_month / 12 - 1;
+    std::vector<double> observed(sn.begin(), sn.begin() + std::min<std::ptrdiff_t>(static_cast<std::ptrdiff_t>(n), last_record_year - Y0 + 1));
+    Json episodes = Json::array();
+    for (const auto& e : detect_solar_episodes(observed, Y0, t.episode_low, t.episode_high, t.episode_window, t.episode_min_years)) {
+        std::string matched;
+        for (const auto& c : t.epochs)
+            if (c.start_year <= e.end_year + 0.5 && e.start_year <= c.end_year &&
+                (e.grand_minimum ? (c.kind == SolarEpochKind::grand_minimum || c.kind == SolarEpochKind::minimum) : (c.kind == SolarEpochKind::grand_maximum || c.kind == SolarEpochKind::maximum)))
+                matched = c.name;
+        episodes.push_back({{"kind", e.grand_minimum ? "grand_minimum" : "grand_maximum"}, {"start_year", e.start_year}, {"end_year", e.end_year},
+                            {"years", e.end_year - e.start_year + 1}, {"mean_sunspot", fixed(e.mean_sunspot, 1)}, {"epoch", matched.empty() ? Json(nullptr) : Json(matched)}});
+    }
+    // Cycles over the whole span.
+    Json cycles = Json::array();
+    auto add_cycle = [&](const SolarCycleCurve& c, int number, const char* from, double scenario) {
+        if (c.peak_year() < Y0 || c.onset_year > Y1) return;
+        Json row = {{"number", number}, {"onset_year", fixed(c.onset_year, 2)}, {"peak_year", fixed(c.peak_year(), 2)}, {"amplitude", fixed(c.amplitude, 1)}, {"source", from}};
+        if (std::isfinite(scenario)) row["grand_minimum_scenario_amplitude"] = fixed(scenario, 1);
+        cycles.push_back(row);
+    };
+    for (std::size_t k = 0; k < hist.curves.size(); ++k) add_cycle(hist.curves[k], hist.numbers[k], "envelope", kNaN);
+    for (std::size_t k = 0; k < known.size(); ++k)
+        if (table_curves.empty() ? false : known_numbers[k] < r.first_cycle_number) add_cycle(known[k], known_numbers[k], "table", kNaN);
+    for (std::size_t k = 0; k < analysis.fits.size(); ++k) add_cycle(analysis.fits[k].curve, analysis.cycles[k].number, k + 1 == analysis.fits.size() ? "record_fit_in_progress" : "record_fit", kNaN);
+    const double forecast_end = forecast.year_at(forecast.months - 1);
+    for (std::size_t k = 0; k < regular.size(); ++k)
+        if (regular_numbers[k] > analysis.current_cycle)
+            add_cycle(regular[k], regular_numbers[k], regular[k].onset_year <= forecast_end ? "forecast_central" : "mean_continuation", minimum[k].amplitude);
+
+    // The future: a grand minimum against the regular continuation.
+    Json future_rows = Json::array();
+    const int issue_year = issue_month / 12;
+    for (int y : {2030, 2040, 2050, 2060, 2075, 2090, 2100}) {
+        if (y < issue_year || y > Y1) continue;
+        const std::size_t k = static_cast<std::size_t>(y - Y0), k0 = static_cast<std::size_t>(issue_year - Y0);
+        future_rows.push_back({{"year", y}, {"sunspot_regular", fixed(sn[k], 1)}, {"sunspot_grand_minimum", fixed(sn_gm[k], 1)}, {"tsi_difference_w_m2", tidy(tsi_gm[k] - tsi_central[k], 3)},
+                               {"uv_200_242_difference_pct", tidy(uv_gm[k] - uv[k], 3)}, {"global_difference_k", tidy(total_gm[k] - total[k], 3)},
+                               {"regional_winter_difference_k", tidy(regional_gm[k] - regional[k], 3)}, {"co2_warming_since_issue_k", tidy(t_co2[k] - t_co2[k0], 3)}});
+    }
+    double largest = 0.0;
+    int largest_year = Y0;
+    for (std::size_t k = 0; k < n; ++k) if (total_gm[k] - total[k] < largest) { largest = total_gm[k] - total[k]; largest_year = Y0 + static_cast<int>(k); }
+
+    // The dynamo map: long-run statistics, an example grand minimum, a synthetic Holocene and the outlook.
+    const auto& dc = t.dynamo;
+    NormalSequence random(t.dynamo_seed);
+    const auto steps = simulate_solar_dynamo(dc, 1.0, t.dynamo_statistics_cycles, random);
+    std::vector<double> amps;
+    for (const auto& s : steps) amps.push_back(s.amplitude);
+    const double years_per_cycle = st.mean_period_years;
+    const auto ds = dynamo_statistics(amps, dc, years_per_cycle);
+    const auto all_episodes = dynamo_episodes(amps, dc);
+    // The example: the first Maunder-like grand minimum (5-8 cycles, spots practically gone in at least one cycle).
+    Json example = nullptr;
+    for (const auto& e : all_episodes) {
+        if (!e.grand_minimum || e.length < 5 || e.length > 8 || e.start < 12 || e.start + e.length + 12 > steps.size()) continue;
+        double deepest = 1e9;
+        for (std::size_t i = e.start; i < e.start + e.length; ++i) deepest = std::min(deepest, steps[i].amplitude);
+        if (deepest > 5.0) continue;
+        Json field = Json::array(), emergence = Json::array(), efficiency = Json::array(), amplitude = Json::array();
+        for (std::size_t i = e.start - 10; i < e.start + e.length + 10; ++i) {
+            field.push_back(fixed(steps[i].field, 3)); emergence.push_back(fixed(steps[i].emergence, 3));
+            efficiency.push_back(fixed(steps[i].efficiency, 3)); amplitude.push_back(fixed(steps[i].amplitude, 1));
+        }
+        example = {{"first_cycle", e.start - 10}, {"episode_start", 10}, {"episode_cycles", e.length}, {"field", field}, {"emergence", emergence}, {"efficiency", efficiency}, {"amplitude", amplitude}};
+        break;
+    }
+    const std::size_t holocene = std::min<std::size_t>(amps.size(), static_cast<std::size_t>(std::ceil(11400.0 / years_per_cycle)));
+    Json holocene_amplitudes = Json::array(), holocene_episodes = Json::array();
+    for (std::size_t i = 0; i < holocene; ++i) holocene_amplitudes.push_back(fixed(amps[i], 1));
+    for (const auto& e : all_episodes)
+        if (e.start + e.length <= holocene) holocene_episodes.push_back({{"kind", e.grand_minimum ? "grand_minimum" : "grand_maximum"}, {"start", e.start}, {"cycles", e.length}});
+    Json lengths = Json::array();
+    for (std::size_t L = 0; L < ds.grand_minimum_lengths.size(); ++L) if (ds.grand_minimum_lengths[L]) lengths.push_back({{"cycles", L}, {"count", ds.grand_minimum_lengths[L]}});
+    const std::vector<double> last_two = {analysis.fits[analysis.fits.size() - 2].curve.amplitude, analysis.fits.back().curve.amplitude};
+    const auto outlook = dynamo_outlook(dc, last_two, t.dynamo_cycles_ahead, t.dynamo_realizations, t.dynamo_seed + 1);
+    Json outlook_rows = Json::array();
+    double before_horizon = 0.0;
+    const double last_peak = analysis.fits.back().curve.peak_year();
+    for (std::size_t k = 0; k < t.dynamo_cycles_ahead; ++k) {
+        const int number = analysis.current_cycle + 1 + static_cast<int>(k);
+        double peak = last_peak + static_cast<double>(k + 1) * years_per_cycle;
+        for (std::size_t j = 0; j < regular.size(); ++j) if (regular_numbers[j] == number) peak = regular[j].peak_year();
+        if (peak <= Y1) before_horizon = outlook.grand_minimum_begun[k];
+        outlook_rows.push_back({{"cycle", number}, {"peak_year", fixed(peak, 1)}, {"grand_minimum_begun", tidy(outlook.grand_minimum_begun[k], 3)}, {"below_threshold", tidy(outlook.below_threshold[k], 3)},
+                                {"amplitude_p5", fixed(outlook.amplitude_p5[k], 1)}, {"amplitude_p50", fixed(outlook.amplitude_p50[k], 1)}, {"amplitude_p95", fixed(outlook.amplitude_p95[k], 1)}});
+    }
+    const double rate = ds.grand_minima_per_11400_years / 11400.0;
+    Json dynamo = {
+        {"config", {{"weak_alpha", dc.weak_alpha}, {"babcock_leighton_noise", dc.babcock_leighton_noise}, {"babcock_leighton_efficiency", tidy(dc.babcock_leighton_efficiency(), 5)},
+                    {"emergence_threshold", dc.emergence_threshold}, {"emergence_width", dc.emergence_width}, {"quenching_field", dc.quenching_field}, {"floor_noise", dc.floor_noise},
+                    {"amplitude_scale", dc.amplitude_scale}, {"cycle_mean_fraction", dc.cycle_mean_fraction}, {"grand_minimum_mean", dc.grand_minimum_mean},
+                    {"grand_maximum_mean", dc.grand_maximum_mean}, {"episode_cycles", dc.episode_cycles}, {"seed", t.dynamo_seed}, {"years_per_cycle", fixed(years_per_cycle, 3)}}},
+        {"statistics", {{"cycles", ds.cycles}, {"years", fixed(ds.years, 0)}, {"grand_minimum_fraction", tidy(ds.grand_minimum_fraction, 3)},
+                        {"grand_minima_per_11400_years", tidy(ds.grand_minima_per_11400_years, 3)}, {"grand_minimum_mean_years", tidy(ds.grand_minimum_mean_years, 3)},
+                        {"grand_minimum_longest_years", tidy(ds.grand_minimum_longest_years, 3)}, {"grand_maximum_fraction", tidy(ds.grand_maximum_fraction, 3)},
+                        {"grand_maxima_per_11400_years", tidy(ds.grand_maxima_per_11400_years, 3)}, {"grand_maximum_mean_years", tidy(ds.grand_maximum_mean_years, 3)},
+                        {"mean_amplitude_outside_minima", fixed(ds.mean_amplitude_outside_minima, 1)}, {"amplitude_autocorrelation", tidy(ds.amplitude_autocorrelation, 3)},
+                        {"mean_waiting_years", tidy(ds.mean_waiting_years, 3)}, {"grand_minimum_lengths", lengths}}},
+        {"targets", t.dynamo_targets},
+        {"example", example},
+        {"holocene", {{"amplitudes", holocene_amplitudes}, {"episodes", holocene_episodes}, {"years_per_cycle", fixed(years_per_cycle, 3)}}},
+        {"outlook", {{"observed_amplitudes", {fixed(last_two[0], 1), fixed(last_two[1], 1)}}, {"realizations", t.dynamo_realizations}, {"cycles", outlook_rows},
+                     {"grand_minimum_by_horizon", tidy(before_horizon, 3)},
+                     {"poisson_by_horizon", tidy(1.0 - std::exp(-rate * (Y1 - r.issue_year)), 3)}}},
+    };
+
+    // Secular background summary: the TSI of the case-study epoch against the reference period, per scenario.
+    Json secular = {{"timescale_years", t.secular_timescale}, {"reference_start_year", t.reference_start}, {"reference_end_year", t.reference_end},
+                    {"reference_background_sunspot", fixed(m_ref, 2)}, {"facular_index_per_sunspot", {{"low", t.secular_low}, {"central", t.secular_central}, {"high", t.secular_high}}}};
+    auto vec = [&](const std::vector<double>& v, int digits) { return tidy_array(v, digits); };
+    Json series = {
+        {"sunspot", fixed_array(sn, 1)}, {"decadal_sunspot", fixed_array(running_mean(sn, t.episode_window), 1)}, {"sunspot_grand_minimum_scenario", fixed_array(sn_gm, 1)},
+        {"source", source}, {"envelope", fixed_array(envelope, 1)},
+        {"background_sunspot", fixed_array(background, 1)},
+        {"tsi_w_m2", {{"low", fixed_array(tsi_low, 3)}, {"central", fixed_array(tsi_central, 3)}, {"high", fixed_array(tsi_high, 3)}, {"grand_minimum_scenario", fixed_array(tsi_gm, 3)}}},
+        {"uv_200_242_pct", fixed_array(uv, 3)}, {"uv_200_242_grand_minimum_pct", fixed_array(uv_gm, 3)}, {"ozone_pct", fixed_array(ozone, 3)}, {"stratosphere_k", fixed_array(strat, 3)},
+        {"modulation_potential_mv", fixed_array(phi, 0)}, {"cosmogenic_production", fixed_array(production, 3)}, {"cosmogenic_production_grand_minimum", fixed_array(production_gm, 3)},
+        {"co2_ppm", fixed_array(co2, 1)},
+        {"forcing_w_m2", {{"solar_low", vec(f_low, 3)}, {"solar_central", vec(f_central, 3)}, {"solar_high", vec(f_high, 3)}, {"solar_grand_minimum", vec(f_gm, 3)},
+                          {"volcanic", vec(f_volcanic, 3)}, {"co2", vec(f_co2, 3)}}},
+        {"temperature_k", {{"solar_low", vec(t_low, 3)}, {"solar_central", vec(t_central, 3)}, {"solar_high", vec(t_high, 3)}, {"solar_grand_minimum", vec(t_gm, 3)},
+                           {"volcanic", vec(t_volcanic, 3)}, {"co2", vec(t_co2, 3)}, {"total", vec(total, 3)}, {"total_grand_minimum", vec(total_gm, 3)},
+                           {"regional_winter", vec(regional, 3)}, {"regional_winter_grand_minimum", vec(regional_gm, 3)}}},
+    };
+    Json eruptions = Json::array();
+    for (const auto& e : t.eruptions) eruptions.push_back({{"name", e.name}, {"year", e.year}, {"peak_forcing_w_m2", e.peak_forcing_w_m2}});
+    Json co2_points = Json::array();
+    for (const auto& [y, c] : t.co2) co2_points.push_back({y, c});
+    return {
+        {"start_year", Y0}, {"horizon_year", Y1}, {"preindustrial_end_year", pre_end}, {"issue_year", r.issue_year},
+        {"series", series},
+        {"epochs", epochs}, {"episodes", episodes}, {"cycles", cycles},
+        {"episode_definition", {{"window_years", t.episode_window}, {"min_years", t.episode_min_years}, {"grand_minimum_mean", t.episode_low}, {"grand_maximum_mean", t.episode_high}}},
+        {"envelope", {{"normal_amplitude", t.envelope.normal_amplitude}, {"transition_years", t.envelope.transition_years}, {"first_known_onset", fixed(first_onset, 2)}}},
+        {"secular_background", secular},
+        {"cosmic_rays", {{"phi_min_mv", t.cosmic.phi_min_mv}, {"phi_per_sunspot_mv", t.cosmic.phi_per_sunspot_mv}, {"background_weight", t.cosmic.background_weight},
+                         {"production_offset_mv", t.cosmic.production_offset_mv}, {"production_exponent", t.cosmic.production_exponent}, {"reference_phi_mv", fixed(phi_ref, 1)}}},
+        {"volcanic", {{"rise_years", t.volcanic_rise}, {"eruptions", eruptions}, {"preindustrial_mean_w_m2", tidy(volcanic_pre, 4)}}},
+        {"co2", {{"points", co2_points}, {"preindustrial_mean_ppm", fixed(co2_pre, 2)}}},
+        {"regional_winter", {{"name", t.regional_name}, {"global_amplification", t.regional_amplification}, {"top_down_k_per_uv_pct", t.regional_top_down_k_per_uv_pct},
+                             {"uv_band", r.bands[uv_band].key}}},
+        {"future", {{"grand_minimum", {{"first_cycle", t.gm_first_cycle}, {"cycles", t.gm_cycles}, {"amplitude", t.gm_amplitude}}}, {"rows", future_rows},
+                    {"largest_global_difference_k", tidy(largest, 3)}, {"largest_difference_year", largest_year}}},
+        {"dynamo", dynamo},
+        {"case_study", t.case_epoch.empty() ? Json(nullptr) : Json{{"epoch", t.case_epoch}, {"from_year", t.case_from}, {"to_year", t.case_to}}},
+        {"limitations", Json::array({
+            "before the cycle table the cycles are synthesised around a catalogue of epochs (a summary of the literature, not a reconstruction): their dates and amplitudes are illustrative",
+            "the slow brightening of the quiet Sun is uncertain: low, central and high TSI scenarios span it",
+            "the cosmogenic production is a calibrated proxy, not cosmic-ray transport; no geomagnetic-field change",
+            "volcanic and CO2 forcings are rounded comparison forcings; no aerosols besides volcanoes, no land use, no orbital forcing",
+            "the regional winter response is an illustrative parametrisation of the top-down pathway, not a circulation model",
+            "the dynamo map is a conceptual model calibrated to grand-minimum statistics; it makes grand maxima too short and too rare"})},
+    };
+}
 
 void print_usage(const char* executable) { std::cerr << "Usage: " << executable << " <run-request.json> <output-timeline.json>\n"; }
 
@@ -920,6 +1424,7 @@ int main(int argc, char** argv) {
                     "the disk shows an illustrative day: region positions, sizes and flares are random draws consistent with the cycle, not solar observations"})},
             }},
         };
+        if (r.long_term.enabled) output["solar"]["long_term"] = build_long_term(r, record, table_curves, analysis, forecast, issue_month);
         std::ofstream out(argv[2]);
         if (!out) throw std::runtime_error(std::string("cannot write output: ") + argv[2]);
         out << output.dump() << '\n';
