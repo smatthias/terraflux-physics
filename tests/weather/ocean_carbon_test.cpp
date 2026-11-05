@@ -148,6 +148,13 @@ void column_budgets_and_dead_zones() {
     for (int step = 0; step < 24 * 20; ++step) s = advance_bgc(s, winter, c, 3600.0);
     require(s.oxygen[4] > 180.0, "deep winter mixing re-oxygenates the bottom water");
     require(assess_habitat(s, winter, c).dead_zone[0] == 0, "the dead zone is seasonal");
+    // Levels with (nearly) the same oxygen: the minimum is reported at the shallowest of them, not wherever
+    // rounding puts it.
+    auto even = s;
+    for (std::size_t k = 0; k < 5; ++k) even.oxygen[k] = 200.0 + (k == 3 ? -1e-9 : 1e-9 * static_cast<double>(k));
+    require_near(assess_habitat(even, winter, c).minimum_oxygen_depth_m[0], 2.5, "ties resolve to the shallowest level", 1e-12);
+    even.oxygen[3] = 150.0;
+    require_near(assess_habitat(even, winter, c).minimum_oxygen_depth_m[0], 25.0, "a real minimum is found at its level", 1e-12);
 }
 
 void air_sea_carbon_and_export() {

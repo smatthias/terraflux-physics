@@ -154,7 +154,7 @@ Each level gets a habitat class. Each column takes the class of its worst level.
 - **Dead zone** — a cell whose bottom water is hypoxic, or whose column is hypoxic over at least 20 % of its depth (`dead_zone_column_fraction`).
 - **Reported per cell:**
   - habitable share of the column, hypoxic thickness;
-  - bottom and lowest O₂ (with the depth of the minimum);
+  - bottom and lowest O₂, with the depth of the minimum (the shallowest level within 0.001 µmol/kg of it, so levels the mixed layer made equal do not trade places with rounding);
   - surface and bottom Ω, surface pH and pCO₂.
 - **Reported in total:**
   - sea, dead-zone, anoxic and corrosive areas;

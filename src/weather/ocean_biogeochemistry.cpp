@@ -603,13 +603,18 @@ MarineHabitat assess_habitat(const MarineBgcState& s, const MarineBgcForcing& f,
             total += dz;
             if (cls == 0) habitable += dz;
             if (cls >= 2) hypoxic += dz;
-            if (o2 < min_o2) { min_o2 = o2; min_depth = level_top_m(c, k) + 0.5 * dz; }
+            min_o2 = std::min(min_o2, o2);
             if (k == 0) { h.surface_ph[i] = cs.ph_total; h.surface_omega_aragonite[i] = cs.omega_aragonite; h.surface_pco2_uatm[i] = cs.pco2_uatm; h.corrosive_surface[i] = cs.omega_aragonite < c.corrosive_omega; }
             if (k + 1 == n) { h.bottom_oxygen_umol_kg[i] = o2; h.bottom_omega_aragonite[i] = cs.omega_aragonite; h.corrosive_bottom[i] = cs.omega_aragonite < c.corrosive_omega; }
         }
         h.column_class[i] = worst;
         h.habitable_fraction[i] = total > 0.0 ? habitable / total : 0.0;
         h.hypoxic_thickness_m[i] = hypoxic;
+        // The depth of the minimum: the shallowest level within 0.001 umol/kg of it, so that levels the mixed
+        // layer made equal do not trade places with rounding.
+        for (std::size_t k = 0; k < n; ++k) {
+            if (s.oxygen[base + k] <= min_o2 + 1.0e-3) { min_depth = level_top_m(c, k) + 0.5 * thickness(c, col, k); break; }
+        }
         h.minimum_oxygen_umol_kg[i] = min_o2;
         h.minimum_oxygen_depth_m[i] = min_depth;
         h.dead_zone[i] = h.bottom_oxygen_umol_kg[i] < c.hypoxia_umol_kg || (total > 0.0 && hypoxic / total >= c.dead_zone_column_fraction);

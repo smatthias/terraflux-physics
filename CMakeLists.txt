@@ -257,11 +257,13 @@ if(BUILD_TESTING)
         --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/polar/engine-timeline.json --check)
     add_test(NAME weather.polar_ocean_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/polar_ocean_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
-    # Regenerates the ten-year polar ocean fixture (about 5 minutes): excluded by `ctest -LE slow`.
+    # Regenerates the ten-year polar ocean fixture (about 5 minutes): excluded by `ctest -LE slow`. Ten years of
+    # sea ice turn last-bit differences between compilers into different weather at the ice edge (same climate):
+    # fields are compared by their relative RMS difference (10 %; the ocean fields differ by well under 1 %).
     add_test(NAME weather.viewer_polar_ocean
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
         --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/polar-ocean-request.json
-        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/polar-ocean/engine-timeline.json --check)
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/polar-ocean/engine-timeline.json --check --field-tolerance 0.1)
     set_tests_properties(weather.viewer_polar_ocean PROPERTIES TIMEOUT 1200 LABELS slow)
     add_test(NAME weather.ocean_heat_rain_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_heat_rain_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
