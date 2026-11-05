@@ -861,6 +861,45 @@
       "items": {
         "type": "string"
       }
+    },
+    "solar_cycle": {
+      "type": "object",
+      "description": "Present only when the request had a solar_cycle section.",
+      "required": [
+        "timeline_path",
+        "first_year",
+        "last_year",
+        "reference_tsi_w_m2",
+        "warming",
+        "arctic_shortwave",
+        "max_abs_warming_k"
+      ],
+      "properties": {
+        "timeline_path": {
+          "type": "string"
+        },
+        "first_year": {
+          "type": "integer"
+        },
+        "last_year": {
+          "type": "integer"
+        },
+        "reference_tsi_w_m2": {
+          "type": "number"
+        },
+        "warming": {
+          "type": "boolean"
+        },
+        "arctic_shortwave": {
+          "type": "boolean"
+        },
+        "max_abs_warming_k": {
+          "type": "number"
+        },
+        "applied_to": {
+          "type": "string"
+        }
+      }
     }
   }
 }

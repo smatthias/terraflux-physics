@@ -22,6 +22,7 @@
 #include "terraflux/weather/ocean_biogeochemistry.hpp"
 #include "terraflux/weather/ocean_circulation.hpp"
 #include "terraflux/weather/sea_ice.hpp"
+#include "terraflux/weather/solar_forcing.hpp"
 #include "terraflux/weather/synthetic_terrain.hpp"
 #include "utc_time.hpp"
 
@@ -479,6 +480,8 @@ struct AirSeaRequest {
     double pressure_pa{101325.0};
     std::string shortwave_kind{"astronomical"};
     double shortwave_w_m2{200.0};
+    double solar_constant_w_m2{kSolarConstantW_m2};          // top-of-atmosphere irradiance of the astronomical shortwave
+    std::optional<SolarForcingSeries> solar_cycle;           // or the solar cycle of a solar-cycle run, as an anomaly
     double seasonal_amplitude_south_k{0.0}, seasonal_amplitude_north_k{0.0};   // air temperature cycle, warmest mid-July
     bool rain_saturates_air{true};
     std::vector<AirMass> air_masses;
@@ -743,6 +746,24 @@ void parse_air_sea(const Json& section, ForcingRequest& f, OceanConfig& c, Json&
             shortwave = {{"kind", "constant"}, {"w_m2", a.shortwave_w_m2}};
         } else if (a.shortwave_kind != "astronomical") {
             throw std::invalid_argument("air_sea.shortwave.kind must be astronomical or constant");
+        }
+        // The Sun's irradiance: a fixed solar constant, or the solar cycle of a terraflux-run-solar-cycle timeline
+        // applied as an anomaly (1361 W/m2 + TSI(t) - the run's mean TSI) at each step's date.
+        if (sw.contains("solar_constant_w_m2") || sw.contains("solar_cycle_path")) {
+            if (a.shortwave_kind != "astronomical") throw std::invalid_argument("air_sea.shortwave solar_constant_w_m2 and solar_cycle_path need the astronomical shortwave");
+            if (sw.contains("solar_constant_w_m2") && sw.contains("solar_cycle_path")) throw std::invalid_argument("air_sea.shortwave takes either solar_constant_w_m2 or solar_cycle_path");
+        }
+        if (sw.contains("solar_constant_w_m2")) {
+            a.solar_constant_w_m2 = required_number(sw, "solar_constant_w_m2");
+            if (a.solar_constant_w_m2 < 1300.0 || a.solar_constant_w_m2 > 1400.0) throw std::invalid_argument("air_sea.shortwave.solar_constant_w_m2 must lie within 1300-1400");
+            shortwave["solar_constant_w_m2"] = a.solar_constant_w_m2;
+        }
+        if (sw.contains("solar_cycle_path")) {
+            const std::string path = required_string(sw, "solar_cycle_path");
+            a.solar_cycle = load_solar_forcing(path);
+            shortwave["solar_cycle"] = {{"path", path}, {"first_year", static_cast<int>(a.solar_cycle->years.front())}, {"last_year", static_cast<int>(a.solar_cycle->years.back())},
+                                        {"reference_tsi_w_m2", a.solar_cycle->reference_tsi_w_m2},
+                                        {"applied_as", "1361 W/m2 + (annual TSI of the solar run at the model date - its mean TSI); the mean Sun outside its years"}};
         }
     }
     Json masses = Json::array();
@@ -1127,6 +1148,7 @@ OceanForcing forcing_at(const ForcingRequest& f, double elapsed, double dt, cons
         const double epoch = f.start_epoch_seconds + mid, days = std::floor(epoch / 86400.0);
         const double utc_hour = (epoch - days * 86400.0) / 3600.0;
         const double day_of_year = fractional_day_of_year(static_cast<std::int64_t>(days), utc_hour);
+        const double solar_constant = a.solar_cycle ? kSolarConstantW_m2 + a.solar_cycle->tsi_anomaly_at(decimal_year_from_epoch(epoch)) : a.solar_constant_w_m2;
         const double lat0 = g.geographic_anchor_latitude_deg, lon0 = g.geographic_anchor_longitude_deg;
         for (std::size_t i = 0; i < count; ++i) {
             const double lat = lat0 + cell_north(i) / 111195.0, lon = lon0 + cell_east(i) / (111195.0 * std::cos(lat0 * kPi / 180.0));
@@ -1175,7 +1197,7 @@ OceanForcing forcing_at(const ForcingRequest& f, double elapsed, double dt, cons
             out.wind_speed_m_s[i] = std::min(80.0, wind);
             out.cloud_fraction[i] = std::min(1.0, std::max(0.0, cloud));
             out.shortwave_down_w_m2[i] = a.shortwave_kind == "constant" ? a.shortwave_w_m2
-                : std::min(1400.0, surface_shortwave_w_m2(solar_cosine_zenith(lat, lon, day_of_year, utc_hour), vapour_pressure_pa(q, pressure), out.cloud_fraction[i]));
+                : std::min(1400.0, surface_shortwave_w_m2(solar_cosine_zenith(lat, lon, day_of_year, utc_hour), vapour_pressure_pa(q, pressure), out.cloud_fraction[i], solar_constant));
         }
     }
     // Default rain temperature: coupled wet bulb, the wet bulb of the air-sea atmosphere, or the target + offset.

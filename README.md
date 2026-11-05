@@ -42,6 +42,12 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
   - The sea's carbonate chemistry (pH, aragonite saturation) and air–sea CO₂/O₂ exchange.
   - Carbon, oxygen and nitrate on depth levels to the seafloor: river nitrate, plankton, sinking and seafloor respiration.
   - Habitat classes (habitable, stressed, hypoxic, anoxic) and seasonal dead zones, today and in 2100.
+- `docs/weather/solar-cycle-model.md`, `solar-cycle-run-v1.schema.json` and `solar-cycle-v1.schema.json`: the Sun's 11-year cycle and what it does to the Earth.
+  - The sunspot record (SILSO monthly file, or synthesised from a cycle table), Hathaway cycle curves, minima and maxima of the 13-month smoothed series.
+  - A forecast of the cycle in progress and the next ones with an ensemble, tested by a backtest on the past cycles.
+  - TSI, F10.7, Mg II and UV bands from Lyman-α to UV-A; ozone, the stratosphere and the surface UV index.
+  - Flare rates and sizes, NOAA radio-blackout levels and flare energy; the global temperature response; the solar disk and the butterfly diagram.
+  - A forcing export that the ocean shortwave and the polar-melt scenarios can take.
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -58,12 +64,14 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `examples/weather/maps/` — synthetic palette rasters and metadata
 - `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
+- `tools/silso_to_request.py` — turn a downloaded SILSO monthly sunspot file into the record of a solar-cycle request
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
 - `terraflux-run-coupled-wind` — the same wind coupled with temperature, humidity and diagnosed density, with configurable diffusion; writes a viewer-ready timeline, optionally with per-cell vertical column diagnostics
 - `terraflux-run-coastal-flooding`: a rising sea on a coast (land lost, storm floods, defences overtopped, rivers pushed back, salt intrusion, islands), year by year for the polar-melt scenarios; writes a viewer timeline with a `coast` block
 - `terraflux-run-polar-melt`: Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios over centuries; writes a viewer timeline with a `polar` block
+- `terraflux-run-solar-cycle`: the sunspot cycle with its minima, maxima and forecast, and the UV, ozone, flares and climate response it brings; writes a viewer timeline with solar-disk frames and a `solar` block
 - `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
@@ -262,6 +270,29 @@ python3 tools/make_ocean_carbon_examples.py   # writes the two example requests
 - the sea coloured by bottom oxygen, habitat, oxygen at a chosen depth, pH, aragonite saturation, CO₂ flux, production or nitrate; the land by the CO₂ in the air;
 - dead zones as red volumes with outlines, anoxic columns ☠, corrosive water in magenta, the CO₂ sources and the river mouths with their nitrate loads;
 - metrics, charts of the year (dead zones, uptake, pH, Ω, CO₂ in the air, production), the water column of a cell with its oxygen over the year, a dead-zone table, the carbon budgets of sea and air, and a today ↔ 2100 comparison.
+
+**The Sun: the solar cycle, UV, flares and the climate.** `terraflux-run-solar-cycle` reads a monthly sunspot record (converted from SILSO with `tools/silso_to_request.py`, or synthesised from a table of cycles) and:
+
+- finds the minima and maxima of the 13-month smoothed sunspot number and fits every cycle with a Hathaway curve;
+- forecasts the cycle in progress and the next ones: a fit to the cycle so far, weighed against a prior from the earlier cycles by the errors a backtest on the past cycles found at the same age, and a 200-member ensemble for the next minimum and maximum with their ranges;
+- turns the cycle into TSI, F10.7, Mg II and UV bands, ozone and stratospheric temperature, the clear-sky noon UV index at sites, flare rates and NOAA radio-blackout probabilities, and the global surface temperature of a two-layer energy balance;
+- exports annual TSI and temperature response that the ocean shortwave (`forcing.air_sea.shortwave.solar_cycle_path`) and the polar-melt scenarios (`solar_cycle`) can take.
+
+See [solar-cycle-model.md](docs/weather/solar-cycle-model.md).
+
+```sh
+./build/terraflux-run-solar-cycle examples/solar-cycle-request.json solar.json   # about 7 s
+# Real data: download SN_m_tot_V2.0.csv from SILSO, then
+python3 tools/silso_to_request.py SN_m_tot_V2.0.csv --start 1850-01 --first-cycle 10 --output my-solar-request.json
+```
+
+The example's record is synthesised from an approximate, hand-entered table of the SILSO cycles 9–25 (not verified against the SILSO files) with monthly noise; its dates illustrate the method rather than forecast the real Sun.
+
+**☀ Load solar cycle & space weather example** opens the **Sun & solar cycle** view. It shows:
+
+- the solar disk as a dome: limb-darkened photosphere, spot groups at the latitudes of their cycle's zone, faculae, and the month's flares coloured by radio-blackout level; the disk can be coloured by brightness, by contrast to the quiet Sun, or by cycle;
+- the sunspot chart with record, smoothed series, fitted curves and the forecast's 50 % and 90 % ranges, and a table of minima and maxima with the predicted ones;
+- the backtest skill by cycle age, the UV spectrum of the cycle, TSI, UV at the top against the UV index at the ground with a site table, flare counts, the radio-blackout table and an annual flare outlook, the climate response, and the butterfly diagram.
 
 The field-layer list is folded into topic groups showing only layers with data, with a tooltip for every layer and example.
 

@@ -113,11 +113,11 @@ class NormalSequence {
 public:
     explicit NormalSequence(std::uint64_t seed);
     double next();
+    double uniform();                           // (0, 1); shares the state with next()
 private:
     std::uint64_t state_;
     bool has_spare_{false};
     double spare_{0.0};
-    double uniform();
 };
 
 }  // namespace terraflux::weather

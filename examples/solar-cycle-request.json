@@ -1,0 +1,213 @@
+{
+  "schema_version": "terraflux.solar.cycle-run/v1",
+  "record": {
+    "kind": "cycle_table",
+    "data_origin": "Approximate SILSO sunspot number v2 cycle table (dates of the minima and maxima of the 13-month smoothed series and the maximum values, rounded; cycle 25's maximum provisional), entered by hand and not verified against the SILSO files: check before quantitative use. The monthly values are synthesised from it with noise; they are not observations.",
+    "first_cycle_number": 10,
+    "start_year": 1850.0,
+    "calibrate_widths": false,
+    "noise": {
+      "factor": 2.5,
+      "autocorrelation": 0.6,
+      "seed": 11
+    },
+    "cycles": [
+      {
+        "number": 9,
+        "minimum_year": 1843.5,
+        "maximum_year": 1848.1,
+        "maximum": 219.9
+      },
+      {
+        "number": 10,
+        "minimum_year": 1855.9,
+        "maximum_year": 1860.1,
+        "maximum": 186.2
+      },
+      {
+        "number": 11,
+        "minimum_year": 1867.2,
+        "maximum_year": 1870.6,
+        "maximum": 234.0
+      },
+      {
+        "number": 12,
+        "minimum_year": 1878.9,
+        "maximum_year": 1883.9,
+        "maximum": 124.4
+      },
+      {
+        "number": 13,
+        "minimum_year": 1890.2,
+        "maximum_year": 1894.1,
+        "maximum": 146.5
+      },
+      {
+        "number": 14,
+        "minimum_year": 1902.0,
+        "maximum_year": 1906.2,
+        "maximum": 107.1
+      },
+      {
+        "number": 15,
+        "minimum_year": 1913.6,
+        "maximum_year": 1917.6,
+        "maximum": 175.7
+      },
+      {
+        "number": 16,
+        "minimum_year": 1923.6,
+        "maximum_year": 1928.4,
+        "maximum": 130.2
+      },
+      {
+        "number": 17,
+        "minimum_year": 1933.8,
+        "maximum_year": 1937.4,
+        "maximum": 198.6
+      },
+      {
+        "number": 18,
+        "minimum_year": 1944.2,
+        "maximum_year": 1947.4,
+        "maximum": 218.7
+      },
+      {
+        "number": 19,
+        "minimum_year": 1954.3,
+        "maximum_year": 1958.2,
+        "maximum": 285.0
+      },
+      {
+        "number": 20,
+        "minimum_year": 1964.8,
+        "maximum_year": 1968.9,
+        "maximum": 156.6
+      },
+      {
+        "number": 21,
+        "minimum_year": 1976.2,
+        "maximum_year": 1979.9,
+        "maximum": 232.9
+      },
+      {
+        "number": 22,
+        "minimum_year": 1986.8,
+        "maximum_year": 1989.6,
+        "maximum": 212.5
+      },
+      {
+        "number": 23,
+        "minimum_year": 1996.4,
+        "maximum_year": 2001.9,
+        "maximum": 180.3
+      },
+      {
+        "number": 24,
+        "minimum_year": 2008.9,
+        "maximum_year": 2014.3,
+        "maximum": 116.4
+      },
+      {
+        "number": 25,
+        "minimum_year": 2019.9,
+        "maximum_year": 2024.8,
+        "maximum": 160.9,
+        "note": "maximum provisional"
+      }
+    ]
+  },
+  "forecast": {
+    "issue_year": 2026.8,
+    "horizon_year": 2050.0,
+    "members": 200,
+    "seed": 25,
+    "backtest_phases_years": [
+      0,
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "irradiance": {
+    "f107_base_sfu": 65.0,
+    "f107_per_sunspot": 0.62,
+    "mgii_quiet": 0.15,
+    "mgii_per_sfu": 0.00011,
+    "reference_sunspot_number": 180.0,
+    "tsi_quiet_w_m2": 1360.6,
+    "facular_brightening_w_m2": 2.1,
+    "spot_darkening_w_m2_per_sunspot": 0.0055
+  },
+  "atmosphere": {
+    "ozone_change_at_reference": 0.02,
+    "stratosphere_warming_at_reference_k": 1.0,
+    "erythemal_variability": 0.01,
+    "radiation_amplification_factor": 1.23
+  },
+  "uv_sites": [
+    {
+      "name": "Equator (1° N)",
+      "latitude_deg": 1.3,
+      "ozone_du": 265,
+      "ozone_seasonal_amplitude_du": 10,
+      "ozone_peak_day": 250
+    },
+    {
+      "name": "Mid-latitudes (45° N)",
+      "latitude_deg": 45.0,
+      "ozone_du": 335,
+      "ozone_seasonal_amplitude_du": 35,
+      "ozone_peak_day": 90
+    },
+    {
+      "name": "Northern Europe (60° N)",
+      "latitude_deg": 60.0,
+      "ozone_du": 350,
+      "ozone_seasonal_amplitude_du": 50,
+      "ozone_peak_day": 95
+    },
+    {
+      "name": "Southern mid-latitudes (40° S)",
+      "latitude_deg": -40.0,
+      "ozone_du": 300,
+      "ozone_seasonal_amplitude_du": 20,
+      "ozone_peak_day": 270
+    }
+  ],
+  "flares": {
+    "x_rate_per_year": 15.0,
+    "reference_sunspot_number": 100.0,
+    "rate_exponent": 1.3,
+    "size_index": 2.2,
+    "max_peak_flux_w_m2": 0.004,
+    "energy_x1_j": 1e+25,
+    "energy_exponent": 0.8,
+    "seed": 5
+  },
+  "climate": {
+    "albedo": 0.29,
+    "upper_heat_capacity": 7.3,
+    "deep_heat_capacity": 106.0,
+    "feedback_w_m2_k": 1.13,
+    "exchange_w_m2_k": 0.74
+  },
+  "disk": {
+    "first_year": 2008.5,
+    "last_year": 2045.5,
+    "every_months": 6,
+    "seed": 3,
+    "cells": 56
+  },
+  "butterfly": {
+    "start_year": 1900.0,
+    "step_months": 3,
+    "latitude_step_deg": 2.5,
+    "max_latitude_deg": 45.0
+  }
+}

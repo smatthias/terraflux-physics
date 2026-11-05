@@ -6,8 +6,8 @@ export const LAYER_GROUPS = [
   {
     id: 'air', title: 'Weather & air', tooltip: 'Temperature, wind, pressure and moisture of the air near the ground.',
     layers: [
-      { key: 'temperature', title: 'Air temperature', subtitle: 'Dry transport · °C', tooltip: 'Air temperature near the ground, carried by the wind and smoothed by diffusion. With a terrain grid it can be corrected by the lapse rate (colder up high).', needs: d => !d.coast },
-      { key: 'wind', title: 'Wind speed', subtitle: 'Prescribed field · m/s', tooltip: 'Wind speed near the ground. In coupled runs it follows from the pressure pattern, the Coriolis force and surface friction; arrows show the direction.', needs: () => true },
+      { key: 'temperature', title: 'Air temperature', subtitle: 'Dry transport · °C', tooltip: 'Air temperature near the ground, carried by the wind and smoothed by diffusion. With a terrain grid it can be corrected by the lapse rate (colder up high).', needs: d => !d.coast && !d.solar },
+      { key: 'wind', title: 'Wind speed', subtitle: 'Prescribed field · m/s', tooltip: 'Wind speed near the ground. In coupled runs it follows from the pressure pattern, the Coriolis force and surface friction; arrows show the direction.', needs: d => !d.solar },
       { key: 'pressure', title: 'Sea-level pressure', subtitle: 'Synthetic regional field · hPa', tooltip: 'Air pressure reduced to sea level. Lows (blue) bring wind and weather, highs (red) calm and dry conditions.', needs: d => !!(d.atmosphere || d.coupled) },
       { key: 'humidity', title: 'Relative humidity', subtitle: 'Synthetic regional field · %', tooltip: 'How close the air is to saturation. At 100 % water vapour condenses into cloud.', needs: d => !!(d.atmosphere || d.coupled) },
       { key: 'density', title: 'Air density', subtitle: 'Coupled moist layer · kg/m³', tooltip: 'Mass of a cubic metre of air, from pressure, temperature and humidity. Warm, moist air is lighter and accelerates faster under the same pressure gradient.', needs: has('coupled') },
@@ -109,6 +109,13 @@ export const LAYER_GROUPS = [
     ],
   },
   {
+    id: 'sun', title: 'Sun & space weather', tooltip: 'The solar disk of the sunspot cycle: spots, faculae and flaring regions on an illustrative day.',
+    layers: [
+      { key: 'sunbrightness', title: 'Photosphere brightness', subtitle: 'Solar disk · K', tooltip: 'Brightness temperature of the visible solar surface: limb darkening toward the edge, dark sunspots, slightly brighter faculae. One illustrative day of the month.', needs: has('solar') },
+      { key: 'suncontrast', title: 'Contrast to the quiet Sun', subtitle: 'Spots − / faculae + · %', tooltip: 'Intensity against the same cell of a spotless Sun: sunspots remove light, faculae add a little. Integrated over the disk the faculae usually win, so the Sun is brighter at maximum.', needs: has('solar') },
+    ],
+  },
+  {
     id: 'carbon', title: 'Carbon & ocean life', tooltip: 'CO₂ in the air and the sea: the ocean\'s uptake, acidification, oxygen, and the dead zones where sea life cannot live.',
     layers: [
       { key: 'co2air', title: 'CO₂ in the air', subtitle: 'Boundary layer · ppm', tooltip: 'CO₂ of the air near the ground over land and sea: the scenario background, raised by cities and industry, carried by the wind, drawn down by plants in daylight and by the sea.', needs: has('carbon') },
@@ -184,6 +191,9 @@ export const EXAMPLE_GROUPS = [
   { id: 'carbon', title: 'Carbon & ocean life', examples: [
     { action: 'loadCarbonExample', label: '🫧 Load ocean carbon & dead zones (today)', tooltip: 'A Gulf-like sea under today\'s 427 ppm: city and refinery CO₂ plumes, the sea taking up CO₂, a delta river whose nitrate feeds a summer dead zone.' },
     { action: 'loadCarbon2100Example', label: '🌡 Load ocean carbon & dead zones (2100)', tooltip: 'The same sea in 2100 under high emissions (about 1,010 ppm, 3 K warmer): more acid, less shell-friendly, larger dead zones.' },
+  ] },
+  { id: 'space', title: 'Sun & space weather', examples: [
+    { action: 'loadSolarExample', label: '☀ Load solar cycle & space weather example', tooltip: 'The 11-year sunspot cycle since 1850 with its minima and maxima, a tested forecast to 2050, and what the cycle does to UV, ozone, flares and the climate.' },
   ] },
   { id: 'coast', title: 'Sea level & coasts', examples: [
     { action: 'loadCoastExample', label: '🏝 Load sea-level rise & coasts example', tooltip: 'The sea-level rise of the polar-melt scenarios on a coast with a delta, an estuary city, barrier islands, cliffs and low islands: land lost, storm floods, defences, rivers.' },

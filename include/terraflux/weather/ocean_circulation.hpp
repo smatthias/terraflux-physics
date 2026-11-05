@@ -445,7 +445,9 @@ double shortwave_transmission(double depth_m, const OceanThermalLayersConfig& th
 //   Q0 = S0 cos^2 Z / ((cos Z + 2.7) e_a 1e-3 + 1.085 cos Z + 0.10),  e_a in hPa (the function takes Pa),
 // reduced for cloud by Reed (1977): Q = Q0 min(1, 1 - 0.62 C).
 double solar_cosine_zenith(double latitude_deg, double longitude_deg, double day_of_year, double utc_hour);
-double surface_shortwave_w_m2(double cosine_zenith, double vapour_pressure_pa, double cloud_fraction);
+// `solar_constant_w_m2` is the irradiance at the top of the atmosphere (a solar-cycle run can vary it; see solar_forcing.hpp).
+constexpr double kSolarConstantW_m2 = 1361.0;
+double surface_shortwave_w_m2(double cosine_zenith, double vapour_pressure_pa, double cloud_fraction, double solar_constant_w_m2 = kSolarConstantW_m2);
 // Sigma fractions of the layered column (top first, summing to 1).
 std::vector<double> thermal_layer_fractions(const OceanConfig& config);
 // Nearest sea cell of every land cell within the coastal band (count = none; sea cells map to count too).
