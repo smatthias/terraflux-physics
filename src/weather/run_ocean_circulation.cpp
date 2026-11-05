@@ -15,9 +15,11 @@
 // position) and `physics.thermal_layers` (the layered temperature and salinity
 // column). Each adds its own per-frame block; without them the output is the
 // 1.5-layer slab output unchanged.
+#include "terraflux/weather/atmospheric_co2.hpp"
 #include "terraflux/weather/ice_sheet.hpp"
 #include "terraflux/weather/marine_indicators.hpp"
 #include "terraflux/weather/moist_air.hpp"
+#include "terraflux/weather/ocean_biogeochemistry.hpp"
 #include "terraflux/weather/ocean_circulation.hpp"
 #include "terraflux/weather/sea_ice.hpp"
 #include "terraflux/weather/synthetic_terrain.hpp"
@@ -1253,6 +1255,330 @@ struct IceSheetCoupling {
     Json provenance;
 };
 
+// ---- Carbon: atmospheric CO2 over the region and the ocean's carbon, oxygen and habitability -----------------
+
+struct Co2Source {
+    std::string name;
+    double east_m{0.0}, north_m{0.0}, radius_m{1.0}, mt_co2_per_year{0.0};
+};
+
+struct CarbonCoupling {
+    bool enabled{false};
+    MarineBgcConfig bgc;
+    AtmosphericCo2Config atmosphere;
+    std::vector<double> background_years, background_ppm;
+    std::vector<Co2Source> sources;
+    std::vector<double> emission_mol_m2_s;         // static per cell
+    double photosynthesis_umol_per_j{0.0};          // land uptake per joule of PAR (umol CO2 per J)
+    double respiration_umol_m2_s{0.0};
+    RiverChemistry river_default;
+    std::vector<RiverChemistry> river_chemistry;    // per river, in request order
+    std::size_t step_every{4};
+    Json provenance;
+    double background(double year) const {
+        if (year <= background_years.front()) return background_ppm.front();
+        if (year >= background_years.back()) return background_ppm.back();
+        std::size_t k = 1;
+        while (background_years[k] < year) ++k;
+        const double w = (year - background_years[k - 1]) / (background_years[k] - background_years[k - 1]);
+        return background_ppm[k - 1] + (background_ppm[k] - background_ppm[k - 1]) * w;
+    }
+};
+
+MarineTracerProfile parse_profile(const Json& j, MarineTracerProfile p) {
+    p.surface = optional_number(j, "surface", p.surface);
+    p.deep = optional_number(j, "deep", p.deep);
+    p.scale_m = optional_number(j, "scale_m", p.scale_m);
+    return p;
+}
+
+RiverChemistry parse_river_chemistry(const Json& j, RiverChemistry r) {
+    r.nitrate_umol_kg = optional_number(j, "nitrate_umol_kg", r.nitrate_umol_kg);
+    r.dic_umol_kg = optional_number(j, "dic_umol_kg", r.dic_umol_kg);
+    r.alkalinity_umol_kg = optional_number(j, "alkalinity_umol_kg", r.alkalinity_umol_kg);
+    r.oxygen_saturation = optional_number(j, "oxygen_saturation", r.oxygen_saturation);
+    if (r.nitrate_umol_kg < 0.0 || r.nitrate_umol_kg > 2000.0 || r.dic_umol_kg < 0.0 || r.dic_umol_kg > 6000.0 || r.alkalinity_umol_kg <= 0.0 || r.alkalinity_umol_kg > 6000.0 ||
+        r.oxygen_saturation < 0.0 || r.oxygen_saturation > 2.0) {
+        throw std::invalid_argument("river chemistry out of range");
+    }
+    return r;
+}
+
+CarbonCoupling parse_carbon(const Json& request, const OceanConfig& c, const std::vector<double>& elevation) {
+    CarbonCoupling out;
+    if (!request.contains("biogeochemistry") && !request.contains("atmosphere_co2")) return out;
+    if (!request.contains("biogeochemistry") || !request.contains("atmosphere_co2")) throw std::invalid_argument("biogeochemistry and atmosphere_co2 go together");
+    if (c.thermal.count < 2) throw std::invalid_argument("biogeochemistry needs the layered column (thermal_layers)");
+    out.enabled = true;
+    const Json& j = required(request, "biogeochemistry");
+    auto& b = out.bgc;
+    b.grid = c.grid;
+    b.sea = c.ocean;
+    const std::size_t count = c.ocean.size();
+    b.seafloor_depth_m.assign(count, 0.0);
+    const double floor_min = optional_number(j, "minimum_depth_m", 5.0);
+    for (std::size_t i = 0; i < count; ++i) if (c.ocean[i]) b.seafloor_depth_m[i] = std::max(floor_min, -elevation[i]);
+    // The ocean's sponge is the open boundary of the chemistry too: it exchanges water with the ocean outside.
+    if (!c.sponge.empty()) { b.open_boundary = c.sponge; for (std::size_t i = 0; i < count; ++i) if (!c.ocean[i]) b.open_boundary[i] = 0.0; }
+    b.open_boundary_time_s = c.physics.sponge_time_scale_s;
+    b.level_bottoms_m.clear();
+    for (const Json& v : required(j, "levels_m")) {
+        if (!v.is_number()) throw std::invalid_argument("biogeochemistry.levels_m must hold numbers");
+        b.level_bottoms_m.push_back(v.get<double>());
+    }
+    if (j.contains("step_every")) out.step_every = required_positive_size(j, "step_every");
+    const Json profiles = j.value("profiles", Json::object());
+    b.dic = parse_profile(profiles.value("dic", Json::object()), b.dic);
+    b.alkalinity = parse_profile(profiles.value("alkalinity", Json::object()), b.alkalinity);
+    b.oxygen = parse_profile(profiles.value("oxygen", Json::object()), b.oxygen);
+    b.nitrate = parse_profile(profiles.value("nitrate", Json::object()), b.nitrate);
+    if (j.contains("surface_dic_from_atmosphere")) b.surface_dic_from_atmosphere = required(j, "surface_dic_from_atmosphere").get<bool>();
+    const Json bio = j.value("biology", Json::object());
+    read_into(bio, "max_growth_per_day", b.max_growth_per_day);
+    read_into(bio, "max_production_umol_n_kg_day", b.max_production_umol_n_kg_day);
+    read_into(bio, "nitrate_half_saturation_umol_kg", b.nitrate_half_saturation_umol_kg);
+    read_into(bio, "light_half_saturation_w_m2", b.light_half_saturation_w_m2);
+    read_into(bio, "par_fraction", b.par_fraction);
+    read_into(bio, "light_attenuation_per_m", b.light_attenuation_per_m);
+    read_into(bio, "martin_exponent", b.martin_exponent);
+    read_into(bio, "rain_ratio", b.rain_ratio);
+    const Json tr = j.value("transport", Json::object());
+    read_into(tr, "horizontal_diffusivity_m2_s", b.horizontal_diffusivity_m2_s);
+    read_into(tr, "vertical_diffusivity_m2_s", b.vertical_diffusivity_m2_s);
+    read_into(tr, "ventilation_depth_m", b.ventilation_depth_m);
+    if (tr.contains("ventilation_time_years")) b.ventilation_time_s = required_number(tr, "ventilation_time_years") * 365.25 * 86400.0;
+    const Json hab = j.value("habitat", Json::object());
+    read_into(hab, "hypoxia_umol_kg", b.hypoxia_umol_kg);
+    read_into(hab, "anoxia_umol_kg", b.anoxia_umol_kg);
+    read_into(hab, "corrosive_omega", b.corrosive_omega);
+    read_into(hab, "dead_zone_column_fraction", b.dead_zone_column_fraction);
+    const Json met = hab.value("metabolic", Json::object());
+    read_into(met, "critical_po2_kpa", b.metabolic.critical_po2_kpa);
+    read_into(met, "reference_temperature_k", b.metabolic.reference_temperature_k);
+    read_into(met, "temperature_sensitivity_ev", b.metabolic.temperature_sensitivity_ev);
+    read_into(met, "ecological_threshold", b.metabolic.ecological_threshold);
+    validate_bgc_config(b);
+    out.river_default = parse_river_chemistry(j.value("river_chemistry", Json::object()), out.river_default);
+    const Json forcing = request.value("forcing", Json::object());
+    for (const Json& r : forcing.value("rivers", Json::array())) out.river_chemistry.push_back(r.contains("chemistry") ? parse_river_chemistry(r.at("chemistry"), out.river_default) : out.river_default);
+    // The air.
+    const Json& a = required(request, "atmosphere_co2");
+    auto& at = out.atmosphere;
+    at.grid = c.grid;
+    read_into(a, "boundary_layer_height_m", at.boundary_layer_height_m);
+    if (a.contains("ventilation_hours")) at.ventilation_time_s = required_number(a, "ventilation_hours") * 3600.0;
+    read_into(a, "horizontal_diffusivity_m2_s", at.horizontal_diffusivity_m2_s);
+    validate_atmospheric_co2(at);
+    for (const Json& p : required(a, "background_ppm")) {
+        if (!p.is_array() || p.size() != 2 || !p[0].is_number() || !p[1].is_number()) throw std::invalid_argument("atmosphere_co2.background_ppm points must be [year, ppm]");
+        const double year = p[0].get<double>(), ppm = p[1].get<double>();
+        if ((!out.background_years.empty() && year <= out.background_years.back()) || ppm < 100.0 || ppm > 5000.0) throw std::invalid_argument("atmosphere_co2.background_ppm: increasing years and 100-5000 ppm");
+        out.background_years.push_back(year);
+        out.background_ppm.push_back(ppm);
+    }
+    if (out.background_years.empty()) throw std::invalid_argument("atmosphere_co2.background_ppm needs at least one point");
+    const Json land = a.value("land", Json::object());
+    out.photosynthesis_umol_per_j = optional_number(land, "photosynthesis_umol_per_j", 0.02);
+    out.respiration_umol_m2_s = optional_number(land, "respiration_umol_m2_s", 1.0);
+    if (out.photosynthesis_umol_per_j < 0.0 || out.photosynthesis_umol_per_j > 1.0 || out.respiration_umol_m2_s < 0.0 || out.respiration_umol_m2_s > 50.0) throw std::invalid_argument("atmosphere_co2.land rates out of range");
+    const auto& g = c.grid;
+    const double area = g.spacing_east_m * g.spacing_north_m;
+    out.emission_mol_m2_s.assign(count, 0.0);
+    Json sources = Json::array();
+    for (const Json& src : a.value("sources", Json::array())) {
+        Co2Source cs;
+        cs.name = optional_string(src, "name", "source");
+        cs.east_m = required_number(src, "east_m");
+        cs.north_m = required_number(src, "north_m");
+        cs.radius_m = required_number(src, "radius_m");
+        cs.mt_co2_per_year = required_number(src, "mt_co2_per_year");
+        if (!(cs.radius_m > 0.0) || cs.mt_co2_per_year < 0.0 || cs.mt_co2_per_year > 1.0e4) throw std::invalid_argument("CO2 sources need a positive radius and 0-10000 Mt CO2/yr");
+        // Spread as a Gaussian over the cells, normalised so the total is the source's emission.
+        std::vector<double> weight(count, 0.0);
+        double total = 0.0;
+        std::size_t peak = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            const double de = g.origin_east_m + (static_cast<double>(i % g.nx) + 0.5) * g.spacing_east_m - cs.east_m;
+            const double dn = g.origin_north_m + (static_cast<double>(i / g.nx) + 0.5) * g.spacing_north_m - cs.north_m;
+            weight[i] = std::exp(-(de * de + dn * dn) / (cs.radius_m * cs.radius_m));
+            total += weight[i];
+            if (weight[i] > weight[peak]) peak = i;
+        }
+        if (!(total > 0.0) || weight[peak] < 1.0e-6) throw std::invalid_argument("CO2 source " + cs.name + " lies outside the grid");
+        const double mol_s = cs.mt_co2_per_year * 1.0e12 / 44.01 / (365.25 * 86400.0);
+        for (std::size_t i = 0; i < count; ++i) out.emission_mol_m2_s[i] += mol_s * weight[i] / total / area;
+        sources.push_back({{"name", cs.name}, {"east_m", cs.east_m}, {"north_m", cs.north_m}, {"radius_m", cs.radius_m}, {"mt_co2_per_year", cs.mt_co2_per_year}, {"peak_cell", peak}});
+        out.sources.push_back(cs);
+    }
+    Json background = Json::array();
+    for (std::size_t k = 0; k < out.background_years.size(); ++k) background.push_back({out.background_years[k], out.background_ppm[k]});
+    Json levels = Json::array();
+    for (double v : b.level_bottoms_m) levels.push_back(v);
+    std::size_t open_cells = 0;
+    for (double v : b.open_boundary) if (v > 0.0) ++open_cells;
+    Json rivers = Json::array();
+    for (std::size_t r = 0; r < out.river_chemistry.size(); ++r) {
+        const RiverChemistry& rc = out.river_chemistry[r];
+        rivers.push_back({{"river", r}, {"nitrate_umol_kg", rc.nitrate_umol_kg}, {"dic_umol_kg", rc.dic_umol_kg}, {"alkalinity_umol_kg", rc.alkalinity_umol_kg}, {"oxygen_saturation", rc.oxygen_saturation}});
+    }
+    out.provenance = {{"levels_m", levels}, {"step_every", out.step_every},
+                      {"river_chemistry", rivers},
+                      {"open_boundary", {{"cells", open_cells}, {"relaxation_days", b.open_boundary_time_s / 86400.0}, {"source", open_cells ? "the ocean's sponge" : "none (closed basin)"}}}, {"background_ppm", background}, {"sources", sources},
+                      {"boundary_layer_height_m", at.boundary_layer_height_m}, {"ventilation_hours", at.ventilation_time_s / 3600.0}, {"horizontal_diffusivity_m2_s", at.horizontal_diffusivity_m2_s},
+                      {"land", {{"photosynthesis_umol_per_j", out.photosynthesis_umol_per_j}, {"respiration_umol_m2_s", out.respiration_umol_m2_s}}},
+                      {"biology", {{"max_growth_per_day", b.max_growth_per_day}, {"max_production_umol_n_kg_day", b.max_production_umol_n_kg_day}, {"nitrate_half_saturation_umol_kg", b.nitrate_half_saturation_umol_kg},
+                                   {"light_half_saturation_w_m2", b.light_half_saturation_w_m2}, {"par_fraction", b.par_fraction}, {"light_attenuation_per_m", b.light_attenuation_per_m},
+                                   {"martin_exponent", b.martin_exponent}, {"rain_ratio", b.rain_ratio}, {"carbon_to_nitrogen", b.carbon_to_nitrogen}, {"oxygen_to_nitrogen", b.oxygen_to_nitrogen}}},
+                      {"transport", {{"horizontal_diffusivity_m2_s", b.horizontal_diffusivity_m2_s}, {"vertical_diffusivity_m2_s", b.vertical_diffusivity_m2_s}, {"ventilation_depth_m", b.ventilation_depth_m},
+                                     {"ventilation_time_years", b.ventilation_time_s / (365.25 * 86400.0)}}},
+                      {"habitat", {{"hypoxia_umol_kg", b.hypoxia_umol_kg}, {"anoxia_umol_kg", b.anoxia_umol_kg}, {"corrosive_omega", b.corrosive_omega}, {"dead_zone_column_fraction", b.dead_zone_column_fraction},
+                                   {"metabolic", {{"critical_po2_kpa", b.metabolic.critical_po2_kpa}, {"reference_temperature_k", b.metabolic.reference_temperature_k},
+                                                  {"temperature_sensitivity_ev", b.metabolic.temperature_sensitivity_ev}, {"ecological_threshold", b.metabolic.ecological_threshold}}}}},
+                      {"profiles", {{"dic", {{"surface", b.dic.surface}, {"deep", b.dic.deep}, {"scale_m", b.dic.scale_m}}}, {"alkalinity", {{"surface", b.alkalinity.surface}, {"deep", b.alkalinity.deep}, {"scale_m", b.alkalinity.scale_m}}},
+                                    {"oxygen", {{"surface", b.oxygen.surface}, {"deep", b.oxygen.deep}, {"scale_m", b.oxygen.scale_m}}}, {"nitrate", {{"surface", b.nitrate.surface}, {"deep", b.nitrate.deep}, {"scale_m", b.nitrate.scale_m}}},
+                                    {"surface_dic_from_atmosphere", b.surface_dic_from_atmosphere}}}};
+    return out;
+}
+
+// Calendar year (decimal) of a model time.
+double calendar_year(double epoch_seconds) { return 1970.0 + epoch_seconds / (365.2425 * 86400.0); }
+
+// The ocean state as the biogeochemistry sees it: temperature and salinity interpolated onto its levels (the
+// deep water below the active layer), the mixed layer, the current, the air and the rivers with their chemistry.
+MarineBgcForcing bgc_forcing(const CarbonCoupling& cc, const OceanState& s, const OceanForcing& f, const OceanConfig& c, const std::vector<double>& co2_ppm) {
+    const std::size_t count = c.ocean.size(), L = cc.bgc.level_bottoms_m.size(), layers = c.thermal.count;
+    const std::vector<double> sigma = thermal_layer_fractions(c);
+    MarineBgcForcing out;
+    out.temperature_k.assign(count * L, 288.15);
+    out.salinity_psu.assign(count * L, c.initial_salinity_psu);
+    out.mixed_layer_depth_m.assign(count, 0.0);
+    out.current_east_m_s.assign(count, 0.0);
+    out.current_north_m_s.assign(count, 0.0);
+    out.active_layer_thickness_m.assign(count, 0.0);
+    out.wind_speed_m_s.assign(count, 0.0);
+    out.shortwave_w_m2.assign(count, 0.0);
+    out.atmospheric_pco2_uatm.assign(count, 400.0);
+    if (c.sea_ice.enabled) out.ice_fraction = s.ice_concentration;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (!c.ocean[i]) continue;
+        for (std::size_t k = 0; k < L; ++k) {
+            const double z = level_top_m(cc.bgc, k) + 0.5 * (cc.bgc.level_bottoms_m[k] - level_top_m(cc.bgc, k));
+            double t = c.physics.deep_temperature_k, sal = c.physics.deep_salinity_psu, top = 0.0;
+            for (std::size_t m = 0; m < layers; ++m) {
+                const double bottom = top + sigma[m] * s.thickness_m[i];
+                if (z < bottom) { t = s.layer_temperature_k[i * layers + m]; sal = s.layer_salinity_psu[i * layers + m]; break; }
+                top = bottom;
+            }
+            out.temperature_k[i * L + k] = std::min(313.0, std::max(271.2, t));
+            out.salinity_psu[i * L + k] = std::min(45.0, std::max(0.0, sal));
+        }
+        out.mixed_layer_depth_m[i] = s.mixed_layer_depth_m.empty() ? c.physics.mixed_layer_depth_m : s.mixed_layer_depth_m[i];
+        out.current_east_m_s[i] = s.u_centre_m_s[i];
+        out.current_north_m_s[i] = s.v_centre_m_s[i];
+        out.active_layer_thickness_m[i] = s.thickness_m[i];
+        out.wind_speed_m_s[i] = f.wind_speed_m_s.empty() ? 5.0 : f.wind_speed_m_s[i];
+        out.shortwave_w_m2[i] = f.shortwave_down_w_m2.empty() ? 0.0 : f.shortwave_down_w_m2[i];
+        const double pressure = f.surface_pressure_pa.empty() ? 101325.0 : f.surface_pressure_pa[i];
+        out.atmospheric_pco2_uatm[i] = co2_ppm[i] * pressure / 101325.0 * 0.98;   // dry-air mole fraction in moist air at the surface
+    }
+    for (std::size_t r = 0; r < f.rivers.size(); ++r) {
+        MarineBgcRiver river;
+        river.cell = f.rivers[r].cell;
+        river.discharge_m3_s = f.rivers[r].discharge_m3_s;
+        river.chemistry = r < cc.river_chemistry.size() ? cc.river_chemistry[r] : cc.river_default;
+        out.rivers.push_back(river);
+    }
+    return out;
+}
+
+AtmosphericCo2Forcing co2_forcing(const CarbonCoupling& cc, const OceanForcing& f, const OceanConfig& c, const std::vector<double>& wind_east, const std::vector<double>& wind_north,
+                                  const MarineBgcState& bgc, double year) {
+    const std::size_t count = c.ocean.size();
+    AtmosphericCo2Forcing out;
+    out.background_ppm = cc.background(year);
+    out.wind_east_m_s = wind_east;
+    out.wind_north_m_s = wind_north;
+    out.emission_mol_m2_s = cc.emission_mol_m2_s;
+    out.land_uptake_mol_m2_s.assign(count, 0.0);
+    out.ocean_uptake_mol_m2_s.assign(count, 0.0);
+    for (std::size_t i = 0; i < count; ++i) {
+        if (c.ocean[i]) { out.ocean_uptake_mol_m2_s[i] = bgc.co2_flux_mol_m2_s.empty() ? 0.0 : bgc.co2_flux_mol_m2_s[i]; continue; }
+        // Land: photosynthesis in the light minus respiration (net ecosystem exchange).
+        const double par = (f.shortwave_down_w_m2.empty() ? 0.0 : f.shortwave_down_w_m2[i]) * 0.43;
+        out.land_uptake_mol_m2_s[i] = (cc.photosynthesis_umol_per_j * par - cc.respiration_umol_m2_s) * 1.0e-6;
+    }
+    return out;
+}
+
+Json carbon_frame_json(const CarbonCoupling& cc, const MarineBgcState& b, const AtmosphericCo2State& a, const MarineBgcForcing& bf, const OceanConfig& c, double year, double background,
+                       const MarineBgcState& start) {
+    const std::size_t count = c.ocean.size(), L = cc.bgc.level_bottoms_m.size();
+    const MarineHabitat h = assess_habitat(b, bf, cc.bgc);
+    const double year_s = 365.25 * 86400.0, area = c.grid.spacing_east_m * c.grid.spacing_north_m, mt = 44.01e-12;
+    auto sea_array = [&](const std::vector<double>& v, double scale, int digits) {
+        Json out = Json::array();
+        for (std::size_t i = 0; i < count; ++i) out.push_back(c.ocean[i] ? tidy(v[i] * scale, digits) : 0.0);
+        return out;
+    };
+    Json column_class = Json::array(), dead = Json::array();
+    double ocean_ppm = 0.0, land_ppm = 0.0, max_ppm = 0.0, uptake = 0.0, production = 0.0;
+    std::size_t nsea = 0, nland = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        column_class.push_back(h.column_class[i]);
+        if (c.ocean[i] && h.dead_zone[i]) dead.push_back(i);
+        if (c.ocean[i]) { ocean_ppm += a.ppm[i]; ++nsea; uptake += b.co2_flux_mol_m2_s[i] * area; production += b.production_mol_c_m2_s[i] * area; }
+        else { land_ppm += a.ppm[i]; ++nland; }
+        max_ppm = std::max(max_ppm, a.ppm[i]);
+    }
+    Json level_o2 = Json::array(), level_ph = Json::array(), level_omega = Json::array(), level_class = Json::array();
+    for (std::size_t k = 0; k < L; ++k) {
+        Json o = Json::array(), p = Json::array(), w = Json::array(), cl = Json::array();
+        for (std::size_t i = 0; i < count; ++i) {
+            const std::size_t ik = i * L + k;
+            const bool present = c.ocean[i] && k < b.levels[i];
+            o.push_back(present ? tidy(b.oxygen[ik], 3) : 0.0);
+            p.push_back(present ? tidy(h.level_ph[ik], 4) : 0.0);
+            w.push_back(present ? tidy(h.level_omega_aragonite[ik], 3) : 0.0);
+            cl.push_back(present ? h.level_class[ik] : -1);
+        }
+        level_o2.push_back(o); level_ph.push_back(p); level_omega.push_back(w); level_class.push_back(cl);
+    }
+    Json surface_nitrate = Json::array();
+    for (std::size_t i = 0; i < count; ++i) surface_nitrate.push_back(c.ocean[i] ? tidy(b.nitrate[i * L], 3) : 0.0);
+    const double sea_km2 = std::max(h.sea_area_km2, 1e-9);
+    return {
+        {"year", tidy(year, 7)},
+        {"atmosphere", {{"co2_ppm", tidy_array(a.ppm, 5)}, {"background_ppm", tidy(background, 5)}, {"max_ppm", tidy(max_ppm, 5)},
+                        {"ocean_mean_ppm", tidy(nsea ? ocean_ppm / nsea : 0.0, 5)}, {"land_mean_ppm", tidy(nland ? land_ppm / nland : 0.0, 5)},
+                        {"emitted_mt_co2", tidy(a.emitted_mol * mt, 5)}, {"land_uptake_mt_co2", tidy(a.land_uptake_mol * mt, 5)}, {"ocean_uptake_mt_co2", tidy(a.ocean_uptake_mol * mt, 5)},
+                        {"ventilation_mt_co2", tidy(a.ventilation_mol * mt, 5)}, {"transport_mt_co2", tidy(a.transport_mol * mt, 5)},
+                        {"background_shift_mt_co2", tidy(a.background_shift_mol * mt, 5)}, {"excess_mt_co2", tidy(a.inventory_excess_mol * mt, 5)}}},
+        {"ocean", {
+            {"co2_flux_mol_m2_yr", sea_array(b.co2_flux_mol_m2_s, year_s, 4)}, {"surface_pco2_uatm", sea_array(h.surface_pco2_uatm, 1.0, 5)},
+            {"surface_ph", sea_array(h.surface_ph, 1.0, 5)}, {"surface_omega_aragonite", sea_array(h.surface_omega_aragonite, 1.0, 4)}, {"bottom_omega_aragonite", sea_array(h.bottom_omega_aragonite, 1.0, 4)},
+            {"bottom_oxygen_umol_kg", sea_array(h.bottom_oxygen_umol_kg, 1.0, 4)}, {"minimum_oxygen_umol_kg", sea_array(h.minimum_oxygen_umol_kg, 1.0, 4)},
+            {"minimum_oxygen_depth_m", sea_array(h.minimum_oxygen_depth_m, 1.0, 4)}, {"habitable_fraction", sea_array(h.habitable_fraction, 1.0, 3)},
+            {"production_g_c_m2_day", sea_array(b.production_mol_c_m2_s, 12.011 * 86400.0, 4)}, {"surface_nitrate_umol_kg", surface_nitrate},
+            {"column_class", column_class}, {"dead_zone_cells", dead},
+            {"level_oxygen_umol_kg", level_o2}, {"level_ph", level_ph}, {"level_omega_aragonite", level_omega}, {"level_class", level_class},
+            {"totals", {{"sea_area_km2", tidy(h.sea_area_km2, 6)}, {"dead_zone_area_km2", tidy(h.dead_zone_area_km2, 6)}, {"anoxic_area_km2", tidy(h.anoxic_area_km2, 6)},
+                        {"corrosive_area_km2", tidy(h.corrosive_area_km2, 6)}, {"volume_km3", tidy(h.volume_km3, 6)}, {"hypoxic_volume_km3", tidy(h.hypoxic_volume_km3, 6)},
+                        {"habitable_volume_pct", tidy(h.habitable_volume_km3 / std::max(h.volume_km3, 1e-9) * 100.0, 5)}, {"dead_zone_pct", tidy(h.dead_zone_area_km2 / sea_km2 * 100.0, 5)},
+                        {"mean_surface_ph", tidy(h.mean_surface_ph, 5)}, {"mean_surface_omega_aragonite", tidy(h.mean_surface_omega_aragonite, 5)},
+                        {"uptake_mt_co2_yr", tidy(uptake * year_s * mt, 5)}, {"production_mt_c_yr", tidy(production * year_s * 12.011e-12, 5)}}},
+            {"budget", {{"carbon_inventory_mol", b.carbon_inventory_mol}, {"carbon_change_mol", b.carbon_inventory_mol - start.carbon_inventory_mol},
+                        {"air_sea_carbon_mol", b.air_sea_carbon_mol}, {"river_carbon_mol", b.river_carbon_mol}, {"export_carbon_mol", b.export_carbon_mol},
+                        {"ventilation_carbon_mol", b.ventilation_carbon_mol}, {"boundary_carbon_mol", b.boundary_carbon_mol}, {"transport_carbon_mol", b.transport_carbon_mol},
+                        {"nitrogen_change_mol", b.nitrogen_inventory_mol - start.nitrogen_inventory_mol}, {"river_nitrogen_mol", b.river_nitrogen_mol}, {"export_nitrogen_mol", b.export_nitrogen_mol},
+                        {"ventilation_nitrogen_mol", b.ventilation_nitrogen_mol}, {"boundary_nitrogen_mol", b.boundary_nitrogen_mol}, {"denitrified_nitrogen_mol", b.denitrified_nitrogen_mol},
+                        {"transport_nitrogen_mol", b.transport_nitrogen_mol},
+                        {"oxygen_change_mol", b.oxygen_inventory_mol - start.oxygen_inventory_mol}, {"air_sea_oxygen_mol", b.air_sea_oxygen_mol}, {"river_oxygen_mol", b.river_oxygen_mol},
+                        {"ventilation_oxygen_mol", b.ventilation_oxygen_mol}, {"boundary_oxygen_mol", b.boundary_oxygen_mol}, {"transport_oxygen_mol", b.transport_oxygen_mol},
+                        {"sulfidic_oxygen_demand_mol", b.sulfidic_oxygen_demand_mol}}},
+        }},
+    };
+}
+
 IceSheetCoupling parse_ice_sheet(const Json& request, const OceanConfig& c, const std::vector<double>& elevation) {
     IceSheetCoupling out;
     if (!request.contains("ice_sheet")) return out;
@@ -1513,6 +1839,8 @@ int main(int argc, char** argv) {
         const ForcingRequest forcing = parse_forcing(request, config, time);
         const bool air_sea = forcing.air_sea.enabled, rain = forcing.rain.enabled, layers = config.thermal.count >= 2;
         const IceSheetCoupling ice = parse_ice_sheet(request, config, elevation);
+        const CarbonCoupling carbon = parse_carbon(request, config, elevation);
+        if (carbon.enabled && !forcing.air_sea.enabled) throw std::invalid_argument("biogeochemistry needs forcing.air_sea (wind, sunshine, air pressure)");
         const bool polar = config.sea_ice.enabled || ice.enabled || forcing.hosing.enabled || forcing.warming.enabled;
         const bool extended = air_sea || rain || layers || polar;
         std::vector<double> wind_east, wind_north;
@@ -1531,7 +1859,20 @@ int main(int argc, char** argv) {
         std::vector<double> ice_liquid(count, 0.0), ice_solid(count, 0.0), smb_sum(count, 0.0), melt_sum(count, 0.0);
         double ice_interval = 0.0;
         if (ice.enabled) ice_state = initialize_ice_sheet(ice.config, ice.initial_thickness);
+        // Carbon: the air's CO2 and the ocean's carbon, oxygen and nitrate step every `step_every` ocean steps.
+        MarineBgcState bgc_state, carbon_start;
+        AtmosphericCo2State co2_state;
+        if (carbon.enabled) {
+            const double t0 = -static_cast<double>(time.spinup_steps) * config.timestep_seconds;
+            const OceanForcing first = forcing_at(forcing, t0, config.timestep_seconds, config, wind_east, wind_north);
+            co2_state = initialize_atmospheric_co2(carbon.atmosphere, carbon.background(calendar_year(forcing.start_epoch_seconds + t0)));
+            bgc_state = initialize_bgc(carbon.bgc, bgc_forcing(carbon, state, first, config, co2_state.ppm));
+        }
         std::size_t global_step = 0;
+        // Sea-air CO2 flux and production are reported as means over the interval since the previous frame (both
+        // follow the sun).
+        std::vector<double> co2_flux_sum(count, 0.0), production_sum(count, 0.0);
+        double carbon_interval = 0.0;
         auto step = [&](double elapsed) {
             OceanForcing f = forcing_at(forcing, elapsed, config.timestep_seconds, config, wind_east, wind_north);
             if (ice.enabled) {
@@ -1552,10 +1893,21 @@ int main(int argc, char** argv) {
             }
             state = advance_ocean(state, f, config);
             ++global_step;
+            if (carbon.enabled && global_step % carbon.step_every == 0) {
+                const double span = static_cast<double>(carbon.step_every) * config.timestep_seconds;
+                const double year = calendar_year(forcing.start_epoch_seconds + elapsed + config.timestep_seconds);
+                co2_state = advance_atmospheric_co2(co2_state, co2_forcing(carbon, f, config, wind_east, wind_north, bgc_state, year), carbon.atmosphere, span);
+                bgc_state = advance_bgc(bgc_state, bgc_forcing(carbon, state, f, config, co2_state.ppm), carbon.bgc, span);
+                for (std::size_t i = 0; i < count; ++i) { co2_flux_sum[i] += bgc_state.co2_flux_mol_m2_s[i] * span; production_sum[i] += bgc_state.production_mol_c_m2_s[i] * span; }
+                carbon_interval += span;
+            }
             return f;
         };
         // Spin-up (not recorded): the gyres need the Rossby-wave crossing time to establish.
-        for (std::size_t k = 0; k < time.spinup_steps; ++k) step(-static_cast<double>(time.spinup_steps - k) * config.timestep_seconds);
+        for (std::size_t k = 0; k < time.spinup_steps; ++k) {
+            if (k + time.snapshot_every == time.spinup_steps) { std::fill(co2_flux_sum.begin(), co2_flux_sum.end(), 0.0); std::fill(production_sum.begin(), production_sum.end(), 0.0); carbon_interval = 0.0; }
+            step(-static_cast<double>(time.spinup_steps - k) * config.timestep_seconds);
+        }
         if (ice.enabled) { ice_state.cumulative_sea_level_rise_m = 0.0; ice_state.cumulative_freshwater_m3 = 0.0; std::fill(smb_sum.begin(), smb_sum.end(), 0.0); std::fill(melt_sum.begin(), melt_sum.end(), 0.0); ice_interval = 0.0; }
         const double initial_ice_volume = ice.enabled ? ice_state.volume_m3 : 0.0;
         state.elapsed_seconds = 0.0;
@@ -1564,6 +1916,15 @@ int main(int argc, char** argv) {
         state.cumulative_coastal_runoff_m3 = state.cumulative_coastal_loss_m3 = state.cumulative_evaporation_m3 = state.cumulative_surface_heat_j = 0.0;
         state.cumulative_ice_water_m3 = state.cumulative_glacial_m3 = 0.0;
         const double initial_volume = state.volume_m3, initial_salt = state.salt_kg, initial_heat = state.heat_content_j, initial_store = state.coastal_storage_m3;
+        if (carbon.enabled) {
+            // The carbon budgets count from the end of the spin-up.
+            for (double* v : {&bgc_state.air_sea_carbon_mol, &bgc_state.river_carbon_mol, &bgc_state.export_carbon_mol, &bgc_state.ventilation_carbon_mol, &bgc_state.air_sea_oxygen_mol,
+                              &bgc_state.river_oxygen_mol, &bgc_state.ventilation_oxygen_mol, &bgc_state.sulfidic_oxygen_demand_mol, &bgc_state.river_nitrogen_mol, &bgc_state.export_nitrogen_mol,
+                              &bgc_state.ventilation_nitrogen_mol, &bgc_state.denitrified_nitrogen_mol, &bgc_state.transport_carbon_mol, &bgc_state.transport_nitrogen_mol, &bgc_state.transport_oxygen_mol,
+                              &bgc_state.boundary_carbon_mol, &bgc_state.boundary_nitrogen_mol, &bgc_state.boundary_oxygen_mol, &co2_state.emitted_mol, &co2_state.land_uptake_mol, &co2_state.ocean_uptake_mol, &co2_state.ventilation_mol, &co2_state.transport_mol, &co2_state.background_shift_mol}) *v = 0.0;
+            carbon_start = bgc_state;
+        }
+        const double initial_co2_excess = co2_state.inventory_excess_mol;
 
         Json frames = Json::array(), ocean_frames = Json::array();
         OceanForcing current = forcing_at(forcing, 0.0, config.timestep_seconds, config, wind_east, wind_north);
@@ -1592,6 +1953,19 @@ int main(int argc, char** argv) {
                 std::fill(smb_sum.begin(), smb_sum.end(), 0.0);
                 std::fill(melt_sum.begin(), melt_sum.end(), 0.0);
                 ice_interval = 0.0;
+            }
+            if (carbon.enabled) {
+                const double year = calendar_year(forcing.start_epoch_seconds + state.elapsed_seconds);
+                MarineBgcState reported = bgc_state;
+                if (carbon_interval > 0.0) {
+                    for (std::size_t i = 0; i < count; ++i) { reported.co2_flux_mol_m2_s[i] = co2_flux_sum[i] / carbon_interval; reported.production_mol_c_m2_s[i] = production_sum[i] / carbon_interval; }
+                }
+                frame["carbon"] = carbon_frame_json(carbon, reported, co2_state, bgc_forcing(carbon, state, current, config, co2_state.ppm), config, year, carbon.background(year), carbon_start);
+                frame["carbon"]["ocean"]["averaging_hours"] = tidy(carbon_interval / 3600.0, 5);
+                std::fill(co2_flux_sum.begin(), co2_flux_sum.end(), 0.0);
+                std::fill(production_sum.begin(), production_sum.end(), 0.0);
+                carbon_interval = 0.0;
+                frame["carbon"]["atmosphere"]["initial_excess_mt_co2"] = tidy(initial_co2_excess * 44.01e-12, 5);
             }
             ocean_frames.push_back(std::move(frame));
             heat_error = 0.0;
@@ -1643,6 +2017,7 @@ int main(int argc, char** argv) {
             if (ice.enabled) processes.push_back("ice_sheet");
             if (forcing.warming.enabled) processes.push_back("warming");
             if (forcing.hosing.enabled) processes.push_back("hosing");
+            if (carbon.enabled) { processes.push_back("biogeochemistry"); processes.push_back("atmosphere_co2"); }
             if (config.sea_ice.enabled) {
                 const auto& ip = config.sea_ice.physics;
                 ocean["request"]["physics"]["sea_ice"] = {{"initial_thickness_m", config.sea_ice.initial_thickness_m}, {"initial_concentration", config.sea_ice.initial_concentration},
@@ -1658,6 +2033,15 @@ int main(int argc, char** argv) {
                                       {"initial_sea_level_equivalent_m", tidy(initial_ice_volume * 917.0 / 1000.0 / ice.config.physics.global_ocean_area_m2, 5)}, {"source", ice.provenance}};
             }
             ocean["processes"] = processes;
+            if (carbon.enabled) {
+                Json floor = Json::array();
+                for (std::size_t i = 0; i < count; ++i) floor.push_back(config.ocean[i] ? tidy(carbon.bgc.seafloor_depth_m[i], 4) : 0.0);
+                ocean["carbon"] = carbon.provenance;
+                ocean["carbon"]["seafloor_depth_m"] = floor;
+                ocean["carbon"]["method"] = "z_level_npzd_lite_carbonate_wanninkhof_metabolic_index";
+                ocean["carbon"]["emission_mol_m2_s"] = tidy_array(carbon.emission_mol_m2_s, 4);
+                ocean["carbon"]["initial_inventory_mol"] = {{"carbon", carbon_start.carbon_inventory_mol}, {"nitrogen", carbon_start.nitrogen_inventory_mol}, {"oxygen", carbon_start.oxygen_inventory_mol}};
+            }
             ocean["initial_heat_content_j"] = initial_heat;
             extension_config_json(ocean["request"], config, air_sea, rain, time);
             if (layers) {

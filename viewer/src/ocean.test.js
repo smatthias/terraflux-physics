@@ -155,7 +155,8 @@ test('every ocean colour helper produces a colour THREE can parse', async () => 
 })
 
 test('heat and rain styling helpers', () => {
-  assert.equal(PROCESSES.length, 8)
+  assert.equal(PROCESSES.length, 10)
+  assert.ok(PROCESSES.includes('biogeochemistry') && PROCESSES.includes('atmosphere_co2'), 'the carbon processes')
   assert.notEqual(heatFluxColor(-300), heatFluxColor(300))
   assert.equal(heatFluxColor(800), heatFluxColor(400), 'saturates')
   assert.ok(heatFluxColor(0).startsWith('rgb('))

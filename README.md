@@ -37,6 +37,11 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
   - 100-year storm floods with wind setup over the shelf and attenuation inland.
   - Storms pushing up rivers, salt intrusion, Bruun erosion, drowning islands.
   - How often today's 100-year flood comes, per-region ranking and events to 2300.
+- `docs/weather/ocean-carbon-model.md`: CO₂ in the air and the sea, run inside the ocean CLI.
+  - Boundary-layer CO₂ over land and sea: scenario background, city and industry sources, wind, vegetation, ocean uptake.
+  - The sea's carbonate chemistry (pH, aragonite saturation) and air–sea CO₂/O₂ exchange.
+  - Carbon, oxygen and nitrate on depth levels to the seafloor: river nitrate, plankton, sinking and seafloor respiration.
+  - Habitat classes (habitable, stressed, hypoxic, anoxic) and seasonal dead zones, today and in 2100.
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -236,6 +241,27 @@ It also ranks the regions by where it hits hardest. See [coastal-flooding-model.
 - alternative land colours: the year the land is lost, flood frequency, population or subsidence;
 - the sea-level components, a "where does it hit hardest?" ranking and a "when?" event table;
 - charts over time and a rivers table.
+
+**Ocean carbon, acidification and dead zones.** With the request sections `biogeochemistry` and `atmosphere_co2`, `terraflux-run-ocean-circulation` also computes:
+
+- the CO₂ of the air over land and sea: the scenario background, plumes from cities and industry carried by the wind, drawdown by vegetation and by the sea;
+- the ocean's CO₂ uptake and its acidification: pH and aragonite saturation from the carbonate chemistry;
+- carbon, oxygen and nitrate on depth levels down to the seafloor: river nitrate feeds the plankton, whose sinking remains are respired at depth and on the seafloor;
+- which water is habitable, stressed (corrosive or too little oxygen for the temperature), hypoxic or anoxic, and where the dead zones are.
+
+See [ocean-carbon-model.md](docs/weather/ocean-carbon-model.md).
+
+```sh
+python3 tools/make_ocean_carbon_examples.py   # writes the two example requests
+./build/terraflux-run-ocean-circulation examples/ocean-carbon-request.json carbon.json        # today, about a minute
+./build/terraflux-run-ocean-circulation examples/ocean-carbon-2100-request.json carbon2100.json   # 2100, high emissions
+```
+
+**🫧 Load ocean carbon & dead zones (today)** or **(2100)** opens the **Carbon & ocean life** view on a Gulf-like sea with a delta river. It shows:
+
+- the sea coloured by bottom oxygen, habitat, oxygen at a chosen depth, pH, aragonite saturation, CO₂ flux, production or nitrate; the land by the CO₂ in the air;
+- dead zones as red volumes with outlines, anoxic columns ☠, corrosive water in magenta, the CO₂ sources and the river mouths with their nitrate loads;
+- metrics, charts of the year (dead zones, uptake, pH, Ω, CO₂ in the air, production), the water column of a cell with its oxygen over the year, a dead-zone table, the carbon budgets of sea and air, and a today ↔ 2100 comparison.
 
 The field-layer list is folded into topic groups showing only layers with data, with a tooltip for every layer and example.
 

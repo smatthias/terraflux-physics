@@ -33,6 +33,10 @@ test('availability follows the loaded data', () => {
   const polarOcean = validateSequence(fixture('polar-ocean'))[0]
   assert.ok(['seaice', 'oxygen', 'icethickness', 'current', 'oceansst'].every(k => layerAvailable(k, polarOcean)))
   assert.equal(layerAvailable('unknown', polarOcean), false)
+  const carbon = validateSequence(fixture('ocean-carbon'))[0]
+  assert.ok(LAYER_GROUPS.find(g => g.id === 'carbon').layers.every(l => layerAvailable(l.key, carbon)), 'every carbon layer with a carbon block')
+  assert.ok(['current', 'oceansst', 'mld'].every(k => layerAvailable(k, carbon)), 'the ocean layers of the same run')
+  assert.ok(!layerAvailable('co2air', polarOcean) && !layerAvailable('bottomo2', coast), 'carbon layers need the carbon block')
 })
 
 test('subtitles describe the source of the loaded data', () => {

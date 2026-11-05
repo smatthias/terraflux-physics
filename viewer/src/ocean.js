@@ -3,6 +3,8 @@
 // temperature, deep-water formation, streams and river exchange points),
 // styling for the ocean-streams view and per-frame metrics. No dynamics run in
 // the browser: the viewer checks the engine output and composes layers from it.
+import { validateCarbon } from './oceanCarbon.js'
+
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 
@@ -13,7 +15,7 @@ const FRAME_ARRAYS = ['u_m_s', 'v_m_s', 'thickness_m', 'salinity_psu', 'surface_
 const FRAME_NUMBERS = ['overturning_sv', 'mean_upwelling_m_s', 'river_input_m3_s', 'net_precipitation_m3_s', 'sponge_volume_m3_s', 'sponge_salt_kg_s', 'volume_m3', 'salt_kg',
   'kinetic_energy_j', 'volume_balance_error_m3', 'salt_balance_error_kg', 'formation_area_km2', 'mean_salinity_psu', 'min_salinity_psu', 'max_speed_m_s']
 const DIRECTIONS = ['northward', 'southward', 'eastward', 'westward']
-export const PROCESSES = ['rain', 'coastal_runoff', 'air_sea', 'thermal_layers', 'sea_ice', 'ice_sheet', 'warming', 'hosing']
+export const PROCESSES = ['rain', 'coastal_runoff', 'air_sea', 'thermal_layers', 'sea_ice', 'ice_sheet', 'warming', 'hosing', 'biogeochemistry', 'atmosphere_co2']
 export const LENS_KINDS = ['rain', 'coastal_runoff', 'river', 'glacial', 'other']
 const ICE_TO_WATER = 0.917, GLOBAL_OCEAN_AREA_M2 = 3.618e14
 const FLUXES = ['shortwave_w_m2', 'longwave_w_m2', 'sensible_w_m2', 'latent_w_m2', 'rain_heat_w_m2', 'net_heat_w_m2']
@@ -101,6 +103,13 @@ export function validateOcean(block, frames, terrain) {
     if (polar) Object.assign(frame.ocean, validatePolarOcean(b, f, i, grid, processes, layered))
     previous = f
   })
+  // Ocean carbon: atmospheric CO2, uptake, acidification, oxygen and dead zones (frame.carbon).
+  const carbon = processes.includes('biogeochemistry')
+  check(carbon === processes.includes('atmosphere_co2'), 'Ocean biogeochemistry and atmospheric CO2 come together.')
+  if (carbon) {
+    check(layered && airSea, 'Ocean carbon needs the layered column and the air-sea exchange.')
+    validateCarbon(b, frames)
+  }
   return b
 }
 

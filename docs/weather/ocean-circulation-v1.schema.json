@@ -1037,6 +1037,411 @@
                 "description": "Ocean temperature above freezing at the front depth, mean over the fronts."
               }
             }
+          },
+          "carbon": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "year",
+              "atmosphere",
+              "ocean"
+            ],
+            "description": "Atmospheric CO2 and ocean carbon, oxygen and habitability at the frame time (with biogeochemistry and atmosphere_co2).",
+            "properties": {
+              "year": {
+                "type": "number",
+                "description": "Decimal calendar year."
+              },
+              "atmosphere": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "co2_ppm",
+                  "background_ppm",
+                  "max_ppm",
+                  "ocean_mean_ppm",
+                  "land_mean_ppm",
+                  "emitted_mt_co2",
+                  "land_uptake_mt_co2",
+                  "ocean_uptake_mt_co2",
+                  "ventilation_mt_co2",
+                  "transport_mt_co2",
+                  "background_shift_mt_co2",
+                  "excess_mt_co2",
+                  "initial_excess_mt_co2"
+                ],
+                "properties": {
+                  "co2_ppm": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Boundary-layer CO2 per cell (ppm), land and sea."
+                  },
+                  "background_ppm": {
+                    "type": "number",
+                    "description": "Scenario background at the frame time."
+                  },
+                  "max_ppm": {
+                    "type": "number"
+                  },
+                  "ocean_mean_ppm": {
+                    "type": "number"
+                  },
+                  "land_mean_ppm": {
+                    "type": "number"
+                  },
+                  "emitted_mt_co2": {
+                    "type": "number",
+                    "description": "Cumulative since the end of the spin-up (Mt CO2), like the other *_mt_co2 terms."
+                  },
+                  "land_uptake_mt_co2": {
+                    "type": "number",
+                    "description": "Net ecosystem uptake (negative: respiration wins)."
+                  },
+                  "ocean_uptake_mt_co2": {
+                    "type": "number",
+                    "description": "Into the sea (negative: outgassing)."
+                  },
+                  "ventilation_mt_co2": {
+                    "type": "number",
+                    "description": "Lost to the free troposphere by relaxation to the background."
+                  },
+                  "transport_mt_co2": {
+                    "type": "number",
+                    "description": "Carried in (+) or out (-) through the region boundary."
+                  },
+                  "background_shift_mt_co2": {
+                    "type": "number",
+                    "description": "Change of the excess because the background moved."
+                  },
+                  "excess_mt_co2": {
+                    "type": "number",
+                    "description": "CO2 above the background in the region boundary layer."
+                  },
+                  "initial_excess_mt_co2": {
+                    "type": "number",
+                    "description": "excess at the end of the spin-up: excess - initial = emitted - land - ocean - ventilation + transport + background_shift."
+                  }
+                }
+              },
+              "ocean": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "co2_flux_mol_m2_yr",
+                  "surface_pco2_uatm",
+                  "surface_ph",
+                  "surface_omega_aragonite",
+                  "bottom_omega_aragonite",
+                  "bottom_oxygen_umol_kg",
+                  "minimum_oxygen_umol_kg",
+                  "minimum_oxygen_depth_m",
+                  "habitable_fraction",
+                  "production_g_c_m2_day",
+                  "surface_nitrate_umol_kg",
+                  "column_class",
+                  "dead_zone_cells",
+                  "level_oxygen_umol_kg",
+                  "level_ph",
+                  "level_omega_aragonite",
+                  "level_class",
+                  "totals",
+                  "budget",
+                  "averaging_hours"
+                ],
+                "properties": {
+                  "co2_flux_mol_m2_yr": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Sea-air CO2 flux into the sea (negative: outgassing), mean since the previous frame."
+                  },
+                  "surface_pco2_uatm": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "pCO2 of the surface water."
+                  },
+                  "surface_ph": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "pH (total scale) of the surface level."
+                  },
+                  "surface_omega_aragonite": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Aragonite saturation state at the surface."
+                  },
+                  "bottom_omega_aragonite": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "... of the deepest level (seafloor on shelves)."
+                  },
+                  "bottom_oxygen_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "O2 of the deepest level."
+                  },
+                  "minimum_oxygen_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Lowest O2 in the column."
+                  },
+                  "minimum_oxygen_depth_m": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Depth of that minimum."
+                  },
+                  "habitable_fraction": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Share of the column volume that is habitable (class 0)."
+                  },
+                  "production_g_c_m2_day": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Net community production, mean since the previous frame."
+                  },
+                  "surface_nitrate_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Nitrate of the surface level."
+                  },
+                  "column_class": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Worst class in the column: 0 habitable, 1 stressed (corrosive or metabolic index below the threshold), 2 hypoxic, 3 anoxic; -1 on land."
+                  },
+                  "dead_zone_cells": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Cells whose bottom water is hypoxic or whose column is hypoxic over dead_zone_column_fraction."
+                  },
+                  "level_oxygen_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "O2 per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "level_ph": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "pH per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "level_omega_aragonite": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Aragonite saturation per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "level_class": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "description": "Habitat class per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "totals": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "sea_area_km2",
+                      "dead_zone_area_km2",
+                      "anoxic_area_km2",
+                      "corrosive_area_km2",
+                      "volume_km3",
+                      "hypoxic_volume_km3",
+                      "habitable_volume_pct",
+                      "dead_zone_pct",
+                      "mean_surface_ph",
+                      "mean_surface_omega_aragonite",
+                      "uptake_mt_co2_yr",
+                      "production_mt_c_yr"
+                    ],
+                    "properties": {
+                      "sea_area_km2": {
+                        "type": "number"
+                      },
+                      "dead_zone_area_km2": {
+                        "type": "number"
+                      },
+                      "anoxic_area_km2": {
+                        "type": "number"
+                      },
+                      "corrosive_area_km2": {
+                        "type": "number"
+                      },
+                      "volume_km3": {
+                        "type": "number"
+                      },
+                      "hypoxic_volume_km3": {
+                        "type": "number"
+                      },
+                      "habitable_volume_pct": {
+                        "type": "number"
+                      },
+                      "dead_zone_pct": {
+                        "type": "number"
+                      },
+                      "mean_surface_ph": {
+                        "type": "number"
+                      },
+                      "mean_surface_omega_aragonite": {
+                        "type": "number"
+                      },
+                      "uptake_mt_co2_yr": {
+                        "type": "number"
+                      },
+                      "production_mt_c_yr": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "budget": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "carbon_inventory_mol",
+                      "carbon_change_mol",
+                      "air_sea_carbon_mol",
+                      "river_carbon_mol",
+                      "export_carbon_mol",
+                      "ventilation_carbon_mol",
+                      "boundary_carbon_mol",
+                      "transport_carbon_mol",
+                      "nitrogen_change_mol",
+                      "river_nitrogen_mol",
+                      "export_nitrogen_mol",
+                      "ventilation_nitrogen_mol",
+                      "boundary_nitrogen_mol",
+                      "denitrified_nitrogen_mol",
+                      "transport_nitrogen_mol",
+                      "oxygen_change_mol",
+                      "air_sea_oxygen_mol",
+                      "river_oxygen_mol",
+                      "ventilation_oxygen_mol",
+                      "boundary_oxygen_mol",
+                      "transport_oxygen_mol",
+                      "sulfidic_oxygen_demand_mol"
+                    ],
+                    "properties": {
+                      "carbon_inventory_mol": {
+                        "type": "number"
+                      },
+                      "carbon_change_mol": {
+                        "type": "number"
+                      },
+                      "air_sea_carbon_mol": {
+                        "type": "number"
+                      },
+                      "river_carbon_mol": {
+                        "type": "number"
+                      },
+                      "export_carbon_mol": {
+                        "type": "number"
+                      },
+                      "ventilation_carbon_mol": {
+                        "type": "number"
+                      },
+                      "boundary_carbon_mol": {
+                        "type": "number"
+                      },
+                      "transport_carbon_mol": {
+                        "type": "number"
+                      },
+                      "nitrogen_change_mol": {
+                        "type": "number"
+                      },
+                      "river_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "export_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "ventilation_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "boundary_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "denitrified_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "transport_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "oxygen_change_mol": {
+                        "type": "number"
+                      },
+                      "air_sea_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "river_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "ventilation_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "boundary_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "transport_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "sulfidic_oxygen_demand_mol": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Cumulative mol since the end of the spin-up. carbon_change = air_sea + river - export + ventilation + boundary + transport; nitrogen_change = river - export + ventilation + boundary - denitrified + transport; transport is the numerical residual (about zero)."
+                  },
+                  "averaging_hours": {
+                    "type": "number",
+                    "description": "Interval of the flux and production means."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1052,11 +1457,13 @@
           "sea_ice",
           "ice_sheet",
           "warming",
-          "hosing"
+          "hosing",
+          "biogeochemistry",
+          "atmosphere_co2"
         ]
       },
       "uniqueItems": true,
-      "description": "Extensions active in the run; absent for the 1.5-layer slab with prescribed net precipitation. sea_ice, ice_sheet, warming and hosing are the polar processes: with any of them the frames carry glacial, cumulative ice_water/glacial and the surface oxygen."
+      "description": "Extensions active in the run; absent for the 1.5-layer slab with prescribed net precipitation. sea_ice, ice_sheet, warming and hosing are the polar processes: with any of them the frames carry glacial, cumulative ice_water/glacial and the surface oxygen. biogeochemistry and atmosphere_co2 (always together) add the carbon block to the frames and the top level."
     },
     "initial_heat_content_j": {
       "type": "number",
@@ -1157,6 +1564,92 @@
         "source": {
           "type": "object",
           "description": "Region, dome, precipitation, coupling description."
+        }
+      }
+    },
+    "carbon": {
+      "type": "object",
+      "required": [
+        "levels_m",
+        "seafloor_depth_m",
+        "emission_mol_m2_s",
+        "method",
+        "sources",
+        "habitat",
+        "open_boundary",
+        "river_chemistry",
+        "initial_inventory_mol"
+      ],
+      "description": "Configuration echo of the carbon coupling (levels, profiles, biology, transport, habitat thresholds, background scenario, sources, open boundary, river chemistry) with the seafloor and emission maps.",
+      "properties": {
+        "levels_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Level bottoms (m)."
+        },
+        "seafloor_depth_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Per cell (0 on land)."
+        },
+        "emission_mol_m2_s": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Emission map of the sources."
+        },
+        "method": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "east_m",
+              "north_m",
+              "radius_m",
+              "mt_co2_per_year",
+              "peak_cell"
+            ]
+          }
+        },
+        "habitat": {
+          "type": "object",
+          "required": [
+            "hypoxia_umol_kg",
+            "anoxia_umol_kg",
+            "corrosive_omega",
+            "dead_zone_column_fraction",
+            "metabolic"
+          ]
+        },
+        "open_boundary": {
+          "type": "object",
+          "required": [
+            "cells",
+            "relaxation_days",
+            "source"
+          ]
+        },
+        "river_chemistry": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "river",
+              "nitrate_umol_kg"
+            ]
+          }
+        },
+        "initial_inventory_mol": {
+          "type": "object"
         }
       }
     }

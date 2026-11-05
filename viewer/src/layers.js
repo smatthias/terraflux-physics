@@ -109,6 +109,21 @@ export const LAYER_GROUPS = [
     ],
   },
   {
+    id: 'carbon', title: 'Carbon & ocean life', tooltip: 'CO₂ in the air and the sea: the ocean\'s uptake, acidification, oxygen, and the dead zones where sea life cannot live.',
+    layers: [
+      { key: 'co2air', title: 'CO₂ in the air', subtitle: 'Boundary layer · ppm', tooltip: 'CO₂ of the air near the ground over land and sea: the scenario background, raised by cities and industry, carried by the wind, drawn down by plants in daylight and by the sea.', needs: has('carbon') },
+      { key: 'co2flux', title: 'Air–sea CO₂ flux', subtitle: 'Into the sea · mol/m²/yr', tooltip: 'CO₂ the sea takes up (positive) or releases (negative): the gas transfer with the wind times the pCO₂ difference between air and water.', needs: has('carbon') },
+      { key: 'ph', title: 'Surface pH', subtitle: 'Total scale · acidification', tooltip: 'Acidity of the surface water from its carbonate chemistry: the CO₂ the sea takes up lowers it (about 8.05 today, 7.7 at 1000 ppm).', needs: has('carbon') },
+      { key: 'omega', title: 'Surface aragonite saturation', subtitle: 'Ω · shells dissolve below 1', tooltip: 'How saturated the surface water is in aragonite, the mineral of shells and corals: below 1 the water is corrosive.', needs: has('carbon') },
+      { key: 'omegabottom', title: 'Bottom aragonite saturation', subtitle: 'Ω at the seafloor', tooltip: 'Aragonite saturation of the deepest water: respiration at depth adds CO₂, so bottom water under dead zones turns corrosive first.', needs: has('carbon') },
+      { key: 'bottomo2', title: 'Bottom-water oxygen', subtitle: 'Dissolved O₂ · µmol/kg', tooltip: 'Oxygen at the seafloor (or 600 m in deep water). Below 60 µmol/kg (about 2 mg/L) the water is hypoxic: a dead zone.', needs: has('carbon') },
+      { key: 'habitat', title: 'Habitat of the column', subtitle: '0 habitable → 3 anoxic', tooltip: 'The worst level of the water column: 0 habitable, 1 stressed (corrosive or too little oxygen for the temperature), 2 hypoxic, 3 anoxic.', needs: has('carbon') },
+      { key: 'habitable', title: 'Habitable share of the column', subtitle: 'Volume · %', tooltip: 'Share of the water column (to the seafloor or 600 m) with enough oxygen, not corrosive and not metabolically stressed.', needs: has('carbon') },
+      { key: 'production', title: 'Plankton production', subtitle: 'Net · g C/m²/day', tooltip: 'Net production of the plankton in the sunlit water, fed by nitrate: rivers and winter mixing supply it; what sinks is respired at depth.', needs: has('carbon') },
+      { key: 'nitrate', title: 'Surface nitrate', subtitle: 'Nutrient · µmol/kg', tooltip: 'Nitrate at the surface: river fertiliser near the mouths, used up by the plankton elsewhere.', needs: has('carbon') },
+    ],
+  },
+  {
     id: 'coast', title: 'Sea level & coasts', tooltip: 'What a rising sea does to the coast: land lost, storm floods, defences, rivers and islands.',
     layers: [
       { key: 'coastlost', title: 'Land lost to the sea', subtitle: 'Share of the cell · %', tooltip: 'Land permanently under the daily high water (100 %) or eroded from sandy shores (partial) compared with today, in the map scenario.', needs: has('coast') },
@@ -165,6 +180,10 @@ export const EXAMPLE_GROUPS = [
     { action: 'loadOceanHeatExample', label: '🌧 Load ocean heat & rain example', tooltip: 'Rain on the sea and the coast, evaporation, air–sea heat exchange and a layered water column.' },
     { action: 'loadPolarExample', label: '🧊 Load polar melt & overturning example', tooltip: 'Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios to 2300: when the currents collapse.' },
     { action: 'loadPolarOceanExample', label: '❄ Load polar ocean (sea ice & hosing) example', tooltip: 'Ten years of a layered ocean with drifting sea ice, a melting ice sheet, warming and meltwater hosing.' },
+  ] },
+  { id: 'carbon', title: 'Carbon & ocean life', examples: [
+    { action: 'loadCarbonExample', label: '🫧 Load ocean carbon & dead zones (today)', tooltip: 'A Gulf-like sea under today\'s 427 ppm: city and refinery CO₂ plumes, the sea taking up CO₂, a delta river whose nitrate feeds a summer dead zone.' },
+    { action: 'loadCarbon2100Example', label: '🌡 Load ocean carbon & dead zones (2100)', tooltip: 'The same sea in 2100 under high emissions (about 1,010 ppm, 3 K warmer): more acid, less shell-friendly, larger dead zones.' },
   ] },
   { id: 'coast', title: 'Sea level & coasts', examples: [
     { action: 'loadCoastExample', label: '🏝 Load sea-level rise & coasts example', tooltip: 'The sea-level rise of the polar-melt scenarios on a coast with a delta, an estuary city, barrier islands, cliffs and low islands: land lost, storm floods, defences, rivers.' },

@@ -132,6 +132,19 @@ The coastal flooding suite (`weather.coastal_flooding`) covers:
 
 `weather.coastal_flooding_cli` runs the example and a per-cell request: contract, map–total identities, AR6-range rise, expected regional behaviour and rejections. `weather.viewer_coastal_flooding` regenerates the fixture.
 
+The ocean carbon suite (`weather.ocean_carbon`) covers:
+
+- the carbonate chemistry: the constants against published values at 25 °C and S 35, the alkalinity reconstructed to 10⁻⁶, equilibrium DIC, acidification on doubling CO₂ (−0.3 pH, −⅓ aragonite saturation), the Revelle factor and its rise, pCO₂ rising by about 4 %/K;
+- Schmidt numbers, the transfer velocity and the metabolic index;
+- a closed turbid shelf column conserving nitrogen, carbon and alkalinity, with the oxygen balance closed by denitrification and sulfide; its bottom water turning hypoxic under summer stratification, classified a dead zone, and winter mixing restoring it;
+- a deep column equilibrating with an 800 ppm atmosphere over a year and acidifying; export taking its nitrogen along;
+- the transport: a uniform field stays uniform in a converging current; a blob moves downstream through a channel open at both ends; a converging onshore current over a sloping shelf with a river and an open boundary closes the carbon and nitrogen budgets to 10⁻⁹ with no residual; uniform water stays uniform there;
+- a river fertilising the sea at its mouth and starving the bottom water below the plume; thin bottom remainders merging into the level above;
+- the air: the steady state of a city plume, its drift downwind, the budget with wind and under a rising background, ocean uptake drawing the air down;
+- contract rejections.
+
+`weather.ocean_carbon_cli` runs the example basin for 20 summer days: the contract (shapes, habitat classes against the oxygen thresholds, dead zones against bottom oxygen, areas and uptake against the maps), the carbon, nitrogen and air budgets, the air and the sea seeing the same exchange, the refinery plume, river nitrate at the delta, clean rivers against nitrate-laden ones, a 900 ppm against a 420 ppm atmosphere, schemas and nine rejected requests. `weather.viewer_ocean_carbon` and `weather.viewer_ocean_carbon_2100` regenerate the two fixtures (about a minute each).
+
 Build and run the registered CTest case with:
 
 ~~~sh

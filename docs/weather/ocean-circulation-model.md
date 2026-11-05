@@ -261,7 +261,19 @@ In the **Ocean streams** view:
   - Ten years is also far too short for the deep ocean to adjust.
 - **No feedback to the air.** Warming, seasons and hosing are prescribed. The ice does not warm or moisten the air above it, and the air does not react to the open water.
 
-## 9. Limitations
+## 9. Ocean carbon: CO₂ in the air and the sea, acidification, oxygen and dead zones
+
+The request sections `biogeochemistry` and `atmosphere_co2` (always together; they need `thermal_layers` and `air_sea`) add the ocean's carbon, alkalinity, oxygen and nitrate on depth levels down to the seafloor, and the CO₂ of the boundary-layer air over land and sea:
+- the carbonate chemistry gives pH and aragonite saturation;
+- the air–sea exchange gives the uptake (or outgassing);
+- plankton production fed by river nitrate, sinking and seafloor respiration give the oxygen;
+- each level and column gets a habitat class (habitable, stressed, hypoxic, anoxic), and the dead zones are where the bottom water is hypoxic.
+
+The chemistry is carried by the ocean's current in flux form, made consistent with the seafloor by potential-flow corrections; the sponge is its open boundary. Frames gain a `carbon` block, the top level the configuration echo, and `processes` lists `biogeochemistry` and `atmosphere_co2`.
+
+The model, its calibration, the two examples (today and 2100) and the viewer's **Carbon & ocean life** view are described in [ocean-carbon-model.md](ocean-carbon-model.md).
+
+## 10. Limitations
 
 - One active layer for the dynamics: the velocity has no vertical structure (the layered column resolves temperature and salinity, not currents), no barotropic mode, no bottom topography, no eddies (linear momentum, 50–60 km cells); boundary currents are grid-limited in width and speed, and a closed basin produces boundary jets along walls where the real ocean continues (the sponge mitigates the southern one). The overturning is a parametrised sinking, not a resolved deep circulation.
 - The example is an idealised Atlantic-like basin with synthetic continents and forcing; the magnitudes (streams of order 10–70 Sv, overturning of order 1 Sv, plumes of 10³–10⁵ km²) are illustrative, not a reanalysis.

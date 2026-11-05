@@ -33,6 +33,9 @@ add_library(terraflux_weather_map
     src/weather/marine_indicators.cpp
     src/weather/sea_level.cpp
     src/weather/coastal_flooding.cpp
+    src/weather/ocean_carbon.cpp
+    src/weather/ocean_biogeochemistry.cpp
+    src/weather/atmospheric_co2.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -223,6 +226,20 @@ if(BUILD_TESTING)
     add_executable(terraflux-polar-melt-test tests/weather/polar_melt_test.cpp)
     target_link_libraries(terraflux-polar-melt-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.polar_melt COMMAND terraflux-polar-melt-test)
+    add_executable(terraflux-ocean-carbon-test tests/weather/ocean_carbon_test.cpp)
+    target_link_libraries(terraflux-ocean-carbon-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.ocean_carbon COMMAND terraflux-ocean-carbon-test)
+    add_test(NAME weather.ocean_carbon_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_carbon_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    add_test(NAME weather.viewer_ocean_carbon
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/ocean-carbon-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean-carbon/engine-timeline.json --check)
+    add_test(NAME weather.viewer_ocean_carbon_2100
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/ocean-carbon-2100-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean-carbon-2100/engine-timeline.json --check)
+    set_tests_properties(weather.viewer_ocean_carbon weather.viewer_ocean_carbon_2100 PROPERTIES TIMEOUT 600)
     add_executable(terraflux-coastal-flooding-test tests/weather/coastal_flooding_test.cpp)
     target_link_libraries(terraflux-coastal-flooding-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.coastal_flooding COMMAND terraflux-coastal-flooding-test)
@@ -312,6 +329,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-ocean-heat-rain-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-polar-melt-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-coastal-flooding-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-ocean-carbon-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

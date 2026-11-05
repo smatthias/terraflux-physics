@@ -18,7 +18,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 # Absolute tolerances for per-step residuals (the viewer checks them against 1e-6 of the totals).
-NOISE = {'heat_balance_error_j': 1e12, 'volume_balance_error_m3': 10.0, 'salt_balance_error_kg': 1e4, 'coastal_balance_error_m3': 1.0}
+NOISE = {'heat_balance_error_j': 1e12, 'volume_balance_error_m3': 10.0, 'salt_balance_error_kg': 1e4, 'coastal_balance_error_m3': 1.0,
+         # The transport residual of the ocean chemistry (solver tolerance; inventories are ~1e14 mol).
+         'transport_carbon_mol': 1e5, 'transport_nitrogen_mol': 1e4, 'transport_oxygen_mol': 1e5}
 
 
 def equivalent(a, b, key=''):
