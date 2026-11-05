@@ -6,8 +6,8 @@ export const LAYER_GROUPS = [
   {
     id: 'air', title: 'Weather & air', tooltip: 'Temperature, wind, pressure and moisture of the air near the ground.',
     layers: [
-      { key: 'temperature', title: 'Air temperature', subtitle: 'Dry transport · °C', tooltip: 'Air temperature near the ground, carried by the wind and smoothed by diffusion. With a terrain grid it can be corrected by the lapse rate (colder up high).', needs: d => !d.coast && !d.solar },
-      { key: 'wind', title: 'Wind speed', subtitle: 'Prescribed field · m/s', tooltip: 'Wind speed near the ground. In coupled runs it follows from the pressure pattern, the Coriolis force and surface friction; arrows show the direction.', needs: d => !d.solar },
+      { key: 'temperature', title: 'Air temperature', subtitle: 'Dry transport · °C', tooltip: 'Air temperature near the ground, carried by the wind and smoothed by diffusion. With a terrain grid it can be corrected by the lapse rate (colder up high).', needs: d => !d.coast && !d.solar && !d.dust },
+      { key: 'wind', title: 'Wind speed', subtitle: 'Prescribed field · m/s', tooltip: 'Wind speed near the ground. In coupled runs it follows from the pressure pattern, the Coriolis force and surface friction; arrows show the direction.', needs: d => !d.solar && !d.dust },
       { key: 'pressure', title: 'Sea-level pressure', subtitle: 'Synthetic regional field · hPa', tooltip: 'Air pressure reduced to sea level. Lows (blue) bring wind and weather, highs (red) calm and dry conditions.', needs: d => !!(d.atmosphere || d.coupled) },
       { key: 'humidity', title: 'Relative humidity', subtitle: 'Synthetic regional field · %', tooltip: 'How close the air is to saturation. At 100 % water vapour condenses into cloud.', needs: d => !!(d.atmosphere || d.coupled) },
       { key: 'density', title: 'Air density', subtitle: 'Coupled moist layer · kg/m³', tooltip: 'Mass of a cubic metre of air, from pressure, temperature and humidity. Warm, moist air is lighter and accelerates faster under the same pressure gradient.', needs: has('coupled') },
@@ -109,10 +109,12 @@ export const LAYER_GROUPS = [
     ],
   },
   {
-    id: 'sun', title: 'Sun & space weather', tooltip: 'The solar disk of the sunspot cycle: spots, faculae and flaring regions on an illustrative day.',
+    id: 'sun', title: 'Sun & space weather', tooltip: 'The solar disk of the sunspot cycle (spots, faculae and flaring regions on an illustrative day) and the cosmic dust entering the Earth.',
     layers: [
       { key: 'sunbrightness', title: 'Photosphere brightness', subtitle: 'Solar disk · K', tooltip: 'Brightness temperature of the visible solar surface: limb darkening toward the edge, dark sunspots, slightly brighter faculae. One illustrative day of the month.', needs: has('solar') },
       { key: 'suncontrast', title: 'Contrast to the quiet Sun', subtitle: 'Spots − / faculae + · %', tooltip: 'Intensity against the same cell of a spotless Sun: sunspots remove light, faculae add a little. Integrated over the disk the faculae usually win, so the Sun is brighter at maximum.', needs: has('solar') },
+      { key: 'dustinflux', title: 'Cosmic dust influx', subtitle: 'This hour · µg/m²/day', tooltip: 'Mass of interplanetary dust and small meteoroids entering the atmosphere per square metre, as a daily rate at this hour: the side of the Earth facing its direction of motion (local morning) sweeps up more.', needs: has('dust') },
+      { key: 'dustdaily', title: 'Cosmic dust, daily mean', subtitle: 'Over the day · µg/m²/day', tooltip: 'The influx averaged over the day: its variation with latitude follows the position of the apex of the Earth\'s way in the sky, which changes with the seasons.', needs: has('dust') },
     ],
   },
   {
@@ -194,6 +196,7 @@ export const EXAMPLE_GROUPS = [
   ] },
   { id: 'space', title: 'Sun & space weather', examples: [
     { action: 'loadSolarExample', label: '☀ Load solar cycle & space weather example', tooltip: 'The 11-year sunspot cycle since 1850 with its minima and maxima, a tested forecast to 2050, and what the cycle does to UV, ozone, flares and the climate.' },
+    { action: 'loadDustExample', label: '☄ Load cosmic dust & extraterrestrial water example', tooltip: 'The 30-100 t of dust and small meteoroids entering the Earth every day: what burns up, what reaches the ground, where the extraterrestrial water goes, and whether it matters.' },
   ] },
   { id: 'coast', title: 'Sea level & coasts', examples: [
     { action: 'loadCoastExample', label: '🏝 Load sea-level rise & coasts example', tooltip: 'The sea-level rise of the polar-melt scenarios on a coast with a delta, an estuary city, barrier islands, cliffs and low islands: land lost, storm floods, defences, rivers.' },

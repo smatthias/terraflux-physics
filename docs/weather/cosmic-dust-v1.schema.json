@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/cosmic-dust-v1.schema.json",
+  "title": "TerraFlux cosmic dust block v1 (timeline.cosmic_dust)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "influx",
+    "population",
+    "fate",
+    "profiles",
+    "entry",
+    "scenarios",
+    "what_if",
+    "thresholds",
+    "comparisons",
+    "deposition_export",
+    "map",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.cosmic.dust/v1"
+    },
+    "method": {
+      "const": "gruen_distribution_single_body_entry_langmuir_evaporation"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "request": {
+      "type": "object"
+    },
+    "influx": {
+      "type": "object",
+      "required": [
+        "central_t_per_day",
+        "low_t_per_day",
+        "high_t_per_day",
+        "gruen_t_per_day"
+      ]
+    },
+    "population": {
+      "type": "object",
+      "required": [
+        "min_mass_g",
+        "max_mass_g",
+        "speeds_km_s",
+        "zenith_deg",
+        "composition",
+        "bins"
+      ]
+    },
+    "fate": {
+      "type": "object",
+      "required": [
+        "influx_t_per_day",
+        "ablated_t_per_day",
+        "surviving_t_per_day",
+        "surviving_by_state_t_per_day",
+        "water_in_t_per_day",
+        "water_released_t_per_day",
+        "water_to_surface_kg_per_day",
+        "kinetic_power_w",
+        "median_ablation_altitude_km",
+        "median_water_altitude_km"
+      ]
+    },
+    "profiles": {
+      "type": "object",
+      "required": [
+        "altitude_km",
+        "step_km",
+        "ablation_t_per_day_per_bin",
+        "water_kg_per_day_per_bin",
+        "energy_w_per_bin",
+        "air_density_kg_m3"
+      ],
+      "description": "Per altitude bin (centres in km)."
+    },
+    "entry": {
+      "type": "object"
+    },
+    "scenarios": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "low": {
+          "type": "object",
+          "required": [
+            "influx_t_per_day",
+            "ablated_t_per_day",
+            "surviving_t_per_day",
+            "water",
+            "mass",
+            "energy",
+            "iron",
+            "smoke"
+          ]
+        },
+        "central": {
+          "type": "object",
+          "required": [
+            "influx_t_per_day",
+            "ablated_t_per_day",
+            "surviving_t_per_day",
+            "water",
+            "mass",
+            "energy",
+            "iron",
+            "smoke"
+          ]
+        },
+        "high": {
+          "type": "object",
+          "required": [
+            "influx_t_per_day",
+            "ablated_t_per_day",
+            "surviving_t_per_day",
+            "water",
+            "mass",
+            "energy",
+            "iron",
+            "smoke"
+          ]
+        }
+      },
+      "required": [
+        "low",
+        "central",
+        "high"
+      ]
+    },
+    "what_if": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "multiplier",
+          "influx_t_per_day",
+          "smoke_optical_depth",
+          "forcing_bound_w_m2",
+          "temperature_bound_k",
+          "water_t_per_year"
+        ]
+      }
+    },
+    "thresholds": {
+      "type": "object"
+    },
+    "comparisons": {
+      "type": "object"
+    },
+    "deposition_export": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "dust_kg_m2_s",
+        "smoke_kg_m2_s",
+        "water_kg_m2_s",
+        "iron_kg_m2_s"
+      ]
+    },
+    "map": {
+      "type": "object",
+      "required": [
+        "projection",
+        "cell_degrees",
+        "date_utc",
+        "hours",
+        "mean_influx_ug_m2_day",
+        "sources",
+        "land_mask",
+        "daily_mean_ug_m2_day",
+        "by_latitude",
+        "frames"
+      ],
+      "description": "Equirectangular global grid (the timeline grid carries it in metres along the equator); one frame per timeline frame."
+    },
+    "solar_comparison": {
+      "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

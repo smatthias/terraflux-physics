@@ -53,6 +53,10 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
   - The slow brightening of the quiet Sun (low / central / high TSI), UV and ozone, cosmic rays and ¹⁴C/¹⁰Be production.
   - The climate with volcanic and CO₂ forcing for comparison, an illustrative regional winter response, and a future grand minimum.
   - A stochastic Babcock–Leighton dynamo map in which grand minima arise by chance, calibrated to the Holocene statistics, with the risk of a new one.
+- `docs/weather/cosmic-dust-model.md`, `cosmic-dust-run-v1.schema.json` and `cosmic-dust-v1.schema.json`: the cosmic dust and extraterrestrial water that enter the atmosphere every day (30–100 t/day).
+  - The Grün size distribution, the entry of every size, speed and angle (heating, melting, evaporation, dehydration), calibrated to the Antarctic micrometeorite collections.
+  - Where the water is released, and the budgets of mass, water, energy, iron and meteoric smoke against their terrestrial counterparts; what it would take for the dust to matter for the climate.
+  - Hourly global maps of the influx from the sporadic meteoroid sources (apex, helion, antihelion, toroidal).
 - `docs/weather/precipitation-outcomes-model.md` and `precipitation-outcomes-v1.schema.json` — what each cloud genus delivers: rain, drizzle, snow, sleet, showers, prolonged rain, lightning and hail, with the rate, phase and hazard rules
 - `docs/weather/map-interpretation.md` — map input and interpretation pipeline
 - `docs/weather/map-source-status.md` — NOAA prototype and BOM source status
@@ -70,6 +74,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
 - `tools/silso_to_request.py` — turn a downloaded SILSO monthly sunspot file into the record of a solar-cycle request
+- `tools/make_land_mask.py` — sample the `global-land-mask` package at the cell centres of a global grid (the land mask of the cosmic-dust example)
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
@@ -77,6 +82,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-run-coastal-flooding`: a rising sea on a coast (land lost, storm floods, defences overtopped, rivers pushed back, salt intrusion, islands), year by year for the polar-melt scenarios; writes a viewer timeline with a `coast` block
 - `terraflux-run-polar-melt`: Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios over centuries; writes a viewer timeline with a `polar` block
 - `terraflux-run-solar-cycle`: the sunspot cycle with its minima, maxima and forecast, and the UV, ozone, flares and climate response it brings; writes a viewer timeline with solar-disk frames and a `solar` block
+- `terraflux-run-cosmic-dust`: cosmic dust and extraterrestrial water entering the atmosphere (what burns, what reaches the ground, where the water goes, the budgets); writes a viewer timeline with hourly global influx maps and a `cosmic_dust` block
 - `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
 
@@ -301,6 +307,28 @@ The example's record is synthesised from an approximate, hand-entered table of t
 - the sunspot chart with record, smoothed series, fitted curves and the forecast's 50 % and 90 % ranges, and a table of minima and maxima with the predicted ones;
 - the backtest skill by cycle age, the UV spectrum of the cycle, TSI, UV at the top against the UV index at the ground with a site table, flare counts, the radio-blackout table and an annual flare outlook, the climate response, and the butterfly diagram;
 - grand minima and maxima since 1000 AD with the epochs and detected episodes, long-term TSI and cosmic rays, the climate contributions with an epoch table, a Maunder Minimum case study, the dynamo map with a synthetic Holocene, and the outlook for a new grand minimum.
+
+**Cosmic dust and extraterrestrial water.** `terraflux-run-cosmic-dust` takes the total influx as a scenario (the example: 30 / 60 / 100 t/day; published estimates range from about 5 to 300 t/day). It then:
+
+- spreads the influx over sizes with the Grün (1985) distribution;
+- follows every size, speed and entry angle through the standard atmosphere (drag, heating, radiation, Langmuir evaporation, dehydration of the bound water);
+- sums up what evaporates and where, and what reaches the ground unmelted, partly melted or as cosmic spherules;
+- compares the dust's water, mass, energy, iron and meteoric smoke with the hydrogen escaping to space, the oceans, the rain, volcanic degassing, sunlight, geothermal heat, desert dust and volcanic aerosol;
+- maps the influx hour by hour from the sporadic meteoroid sources.
+
+The entry model is calibrated so that about a quarter of the mass reaches the ground, as the Antarctic collections suggest. With 60 t/day, about 43 t evaporate at a median height of 88 km and about 17 t reach the ground.
+
+The water is 3 t/day at 5 % water. 99.7 % of it is released above 80 km. That is about 0.1 % of the water lost as escaping hydrogen, and 2·10⁻¹² of the rain, so it is not injected into the water models; per-area fluxes are exported instead. The smoke's forcing is at most ±0.006 W/m². It would take about 16× today's influx to reach 0.1 W/m². See [cosmic-dust-model.md](docs/weather/cosmic-dust-model.md).
+
+```sh
+./build/terraflux-run-cosmic-dust examples/cosmic-dust-request.json dust.json   # about 3 s
+```
+
+**☄ Load cosmic dust & extraterrestrial water example** (in the *Sun & space weather* group) opens the **Cosmic dust** view. It shows:
+
+- the world map of the influx hour by hour over one day (or the daily mean), higher and brighter where more arrives, the night side darker, land tinted, and the points where the apex, helion, antihelion and toroidal sources and the Sun stand overhead;
+- the scenario switch (30 / 60 / 100 t/day), the fate of the mass as a bar, the size distribution with the share that reaches the ground, and the altitude profiles of evaporation, water release and heating with the metal layers and noctilucent clouds;
+- the water and budget table with the ratios, the influx over the day at a chosen cell and by latitude, and the "what would it take?" table for 1–10,000× today's influx.
 
 The field-layer list is folded into topic groups showing only layers with data, with a tooltip for every layer and example.
 

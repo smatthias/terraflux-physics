@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/cosmic-dust-run-v1.schema.json",
+  "title": "TerraFlux cosmic dust run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "influx",
+    "map"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.cosmic.dust-run/v1"
+    },
+    "influx": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "central_t_per_day": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000.0,
+          "description": "Total mass entering the atmosphere per day (t)."
+        },
+        "low_t_per_day": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000.0
+        },
+        "high_t_per_day": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000.0
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "central_t_per_day"
+      ],
+      "description": "0 < low <= central <= high. The outputs scale linearly with the influx."
+    },
+    "population": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_mass_g": {
+          "type": "number",
+          "minimum": 1e-18,
+          "maximum": 1000.0,
+          "default": 1e-12
+        },
+        "max_mass_g": {
+          "type": "number",
+          "minimum": 1e-18,
+          "maximum": 1000.0,
+          "default": 1.0
+        },
+        "mass_bins": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 200,
+          "default": 36
+        },
+        "speeds": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "minItems": 1,
+          "maxItems": 30,
+          "description": "[entry speed km/s (11.2-72.8), mass weight]"
+        },
+        "zenith_deg": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 85
+          },
+          "minItems": 1,
+          "maxItems": 20
+        },
+        "composition": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "water": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.05
+            },
+            "iron": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.18
+            },
+            "sodium": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.005
+            },
+            "magnesium": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.096
+            },
+            "silicon": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.107
+            },
+            "nickel": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.011
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "particle_density_kg_m3": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 8000,
+          "default": 2000
+        },
+        "specific_heat_j_kg_k": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 5000,
+          "default": 1000
+        },
+        "heat_transfer": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 1,
+          "default": 1.0
+        },
+        "drag": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 3,
+          "default": 1
+        },
+        "emissivity": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1,
+          "default": 1
+        },
+        "latent_heat_j_kg": {
+          "type": "number",
+          "minimum": 100000.0,
+          "maximum": 20000000.0,
+          "default": 6000000.0
+        },
+        "vapour_a": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 20,
+          "default": 8.7
+        },
+        "vapour_b": {
+          "type": "number",
+          "minimum": 1000,
+          "maximum": 100000,
+          "default": 13500
+        },
+        "vapour_molar_mass_kg": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 0.5,
+          "default": 0.045
+        },
+        "melt_start_k": {
+          "type": "number",
+          "minimum": 500,
+          "maximum": 3000,
+          "default": 1200
+        },
+        "melt_full_k": {
+          "type": "number",
+          "minimum": 500,
+          "maximum": 3500,
+          "default": 1650
+        },
+        "dehydration_start_k": {
+          "type": "number",
+          "minimum": 300,
+          "maximum": 2000,
+          "default": 700
+        },
+        "dehydration_end_k": {
+          "type": "number",
+          "minimum": 300,
+          "maximum": 2500,
+          "default": 1100
+        },
+        "start_altitude_m": {
+          "type": "number",
+          "minimum": 120000,
+          "maximum": 200000,
+          "default": 180000
+        },
+        "air_temperature_k": {
+          "type": "number",
+          "minimum": 150,
+          "maximum": 350,
+          "default": 220
+        },
+        "max_step_m": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 40
+        }
+      }
+    },
+    "altitude": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bottom_km": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200,
+          "default": 50
+        },
+        "top_km": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200,
+          "default": 180
+        },
+        "step_km": {
+          "type": "number",
+          "minimum": 0.25,
+          "default": 1
+        }
+      }
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "date_utc": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "cells_east": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 720,
+          "default": 72
+        },
+        "cells_north": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 360,
+          "default": 36
+        },
+        "hours": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 48,
+          "default": 24
+        },
+        "land_mask": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[#.]+$"
+          },
+          "description": "One string per row, north first: '#' land, '.' sea (tools/make_land_mask.py)."
+        },
+        "land_mask_source": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "longitude_from_apex_deg": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180
+              },
+              "ecliptic_latitude_deg": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90
+              },
+              "weight": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "longitude_from_apex_deg",
+              "ecliptic_latitude_deg",
+              "weight"
+            ]
+          }
+        },
+        "isotropic_share": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        }
+      },
+      "required": [
+        "date_utc"
+      ]
+    },
+    "comparisons": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "smoke_residence_years": {
+          "type": "number"
+        },
+        "smoke_mass_extinction_m2_kg": {
+          "type": "number"
+        },
+        "forcing_per_optical_depth_w_m2": {
+          "type": "number"
+        },
+        "mesospheric_water_ppmv": {
+          "type": "number"
+        },
+        "mesospheric_water_lifetime_days": {
+          "type": "number"
+        },
+        "hydrogen_escape_kg_s": {
+          "type": "number"
+        },
+        "helium_escape_kg_s": {
+          "type": "number"
+        },
+        "ocean_mass_kg": {
+          "type": "number"
+        },
+        "precipitation_kg_yr": {
+          "type": "number"
+        },
+        "volcanic_water_kg_yr": {
+          "type": "number"
+        },
+        "aeolian_iron_kg_yr": {
+          "type": "number"
+        },
+        "geothermal_w": {
+          "type": "number"
+        },
+        "feedback_w_m2_k": {
+          "type": "number"
+        },
+        "earth_age_years": {
+          "type": "number"
+        },
+        "ocean_fraction": {
+          "type": "number"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "scenarios": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "multipliers": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000.0
+          },
+          "minItems": 1,
+          "maxItems": 12
+        }
+      },
+      "required": [
+        "multipliers"
+      ]
+    },
+    "solar_timeline_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A terraflux-run-solar-cycle timeline for the comparison with the Sun."
+    }
+  }
+}
