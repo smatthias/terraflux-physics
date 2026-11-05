@@ -53,6 +53,11 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
   - The slow brightening of the quiet Sun (low / central / high TSI), UV and ozone, cosmic rays and ¹⁴C/¹⁰Be production.
   - The climate with volcanic and CO₂ forcing for comparison, an illustrative regional winter response, and a future grand minimum.
   - A stochastic Babcock–Leighton dynamo map in which grand minima arise by chance, calibrated to the Holocene statistics, with the risk of a new one.
+- `docs/weather/solar-wind-model.md`, `solar-wind-run-v1.schema.json` and `solar-wind-v1.schema.json`: the solar wind at the magnetosphere's polar caps and what it means globally.
+  - A tilted dipole with magnetic coordinates and the cosmic-ray cutoff; the solar-wind coupling (Newell Kp, O'Brien–McPherron Dst, Shue magnetopause); the expanding and contracting polar cap (Milan) with the auroral oval, aurora and Joule heating; the Jacchia thermosphere.
+  - Escape to space: diffusion-limited hydrogen by Jeans escape, charge exchange and the polar wind; O⁺ outflow from the cusp and the oval; helium.
+  - Galactic cosmic rays (force field, effective yields for the ground, 12 km and the Pfotzer maximum, cosmogenic production) and solar proton events with their NOx and polar ozone loss.
+  - A severe storm hour by hour, the solar cycle, and scenarios of storms, proton events, a weaker dipole, methane and places.
 - `docs/weather/cosmic-dust-model.md`, `cosmic-dust-run-v1.schema.json` and `cosmic-dust-v1.schema.json`: the cosmic dust and extraterrestrial water that enter the atmosphere every day (30–100 t/day).
   - The Grün size distribution, the entry of every size, speed and angle (heating, melting, evaporation, dehydration), calibrated to the Antarctic micrometeorite collections.
   - Where the water is released, and the budgets of mass, water, energy, iron and meteoric smoke against their terrestrial counterparts; what it would take for the dust to matter for the climate.
@@ -74,7 +79,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
 - `tools/silso_to_request.py` — turn a downloaded SILSO monthly sunspot file into the record of a solar-cycle request
-- `tools/make_land_mask.py` — sample the `global-land-mask` package at the cell centres of a global grid (the land mask of the cosmic-dust example)
+- `tools/make_land_mask.py` — sample the `global-land-mask` package at the cell centres of a global grid (the land masks of the cosmic-dust and solar-wind examples)
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
@@ -82,6 +87,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-run-coastal-flooding`: a rising sea on a coast (land lost, storm floods, defences overtopped, rivers pushed back, salt intrusion, islands), year by year for the polar-melt scenarios; writes a viewer timeline with a `coast` block
 - `terraflux-run-polar-melt`: Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios over centuries; writes a viewer timeline with a `polar` block
 - `terraflux-run-solar-cycle`: the sunspot cycle with its minima, maxima and forecast, and the UV, ozone, flares and climate response it brings; writes a viewer timeline with solar-disk frames and a `solar` block
+- `terraflux-run-solar-wind`: the solar wind at the polar caps (aurora, escaping ions, cosmic radiation, solar protons) in a storm, over the solar cycle and in scenarios; writes a viewer timeline with global storm maps and a `solar_wind` block
 - `terraflux-run-cosmic-dust`: cosmic dust and extraterrestrial water entering the atmosphere (what burns, what reaches the ground, where the water goes, the budgets); writes a viewer timeline with hourly global influx maps and a `cosmic_dust` block
 - `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
@@ -307,6 +313,27 @@ The example's record is synthesised from an approximate, hand-entered table of t
 - the sunspot chart with record, smoothed series, fitted curves and the forecast's 50 % and 90 % ranges, and a table of minima and maxima with the predicted ones;
 - the backtest skill by cycle age, the UV spectrum of the cycle, TSI, UV at the top against the UV index at the ground with a site table, flare counts, the radio-blackout table and an annual flare outlook, the climate response, and the butterfly diagram;
 - grand minima and maxima since 1000 AD with the epochs and detected episodes, long-term TSI and cosmic rays, the climate contributions with an epoch table, a Maunder Minimum case study, the dynamo map with a synthetic Holocene, and the outlook for a new grand minimum.
+
+**The solar wind at the polar caps.** `terraflux-run-solar-wind` follows a synthetic severe storm hour by hour: a solar proton event, then a fast coronal mass ejection whose magnetic cloud turns the field southward. The magnetic field is not weaker at the poles (it is twice as strong as at the equator); there the field lines are open to the solar wind. So the model maps what comes in and goes out through them:
+
+- **Magnetosphere.** Kp and Dst, the magnetopause pushed inside geostationary orbit, the open polar cap widening to 65° and the aurora reaching 45° magnetic latitude.
+- **Energy and the thermosphere.** Auroral and Joule heating that raise the thermosphere by about 400 K and triple the satellite drag.
+- **Escape.** Oxygen ions escaping from the cusp and the night-side oval, and hydrogen escaping everywhere, limited by its supply from below.
+- **Radiation.** Galactic cosmic rays behind the geomagnetic cutoff, with a Forbush decrease; solar protons entering only the polar caps, where their NOx thins the ozone above 35 km.
+
+The monthly solar cycle comes from the solar-cycle example. Scenarios cover storms up to the Carrington class, proton events, a weaker dipole (Laschamp), methane, and what 18 places see.
+
+Globally: the Earth loses about 4 kg/s, mostly hydrogen. Oxygen (0.3 kg/s) leaves only through the poles. The energy that enters is 4·10⁻⁷ of the absorbed sunlight, negligible for weather and climate. The effects that matter are on the upper atmosphere (drag, polar ozone), on technology and on aviation dose: polar routes receive 2–3 times the cosmic radiation of equatorial ones. See [solar-wind-model.md](docs/weather/solar-wind-model.md).
+
+```sh
+./build/terraflux-run-solar-wind examples/solar-wind-request.json solar-wind.json   # about 2 s
+```
+
+**🧲 Load solar wind & polar caps example** (in the *Sun & space weather* group) opens the **Solar wind & poles** view. It shows:
+
+- the Earth as a globe in a Sun-fixed frame with a sketch of the magnetosphere: closed and open field lines, the magnetopause, the solar wind, escaping O⁺ and H⁺, and cosmic rays or solar protons entering the caps;
+- a choice of layers: aurora, escaping oxygen, dose at 12 km, solar-proton ionisation, cutoff rigidity, thermosphere temperature, open and closed field (or a flat world map);
+- magnetic polar dials and latitude profiles, twelve storm charts, the escape budget, the solar cycle, and tables of proton events, storms, places and a weaker dipole, with a summary of the global effects.
 
 **Cosmic dust and extraterrestrial water.** `terraflux-run-cosmic-dust` takes the total influx as a scenario (the example: 30 / 60 / 100 t/day; published estimates range from about 5 to 300 t/day). It then:
 
