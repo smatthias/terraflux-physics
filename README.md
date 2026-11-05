@@ -58,6 +58,10 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
   - Escape to space: diffusion-limited hydrogen by Jeans escape, charge exchange and the polar wind; O⁺ outflow from the cusp and the oval; helium.
   - Galactic cosmic rays (force field, effective yields for the ground, 12 km and the Pfotzer maximum, cosmogenic production) and solar proton events with their NOx and polar ozone loss.
   - A severe storm hour by hour, the solar cycle, and scenarios of storms, proton events, a weaker dipole, methane and places.
+- `docs/weather/coupled-earth-model.md` and the `earth-forecast-*` / `earth-climate-*` schemas: the Coupled Earth, where the climate and the weather models meet.
+  - Climate drivers ranked by their effect (greenhouse gases, aerosols, land use, the Sun, volcanoes, space), the feedbacks, and the impacts (extremes, sea ice, ocean heat and pH, overturning, sea level) for three scenarios.
+  - CO₂ sources, sinks and transport on a world map, and where +100 ppm hits hardest.
+  - A 10-member ensemble forecast coupling ocean, land, mountains and the Sun to the weather: 3/5/7/10-day products, the 3-day wind, warnings for storms, floods, thunderstorms, tornadoes and hurricanes, and its verification.
 - `docs/weather/cosmic-dust-model.md`, `cosmic-dust-run-v1.schema.json` and `cosmic-dust-v1.schema.json`: the cosmic dust and extraterrestrial water that enter the atmosphere every day (30–100 t/day).
   - The Grün size distribution, the entry of every size, speed and angle (heating, melting, evaporation, dehydration), calibrated to the Antarctic micrometeorite collections.
   - Where the water is released, and the budgets of mass, water, energy, iron and meteoric smoke against their terrestrial counterparts; what it would take for the dust to matter for the climate.
@@ -79,7 +83,7 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `tools/fetch_noaa_mrms.py` — download one current NOAA MRMS composite and provenance
 - `tools/decode_noaa_mrms.py` — decode a bounded MRMS grid crop into canonical reflectivity observations
 - `tools/silso_to_request.py` — turn a downloaded SILSO monthly sunspot file into the record of a solar-cycle request
-- `tools/make_land_mask.py` — sample the `global-land-mask` package at the cell centres of a global grid (the land masks of the cosmic-dust and solar-wind examples)
+- `tools/make_land_mask.py` — sample the `global-land-mask` package at the cell centres of a global grid (the land masks of the cosmic-dust, solar-wind and climate examples) or, with `--spacing-m --anchor`, of a regional azimuthal grid (the forecast example)
 - `terraflux-estimate-rain-rate` — estimate a precipitation rate from reflectivity observations with configurable Z-R coefficients
 - `terraflux-accumulate-rainfall` — integrate timestamped rate observations into precipitation depth in millimetres
 - `terraflux-run-pressure-wind` — integrate the wind between configured high- and low-pressure systems with Coriolis deflection and friction
@@ -88,6 +92,8 @@ See [docs/HANDOVER.md](docs/HANDOVER.md) for setup, inspection controls, reviewe
 - `terraflux-run-polar-melt`: Greenland, the Arctic sea ice and the Atlantic overturning under warming scenarios over centuries; writes a viewer timeline with a `polar` block
 - `terraflux-run-solar-cycle`: the sunspot cycle with its minima, maxima and forecast, and the UV, ozone, flares and climate response it brings; writes a viewer timeline with solar-disk frames and a `solar` block
 - `terraflux-run-solar-wind`: the solar wind at the polar caps (aurora, escaping ions, cosmic radiation, solar protons) in a storm, over the solar cycle and in scenarios; writes a viewer timeline with global storm maps and a `solar_wind` block
+- `terraflux-run-earth-climate`: which drivers change the climate most, what the warming does, and where CO₂ comes from, goes and hits hardest; couples in the solar-cycle, solar-wind, cosmic-dust, polar-melt and forecast runs; writes a viewer timeline with decadal warming maps and an `earth_climate` block
+- `terraflux-run-earth-forecast`: a coupled 1–15 day ensemble forecast (ocean, land, mountains, Sun, a hurricane) with daily products, hourly city wind, warnings with areas, verification against a hidden truth member and coupling sensitivity runs; writes a viewer timeline and an `earth_forecast` block
 - `terraflux-run-cosmic-dust`: cosmic dust and extraterrestrial water entering the atmosphere (what burns, what reaches the ground, where the water goes, the budgets); writes a viewer timeline with hourly global influx maps and a `cosmic_dust` block
 - `terraflux-run-atmospheric-column` — one vertical column: hydrostatic layers, convective adjustment, lifted surface parcel, cloud base and CAPE
 - `CMakeLists.txt` — C++17 weather map and transport targets with CTest integration
@@ -356,6 +362,25 @@ The water is 3 t/day at 5 % water. 99.7 % of it is released above 80 km. That is
 - the world map of the influx hour by hour over one day (or the daily mean), higher and brighter where more arrives, the night side darker, land tinted, and the points where the apex, helion, antihelion and toroidal sources and the Sun stand overhead;
 - the scenario switch (30 / 60 / 100 t/day), the fate of the mass as a bar, the size distribution with the share that reaches the ground, and the altitude profiles of evaporation, water release and heating with the metal layers and noctilucent clouds;
 - the water and budget table with the ratios, the influx over the day at a chosen cell and by latitude, and the "what would it take?" table for 1–10,000× today's influx.
+
+**The Coupled Earth.** Two runs put the models together (see [coupled-earth-model.md](docs/weather/coupled-earth-model.md)):
+
+- `terraflux-run-earth-climate` ranks the drivers of climate change. Today (1.38 K since 1850–1900): CO₂ +1.04 K, aerosols −0.55 K, methane +0.26 K, ozone +0.24 K, halocarbons +0.22 K. The Sun, volcanoes and the space drivers (cosmic rays, solar-wind energy, dust) each contribute a few hundredths of a kelvin or less. It also shows the feedbacks, and the impacts under three scenarios (2100: 1.7 / 2.9 / 5.0 K; the once-in-50-years heat ×11 / ×29 / ×48). On the world map: where CO₂ comes from, where it goes (46 % stays in the air) and where +100 ppm hits hardest (permafrost, the Arctic Ocean, the Southern Ocean, the North Atlantic).
+- `terraflux-run-earth-forecast` runs a 10-member ensemble of the coupled boundary layer over the North Atlantic sector for 10 days under moving pressure systems and a hurricane, with the sea, the soil, the mountains and the Sun coupled in. The forecasts are verified against a hidden member: the pressure pattern stays useful for about 72 h. Warnings follow the member probabilities. Rerunning without the ocean, the mountains or the Sun removes 23 %, 30 % and 48 % of the thunderstorms.
+
+```sh
+./build/terraflux-run-earth-forecast examples/earth-forecast-request.json forecast.json   # about 80 s on 4 threads
+./build/terraflux-run-earth-climate examples/earth-climate-request.json climate.json      # about 2 s
+```
+
+The **Coupled Earth** switch in the header (or *Coupled Earth* in the example list) opens a separate workspace:
+
+- **Overview:** the key answers, a graph of what is coupled to what, and what the forecast owes to each coupling.
+- **Climate drivers:** drivers ranked with their ranges, warming maps, series, feedbacks and the impact table.
+- **CO₂ impact:** flux, concentration and impact maps, the budget, emitters, sinks and hotspots.
+- **Weather forecast:** 3/5/7/10 days, daily maps, city table, skill.
+- **Wind forecast:** hour by hour for 3 days, with meteograms.
+- **Severe weather:** warning maps, the day × hazard matrix, warning areas and the hurricane track plume.
 
 The field-layer list is folded into topic groups showing only layers with data, with a tooltip for every layer and example.
 

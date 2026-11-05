@@ -1,0 +1,933 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/earth-forecast-v1.schema.json",
+  "title": "TerraFlux coupled ensemble forecast v1 (the earth_forecast block of a terraflux-run-earth-forecast timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_kind",
+    "method",
+    "start_utc",
+    "forecast_days",
+    "members",
+    "frame_hours",
+    "diagnosis_hours",
+    "static",
+    "frames",
+    "days",
+    "warnings",
+    "cities",
+    "tracks",
+    "verification",
+    "couplings",
+    "limitations",
+    "request"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.earth.forecast/v1"
+    },
+    "source_kind": {
+      "const": "engine_output"
+    },
+    "method": {
+      "const": "coupled_ensemble_forecast"
+    },
+    "start_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "forecast_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 15
+    },
+    "members": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 50
+    },
+    "frame_hours": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 2
+    },
+    "diagnosis_hours": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1
+    },
+    "request": {
+      "type": "object",
+      "description": "The run request, echoed."
+    },
+    "static": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "land_mask": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1
+        },
+        "land_mask_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "latitude_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "longitude_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "elevation_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "sea_surface_temperature_c": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minItems": 1,
+          "description": "Null over land."
+        },
+        "soil_moisture_initial": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "land_mask",
+        "latitude_deg",
+        "longitude_deg",
+        "elevation_m",
+        "sea_surface_temperature_c",
+        "soil_moisture_initial"
+      ]
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hour": {
+            "type": "integer"
+          },
+          "elapsed_seconds": {
+            "type": "number"
+          },
+          "pressure_hpa": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "description": "Ensemble-mean sea-level pressure (synoptic + tropical cyclones)."
+          },
+          "precip_mm": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "description": "Ensemble-mean precipitation since the previous frame."
+          },
+          "p_precip_1mm": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "cloud_pct": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "gust_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "p_gust_orange": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_thunder": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_tornado": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "systems_member_1": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "enum": [
+                    "low",
+                    "high"
+                  ]
+                },
+                "latitude_deg": {
+                  "type": "number"
+                },
+                "longitude_deg": {
+                  "type": "number"
+                },
+                "anomaly_hpa": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "hour",
+          "elapsed_seconds",
+          "pressure_hpa",
+          "precip_mm",
+          "p_precip_1mm",
+          "cloud_pct",
+          "gust_m_s",
+          "p_gust_orange",
+          "p_thunder",
+          "p_tornado",
+          "systems_member_1"
+        ]
+      },
+      "minItems": 2
+    },
+    "days": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "tmax_c": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "tmin_c": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "tmax_spread_k": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "truth_tmax_c": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "precip_mm": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "precip_spread_mm": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "p_precip_1mm": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_precip_10mm": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "gust_m_s": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "cloud_pct": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "runoff_72h_mm": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "surge_m": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1
+          },
+          "symbol": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 7
+            },
+            "minItems": 1,
+            "description": "0 clear, 1 partly cloudy, 2 cloudy, 3 rain, 4 snow, 5 thunderstorms, 6 gale, 7 hurricane."
+          },
+          "p_gust": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "minItems": 1,
+              "description": "Probability in percent per cell."
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "p_rain": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "minItems": 1,
+              "description": "Probability in percent per cell."
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "p_thunder": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_hail": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_tornado": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_tropical_storm": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "p_hurricane": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "minItems": 1,
+            "description": "Probability in percent per cell."
+          },
+          "warnings": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "wind": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              },
+              "rain": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              },
+              "flood": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              },
+              "thunderstorm": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              },
+              "tornado": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              },
+              "hurricane": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              },
+              "surge": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "wind",
+              "rain",
+              "flood",
+              "thunderstorm",
+              "tornado",
+              "hurricane",
+              "surge"
+            ]
+          },
+          "verification": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "tmax_rmse_k": {
+                "type": "number"
+              },
+              "rain_brier": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "rain_brier_skill": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "day",
+          "tmax_c",
+          "tmin_c",
+          "precip_mm",
+          "p_precip_1mm",
+          "gust_m_s",
+          "symbol",
+          "warnings",
+          "verification"
+        ]
+      },
+      "minItems": 1
+    },
+    "warnings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hazards": {
+          "const": [
+            "wind",
+            "rain",
+            "flood",
+            "thunderstorm",
+            "tornado",
+            "hurricane",
+            "surge"
+          ]
+        },
+        "levels": {
+          "const": [
+            "none",
+            "yellow",
+            "orange",
+            "red"
+          ]
+        },
+        "thresholds": {
+          "type": "object"
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "day": {
+                "type": "integer"
+              },
+              "hazard": {
+                "enum": [
+                  "wind",
+                  "rain",
+                  "flood",
+                  "thunderstorm",
+                  "tornado",
+                  "hurricane",
+                  "surge"
+                ]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "cells": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              "area_km2": {
+                "type": "number"
+              },
+              "peak_cell": {
+                "type": "integer"
+              },
+              "latitude_deg": {
+                "type": "number"
+              },
+              "longitude_deg": {
+                "type": "number"
+              },
+              "peak_value": {
+                "type": "number"
+              },
+              "peak_probability": {
+                "type": "number"
+              },
+              "cities": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nearest_city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "nearest_city_km": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "hazards",
+        "levels",
+        "thresholds",
+        "regions"
+      ]
+    },
+    "cities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "latitude_deg": {
+            "type": "number"
+          },
+          "longitude_deg": {
+            "type": "number"
+          },
+          "inside": {
+            "type": "boolean"
+          },
+          "cell": {
+            "type": "integer"
+          },
+          "cell_latitude_deg": {
+            "type": "number"
+          },
+          "cell_longitude_deg": {
+            "type": "number"
+          },
+          "land": {
+            "type": "boolean"
+          },
+          "elevation_m": {
+            "type": "number"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "hourly": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "inside"
+        ]
+      }
+    },
+    "tracks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "truth": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "members",
+        "truth"
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "hour": {
+                "type": "integer"
+              },
+              "pressure_hpa": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rmse": {
+                    "type": "number"
+                  },
+                  "spread": {
+                    "type": "number"
+                  },
+                  "climatology_rmse": {
+                    "type": "number"
+                  },
+                  "persistence_rmse": {
+                    "type": "number"
+                  },
+                  "skill_vs_climatology": {
+                    "type": "number"
+                  },
+                  "anomaly_correlation": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "rmse",
+                  "spread",
+                  "climatology_rmse",
+                  "persistence_rmse",
+                  "skill_vs_climatology",
+                  "anomaly_correlation"
+                ]
+              },
+              "temperature_k": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rmse": {
+                    "type": "number"
+                  },
+                  "spread": {
+                    "type": "number"
+                  },
+                  "climatology_rmse": {
+                    "type": "number"
+                  },
+                  "persistence_rmse": {
+                    "type": "number"
+                  },
+                  "skill_vs_climatology": {
+                    "type": "number"
+                  },
+                  "anomaly_correlation": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "rmse",
+                  "spread",
+                  "climatology_rmse",
+                  "persistence_rmse",
+                  "skill_vs_climatology",
+                  "anomaly_correlation"
+                ]
+              },
+              "rain_1mm": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "brier": {
+                        "type": "number"
+                      },
+                      "skill": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "lead_days": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "useful_hours": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "frames",
+        "lead_days",
+        "useful_hours"
+      ]
+    },
+    "couplings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "control": {
+          "type": "object"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "enum": [
+                  "no_ocean_coupling",
+                  "uniform_soil",
+                  "flat_terrain",
+                  "no_sun"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "days": {
+                "type": "integer"
+              },
+              "tmax_land_change_k": {
+                "type": "number"
+              },
+              "tmin_land_change_k": {
+                "type": "number"
+              },
+              "precip_change_pct": {
+                "type": "number"
+              },
+              "thunder_change_pct": {
+                "type": "number"
+              },
+              "max_gust_change_m_s": {
+                "type": "number"
+              },
+              "max_hurricane_wind_change_m_s": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "control",
+        "runs"
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}

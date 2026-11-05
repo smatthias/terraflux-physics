@@ -44,6 +44,8 @@ add_library(terraflux_weather_map
     src/weather/magnetosphere.cpp
     src/weather/cosmic_radiation.cpp
     src/weather/atmospheric_escape.cpp
+    src/weather/earth_forecast.cpp
+    src/weather/earth_climate.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -118,6 +120,17 @@ target_link_libraries(terraflux-run-coastal-flooding
 add_executable(terraflux-run-cosmic-dust src/weather/run_cosmic_dust.cpp)
 target_link_libraries(terraflux-run-cosmic-dust
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+find_package(Threads REQUIRED)
+add_executable(terraflux-run-earth-climate src/weather/run_earth_climate.cpp)
+target_link_libraries(terraflux-run-earth-climate
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-earth-forecast src/weather/run_earth_forecast.cpp)
+target_link_libraries(terraflux-run-earth-forecast
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json Threads::Threads
 )
 
 add_executable(terraflux-run-solar-wind src/weather/run_solar_wind.cpp)
@@ -285,6 +298,26 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
         --cli terraflux-run-solar-wind --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/solar-wind-request.json
         --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/solar-wind/engine-timeline.json --check)
+    add_executable(terraflux-earth-system-test tests/weather/earth_system_test.cpp)
+    target_link_libraries(terraflux-earth-system-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.earth_system COMMAND terraflux-earth-system-test)
+    add_test(NAME weather.earth_forecast_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/earth_forecast_check.py $<TARGET_FILE:terraflux-run-earth-forecast>)
+    set_tests_properties(weather.earth_forecast_cli PROPERTIES TIMEOUT 600)
+    add_test(NAME weather.earth_climate_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/earth_climate_check.py $<TARGET_FILE:terraflux-run-earth-climate>)
+    set_tests_properties(weather.earth_climate_cli PROPERTIES TIMEOUT 300)
+    # The climate fixture links to the forecast fixture: regenerate the forecast first.
+    add_test(NAME weather.viewer_earth_forecast
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --cli terraflux-run-earth-forecast --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/earth-forecast-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/coupled-forecast/engine-timeline.json --check)
+    set_tests_properties(weather.viewer_earth_forecast PROPERTIES TIMEOUT 900 LABELS slow)
+    add_test(NAME weather.viewer_earth_climate
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --cli terraflux-run-earth-climate --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/earth-climate-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/coupled-climate/engine-timeline.json --check)
+    set_tests_properties(weather.viewer_earth_climate PROPERTIES DEPENDS weather.viewer_earth_forecast)
     add_executable(terraflux-cosmic-dust-test tests/weather/cosmic_dust_test.cpp)
     target_link_libraries(terraflux-cosmic-dust-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.cosmic_dust COMMAND terraflux-cosmic-dust-test)
@@ -370,6 +403,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-run-solar-cycle PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-cosmic-dust PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-solar-wind PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-earth-forecast PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-earth-climate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
@@ -391,6 +426,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-solar-cycle-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-cosmic-dust-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-solar-wind-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-earth-system-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-ocean-carbon-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()

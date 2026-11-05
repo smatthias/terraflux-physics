@@ -177,6 +177,10 @@ export function layerSubtitle(layer, data) {
 
 // The example datasets, grouped the same way, each with a tooltip.
 export const EXAMPLE_GROUPS = [
+  { id: 'earth', title: 'Coupled Earth', examples: [
+    { action: 'openEarthForecast', label: '🌍 Open the coupled 10-day forecast', tooltip: 'Ocean, land, mountains, the Sun and a hurricane coupled to the weather: a 10-member ensemble forecast with 3/5/7/10-day products, a 3-day wind forecast and severe-weather warnings (Coupled Earth workspace).' },
+    { action: 'openEarthClimate', label: '🌡 Open climate drivers & CO₂ impact', tooltip: 'Which drivers change the climate most (CO₂, methane, aerosols, the Sun, volcanoes, space), what the warming does, and where CO₂ comes from, goes and hits hardest (Coupled Earth workspace).' },
+  ] },
   { id: 'weather', title: 'Weather', examples: [
     { action: 'loadEngineExample', label: '→ Load engine example', tooltip: 'Temperature transport, radar rainfall and surface water on a small synthetic grid: wet weather, then drying.' },
     { action: 'loadCoupledExample', label: '⇶ Load coupled wind example', tooltip: 'Wind from pressure systems with Coriolis and friction, coupled to temperature, humidity and air density.' },

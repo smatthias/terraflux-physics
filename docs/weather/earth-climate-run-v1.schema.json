@@ -1,0 +1,1296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/earth-climate-run-v1.schema.json",
+  "title": "TerraFlux coupled climate (drivers, impacts, CO2) run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "history",
+    "scenarios",
+    "map",
+    "co2_map"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.earth.climate-run/v1"
+    },
+    "years": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "type": "integer",
+          "minimum": 1750,
+          "maximum": 2000
+        },
+        "last": {
+          "type": "integer",
+          "minimum": 2030,
+          "maximum": 2300
+        },
+        "today": {
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2030
+        },
+        "reference_first": {
+          "type": "integer",
+          "minimum": 1750,
+          "maximum": 2000
+        },
+        "reference_last": {
+          "type": "integer",
+          "minimum": 1750,
+          "maximum": 2000
+        },
+        "frame_every": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "description": "first <= reference_first <= reference_last < today (2020 or later) < last; at most 120 frames."
+    },
+    "climate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "upper_heat_capacity": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "W yr m-2 K-1"
+        },
+        "deep_heat_capacity": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 1000
+        },
+        "exchange_w_m2_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "doubling_forcing_w_m2": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 6
+        },
+        "feedbacks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "planck": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "water_vapour_lapse_rate": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 3
+            },
+            "surface_albedo": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 2
+            },
+            "clouds": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2
+            },
+            "other": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "description": "Planck restoring, the others amplifying (W m-2 K-1); the net must stay at least 0.2."
+        },
+        "ecs_low_k": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "ecs_high_k": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "co2_ppm": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 150-3000; linear in between, constant beyond the ends."
+        },
+        "ch4_ppb": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 300-10000; linear in between, constant beyond the ends."
+        },
+        "n2o_ppb": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 150-1000; linear in between, constant beyond the ends."
+        },
+        "halocarbon_w_m2": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 0-3; linear in between, constant beyond the ends."
+        },
+        "ozone_index": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 0-5; linear in between, constant beyond the ends."
+        },
+        "aerosol_index": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 0-5; linear in between, constant beyond the ends."
+        },
+        "land_use_index": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 0-5; linear in between, constant beyond the ends."
+        },
+        "aviation_index": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "description": "[year, value] points within 0-10; linear in between, constant beyond the ends."
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "co2_ppm",
+        "ch4_ppb",
+        "n2o_ppb",
+        "halocarbon_w_m2",
+        "ozone_index",
+        "aerosol_index",
+        "land_use_index",
+        "aviation_index"
+      ],
+      "description": "Observed concentrations and indices."
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "polar_scenario": {
+            "type": "string"
+          },
+          "co2_ppm": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 150-3000; linear in between, constant beyond the ends."
+          },
+          "ch4_ppb": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 300-10000; linear in between, constant beyond the ends."
+          },
+          "n2o_ppb": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 150-1000; linear in between, constant beyond the ends."
+          },
+          "halocarbon_w_m2": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 0-3; linear in between, constant beyond the ends."
+          },
+          "ozone_index": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 0-5; linear in between, constant beyond the ends."
+          },
+          "aerosol_index": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 0-5; linear in between, constant beyond the ends."
+          },
+          "land_use_index": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 0-5; linear in between, constant beyond the ends."
+          },
+          "aviation_index": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "[year, value] points within 0-10; linear in between, constant beyond the ends."
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 6,
+      "description": "Future paths appended to the history after its last year."
+    },
+    "central_scenario": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "co2": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "ch4": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "n2o": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "halocarbons": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "stratospheric_water": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "ozone": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "aerosols": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "black_carbon_snow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "land_use": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "contrails": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "solar": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "volcanic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value_2019_w_m2": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "low_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "high_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "description": "Assessed 2019 forcing of index-based agents and the uncertainty factors of every agent."
+    },
+    "impacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "land_factor": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 2.5
+        },
+        "arctic_factor": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "southern_ocean_factor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5
+        },
+        "north_atlantic_cooling_per_sv_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "heat_sigma_k": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 5
+        },
+        "heavy_rain_factor_per_k": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "sea_ice_extent_reference_mkm2": {
+          "type": "number"
+        },
+        "sea_ice_reference_warming_k": {
+          "type": "number"
+        },
+        "sea_ice_loss_per_k_mkm2": {
+          "type": "number"
+        },
+        "ocean": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "surface_temperature_c": {
+              "type": "number"
+            },
+            "polar_temperature_c": {
+              "type": "number"
+            },
+            "tropical_temperature_c": {
+              "type": "number"
+            },
+            "alkalinity_umol_kg": {
+              "type": "number",
+              "minimum": 1500,
+              "maximum": 3000
+            },
+            "warming_factor": {
+              "type": "number",
+              "minimum": 0.3,
+              "maximum": 1.5
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "sea_level": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "thermal_expansion_m_per_k_yr": {
+              "type": "number"
+            },
+            "deep_ocean_time_scale_years": {
+              "type": "number"
+            },
+            "glacier_m_per_k_yr": {
+              "type": "number"
+            },
+            "glacier_store_m": {
+              "type": "number"
+            },
+            "antarctic_base_m_yr": {
+              "type": "number"
+            },
+            "antarctic_m_per_k_yr": {
+              "type": "number"
+            },
+            "antarctic_threshold_k": {
+              "type": "number"
+            },
+            "land_water_m_yr": {
+              "type": "number"
+            },
+            "greenland_m_per_k_yr": {
+              "type": "number"
+            },
+            "greenland_threshold_k": {
+              "type": "number"
+            },
+            "observed_rise_1900_reference_m": {
+              "type": "number"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cells_east": {
+          "type": "integer",
+          "minimum": 24,
+          "maximum": 360
+        },
+        "cells_north": {
+          "type": "integer",
+          "minimum": 12,
+          "maximum": 180
+        },
+        "land_mask": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[#.]+$"
+          },
+          "minItems": 1,
+          "description": "One string per grid row, north first: '#' land, '.' sea."
+        },
+        "land_mask_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aerosol_regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 40
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "land_mask"
+      ],
+      "description": "Global equirectangular grid from 90 S and 180 W."
+    },
+    "co2_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "fossil_gt_co2_yr": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 50
+              },
+              "cumulative_gt_co2": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 5000
+              },
+              "land_use_gt_co2_yr": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 60
+        },
+        "land_use": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 40
+        },
+        "deserts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 40
+        },
+        "ice": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 40
+        },
+        "upwelling": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "value": {
+                "type": "number",
+                "minimum": -200,
+                "maximum": 200
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 40
+        },
+        "hotspots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boxes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "minItems": 1,
+                "maxItems": 20,
+                "description": "Boxes [south, north, west, east] in degrees (west > east crosses the date line)."
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "boxes"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 40
+        },
+        "sinks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "land_gt_co2_yr": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ocean_gt_co2_yr": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fossil_total_gt_co2_yr": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "land_use_total_gt_co2_yr": {
+              "type": "number",
+              "minimum": 0
+            },
+            "cumulative_total_gt_co2": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "ocean": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "wind_profile": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 1,
+              "maxItems": 200
+            },
+            "air_minus_sea_pco2_profile": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 1,
+              "maxItems": 200
+            },
+            "sst_profile": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 1,
+              "maxItems": 200
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "diffusivity_m2_s": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "relaxation_days": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "mixing_fraction": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "tcre_k_per_1000_gt": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "regions"
+      ]
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "solar_cycle_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cosmic_dust_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "solar_wind_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "polar_melt_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "forecast_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "description": "Other TerraFlux timelines (relative to the working directory) whose results this run couples in."
+    }
+  }
+}

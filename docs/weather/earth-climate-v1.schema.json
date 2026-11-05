@@ -1,0 +1,834 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/earth-climate-v1.schema.json",
+  "title": "TerraFlux coupled climate v1 (the earth_climate block of a terraflux-run-earth-climate timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_kind",
+    "method",
+    "years",
+    "today",
+    "reference",
+    "central_scenario",
+    "agents",
+    "scenarios",
+    "series",
+    "drivers",
+    "impacts",
+    "climate",
+    "map",
+    "co2",
+    "couplings",
+    "links",
+    "limitations",
+    "request"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.earth.climate/v1"
+    },
+    "source_kind": {
+      "const": "engine_output"
+    },
+    "method": {
+      "const": "forcing_attribution_two_layer_energy_balance"
+    },
+    "request": {
+      "type": "object"
+    },
+    "years": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 2
+    },
+    "today": {
+      "type": "integer"
+    },
+    "reference": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "central_scenario": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "group"
+        ]
+      },
+      "minItems": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "minItems": 1
+    },
+    "series": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "global_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "global_low_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "global_high_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "land_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "arctic_k": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "total_forcing_w_m2": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "co2_ppm": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "ocean_heat_zj": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "heat_10yr_factor": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "heat_50yr_factor": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "heavy_rain_factor": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "september_ice_mkm2": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "ph": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "aragonite_saturation": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "aragonite_saturation_polar": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "hurricane_potential_intensity_change_pct": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "overturning_sv": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "sea_level_since_1900_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "sea_level_thermal_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "sea_level_glaciers_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "sea_level_greenland_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "sea_level_antarctic_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "agents": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "global_k",
+          "global_low_k",
+          "global_high_k",
+          "land_k",
+          "arctic_k",
+          "total_forcing_w_m2",
+          "co2_ppm",
+          "ocean_heat_zj",
+          "heat_10yr_factor",
+          "heat_50yr_factor",
+          "heavy_rain_factor",
+          "september_ice_mkm2",
+          "ph",
+          "aragonite_saturation",
+          "aragonite_saturation_polar",
+          "hurricane_potential_intensity_change_pct",
+          "overturning_sv",
+          "sea_level_since_1900_m",
+          "sea_level_thermal_m",
+          "sea_level_glaciers_m",
+          "sea_level_greenland_m",
+          "sea_level_antarctic_m"
+        ]
+      }
+    },
+    "drivers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "today": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "group": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "forcing_w_m2": {
+                  "type": "number"
+                },
+                "warming_k": {
+                  "type": "number"
+                },
+                "warming_low_k": {
+                  "type": "number"
+                },
+                "warming_high_k": {
+                  "type": "number"
+                },
+                "share": {
+                  "type": "number"
+                },
+                "hypothesis_k": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "warming_k"
+              ]
+            },
+            "minItems": 1
+          },
+          "y2050": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "group": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "forcing_w_m2": {
+                  "type": "number"
+                },
+                "warming_k": {
+                  "type": "number"
+                },
+                "warming_low_k": {
+                  "type": "number"
+                },
+                "warming_high_k": {
+                  "type": "number"
+                },
+                "share": {
+                  "type": "number"
+                },
+                "hypothesis_k": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "warming_k"
+              ]
+            },
+            "minItems": 1
+          },
+          "y2100": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "group": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "forcing_w_m2": {
+                  "type": "number"
+                },
+                "warming_k": {
+                  "type": "number"
+                },
+                "warming_low_k": {
+                  "type": "number"
+                },
+                "warming_high_k": {
+                  "type": "number"
+                },
+                "share": {
+                  "type": "number"
+                },
+                "hypothesis_k": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "warming_k"
+              ]
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "today",
+          "y2050",
+          "y2100"
+        ]
+      }
+    },
+    "impacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string"
+          },
+          "preindustrial": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "today": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "scenarios": {
+            "type": "object"
+          },
+          "irreversible_on_human_time_scales": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "today",
+          "scenarios"
+        ]
+      },
+      "minItems": 1
+    },
+    "climate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ecs_k": {
+          "type": "number"
+        },
+        "ecs_low_k": {
+          "type": "number"
+        },
+        "ecs_high_k": {
+          "type": "number"
+        },
+        "tcr_k": {
+          "type": "number"
+        },
+        "feedback_w_m2_k": {
+          "type": "number"
+        },
+        "feedbacks": {
+          "type": "object"
+        },
+        "warming_today_k": {
+          "type": "number"
+        },
+        "warming_2100_k": {
+          "type": "number"
+        },
+        "feedback_shares_today": {
+          "type": "object"
+        },
+        "feedback_shares_2100": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "ecs_k",
+        "tcr_k",
+        "warming_today_k",
+        "warming_2100_k"
+      ]
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "cell_degrees": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "land_mask": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1
+        },
+        "land_mask_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pattern": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "year": {
+                "type": "integer"
+              },
+              "elapsed_seconds": {
+                "type": "number"
+              },
+              "local_warming_k": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 1
+                }
+              },
+              "aerosol_k": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "description": "Local aerosol warming (negative) of the central scenario."
+              },
+              "overturning_k": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "description": "Local cooling from a weaker Atlantic overturning (central scenario)."
+              }
+            }
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "cell_degrees",
+        "land_mask",
+        "pattern",
+        "frames"
+      ]
+    },
+    "co2": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emissions_t_km2_yr": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "sinks_t_km2_yr": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "net_t_km2_yr": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "cumulative_gt_co2": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "surface_ppm_anomaly": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "warming_per_100ppm_k": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "ph_drop_per_100ppm": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minItems": 1
+        },
+        "aragonite_now": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minItems": 1
+        },
+        "aragonite_2100": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minItems": 1
+        },
+        "impact_score": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "region_index": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        },
+        "budget": {
+          "type": "object"
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "sinks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "hotspots": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "emissions_t_km2_yr",
+        "sinks_t_km2_yr",
+        "net_t_km2_yr",
+        "surface_ppm_anomaly",
+        "impact_score",
+        "budget",
+        "regions",
+        "hotspots"
+      ]
+    },
+    "couplings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanism": {
+            "type": "string",
+            "minLength": 1
+          },
+          "magnitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string",
+            "pattern": "^(dominant|strong|moderate|weak|negligible|regional|hypothetical)"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "mechanism",
+          "strength"
+        ]
+      },
+      "minItems": 1
+    },
+    "links": {
+      "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}
