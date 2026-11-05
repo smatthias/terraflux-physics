@@ -1,0 +1,147 @@
+{
+  "schema_version": "terraflux.ocean.circulation-run/v1",
+  "time": {
+    "start_time_utc": "2030-01-01T00:00:00Z",
+    "timestep_seconds": 2700.0,
+    "steps": 116880,
+    "spinup_steps": 23376
+  },
+  "grid": {
+    "nx": 17,
+    "ny": 21,
+    "origin_east_m": 0.0,
+    "origin_north_m": 0.0,
+    "spacing_east_m": 200000.0,
+    "spacing_north_m": 200000.0,
+    "geographic_anchor_longitude_deg": -40.0,
+    "geographic_anchor_latitude_deg": 42.0
+  },
+  "basin": {
+    "sea_level_m": 0.0,
+    "terrain": {
+      "base_elevation_m": -3000.0,
+      "ridges": [
+        {
+          "orientation_deg": 0.0,
+          "center_east_m": -150000.0,
+          "center_north_m": 2100000.0,
+          "height_m": 6000.0,
+          "half_width_m": 350000.0,
+          "length_m": 6000000.0
+        },
+        {
+          "orientation_deg": 0.0,
+          "center_east_m": 3550000.0,
+          "center_north_m": 2800000.0,
+          "height_m": 6000.0,
+          "half_width_m": 380000.0,
+          "length_m": 3600000.0
+        },
+        {
+          "orientation_deg": 0.0,
+          "center_east_m": 1100000.0,
+          "center_north_m": 3500000.0,
+          "height_m": 5500.0,
+          "half_width_m": 300000.0,
+          "length_m": 1600000.0
+        }
+      ]
+    }
+  },
+  "ocean": {
+    "initial_thickness_m": 500.0,
+    "initial_salinity_psu": 35.0,
+    "initial_temperature_k": 288.15
+  },
+  "physics": {
+    "coriolis_mode": "beta_plane",
+    "linear_friction_s": 2e-06,
+    "lateral_viscosity_m2_s": 1500.0,
+    "tracer_diffusivity_m2_s": 800.0,
+    "convection_time_scale_s": 94672800.0,
+    "stream_speed_threshold_m_s": 0.08,
+    "thermal_layers": {
+      "count": 6,
+      "surface_layer_m": 10.0,
+      "initial_mixed_layer_depth_m": 40.0,
+      "initial_thermocline_scale_m": 200.0,
+      "initial_surface_temperature": "surface_temperature_target"
+    },
+    "sea_ice": {
+      "initial_thickness_m": 1.5,
+      "initial_concentration": 0.9
+    },
+    "deep_temperature_k": 275.65,
+    "deep_salinity_psu": 34.95,
+    "formation_reduced_gravity_m_s2": 0.002
+  },
+  "forcing": {
+    "wind": {
+      "kind": "gyre",
+      "stress_amplitude_pa": 0.1,
+      "gyres": 2
+    },
+    "surface_temperature": {
+      "south_k": 293.15,
+      "north_k": 264.15
+    },
+    "net_precipitation": {
+      "south_m_s": 0.0,
+      "north_m_s": 0.0
+    },
+    "air_sea": {
+      "air_temperature_offset_k": -1.0,
+      "relative_humidity_south": 0.78,
+      "relative_humidity_north": 0.85,
+      "cloud_fraction_south": 0.5,
+      "cloud_fraction_north": 0.7,
+      "seasonal_amplitude_south_k": 5.0,
+      "seasonal_amplitude_north_k": 14.0,
+      "shortwave": {
+        "kind": "astronomical"
+      }
+    },
+    "rivers": [
+      {
+        "name": "Arctic rivers",
+        "east_m": 2300000.0,
+        "north_m": 4100000.0,
+        "discharge_m3_s": 60000.0,
+        "temperature_k": 273.65
+      }
+    ],
+    "warming": {
+      "rate_k_per_year": 0.4,
+      "start_seconds": 0.0,
+      "max_k": 4.0,
+      "amplification_south": 1.0,
+      "amplification_north": 2.5
+    },
+    "hosing": {
+      "center_east_m": 1300000.0,
+      "center_north_m": 2500000.0,
+      "radius_m": 500000.0,
+      "start_seconds": 0.0,
+      "ramp_sv_per_year": 0.05,
+      "max_sv": 0.5
+    }
+  },
+  "ice_sheet": {
+    "region": {
+      "center_east_m": 1100000.0,
+      "center_north_m": 3500000.0,
+      "radius_east_m": 500000.0,
+      "radius_north_m": 900000.0
+    },
+    "initial_dome": {
+      "center_thickness_m": 2500.0
+    },
+    "precipitation_m_we_yr": 0.6,
+    "front_depth_m": 300.0,
+    "step_every": 32,
+    "physics": {
+      "marine_front_fraction": 0.1
+    }
+  },
+  "snapshot_every_steps": 2922
+}

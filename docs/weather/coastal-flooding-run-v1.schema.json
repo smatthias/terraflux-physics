@@ -1,0 +1,814 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/weather/coastal-flooding-run-v1.json",
+  "title": "TerraFlux coastal flooding run request v1 (input of terraflux-run-coastal-flooding)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "time",
+    "sea_level",
+    "grid"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "synthetic_coast"
+      ]
+    },
+    {
+      "required": [
+        "cells"
+      ]
+    }
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.coastal.flooding-run/v1"
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_year",
+        "output_years"
+      ],
+      "properties": {
+        "reference_year": {
+          "type": "integer",
+          "minimum": 1800,
+          "maximum": 2500,
+          "description": "Today: every rise and impact is counted from it."
+        },
+        "output_years": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 100,
+          "items": {
+            "type": "integer"
+          },
+          "description": "Increasing years starting at the reference year: the series."
+        },
+        "map_years": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "integer"
+          },
+          "description": "Output years with maps (the timeline frames); default all."
+        }
+      }
+    },
+    "sea_level": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "polar_timeline_path": {
+          "type": "string",
+          "description": "A terraflux-run-polar-melt timeline (relative to the working directory): its non-control scenarios, their global warming and Greenland's sea_level_rise_vs_control_m."
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "global_warming_k"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "global_warming_k": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "description": "[year, value] points with increasing years; linear between them, held beyond the ends."
+              },
+              "greenland_m": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "description": "[year, value] points with increasing years; linear between them, held beyond the ends."
+              }
+            }
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "thermal_expansion_m_per_k_yr": {
+              "type": "number",
+              "description": "beta",
+              "minimum": 0,
+              "maximum": 0.01,
+              "default": 0.0011
+            },
+            "deep_ocean_time_scale_years": {
+              "type": "number",
+              "description": "tau",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 400
+            },
+            "glacier_m_per_k_yr": {
+              "type": "number",
+              "description": "gamma",
+              "minimum": 0,
+              "maximum": 0.01,
+              "default": 0.001
+            },
+            "glacier_store_m": {
+              "type": "number",
+              "description": "Mountain-glacier store at the first year of the record.",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.4
+            },
+            "antarctic_base_m_yr": {
+              "type": "number",
+              "minimum": -0.01,
+              "maximum": 0.05,
+              "default": 0.0005
+            },
+            "antarctic_m_per_k_yr": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.05,
+              "default": 0.0005
+            },
+            "antarctic_threshold_k": {
+              "type": "number",
+              "minimum": -5,
+              "maximum": 10,
+              "default": 1.2
+            },
+            "land_water_m_yr": {
+              "type": "number",
+              "minimum": -0.005,
+              "maximum": 0.005,
+              "default": 0.0003
+            }
+          }
+        },
+        "fingerprints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "greenland": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2,
+              "default": 1
+            },
+            "antarctic": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2,
+              "default": 1
+            },
+            "glaciers": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2,
+              "default": 1
+            }
+          },
+          "description": "Regional rise per metre of global rise from each ice source (Mitrovica et al. 2001): about 0.5-0.6 for Greenland in north-west Europe, 1.1-1.2 in the tropics."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "polar_timeline_path"
+          ]
+        },
+        {
+          "required": [
+            "scenarios"
+          ]
+        }
+      ]
+    },
+    "map_scenario": {
+      "type": "string",
+      "description": "The scenario whose maps are the frames (default: the last)."
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nx",
+        "ny",
+        "spacing_m"
+      ],
+      "properties": {
+        "nx": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000
+        },
+        "ny": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000
+        },
+        "spacing_m": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 100000
+        },
+        "origin_east_m": {
+          "type": "number"
+        },
+        "origin_north_m": {
+          "type": "number"
+        },
+        "anchor_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "anchor_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    },
+    "synthetic_coast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coastline_north_m",
+        "shelf",
+        "land",
+        "features"
+      ],
+      "properties": {
+        "coastline_north_m": {
+          "type": "number",
+          "description": "A straight east-west shoreline: land to the north, sea to the south."
+        },
+        "shelf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "depth_at_coast_m": {
+              "type": "number",
+              "minimum": 0.5
+            },
+            "slope": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max_depth_m": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "land": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "elevation_at_coast_m": {
+              "type": "number",
+              "minimum": 0.5
+            },
+            "slope": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max_elevation_m": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "roughness_m": {
+          "type": "number",
+          "description": "Deterministic cell-scale relief.",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rural_population_per_km2": {
+          "type": "number",
+          "minimum": 0
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "delta",
+                  "estuary",
+                  "barrier",
+                  "cliffs",
+                  "islands"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Also the region name."
+              },
+              "population_per_km2": {
+                "type": "number",
+                "minimum": 0
+              },
+              "subsidence_mm_yr": {
+                "type": "number",
+                "description": "Land sinking (positive) in the feature.",
+                "minimum": -100,
+                "maximum": 100
+              },
+              "coast_type": {
+                "enum": [
+                  "rock",
+                  "sandy",
+                  "muddy"
+                ],
+                "description": "Default: cliffs rock, delta and estuary muddy, others sandy."
+              },
+              "west_m": {
+                "type": "number"
+              },
+              "east_m": {
+                "type": "number"
+              },
+              "protrusion_m": {
+                "type": "number",
+                "description": "delta: how far the delta front protrudes into the sea.",
+                "minimum": 0
+              },
+              "inland_m": {
+                "type": "number",
+                "description": "delta/cliffs: inland extent.",
+                "minimum": 0
+              },
+              "elevation_m": {
+                "type": "number",
+                "description": "delta: elevation at the shore."
+              },
+              "gradient_m_per_km": {
+                "type": "number",
+                "description": "delta: rise inland.",
+                "minimum": 0
+              },
+              "front_depth_factor": {
+                "type": "number",
+                "description": "delta: the sea in front is this shallow relative to the shelf.",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "sea_dike_crest_m": {
+                "type": "number",
+                "description": "delta: crest of the dike along its shore (0 = none).",
+                "minimum": 0
+              },
+              "polders": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "center_east_m",
+                    "center_north_m",
+                    "radius_m",
+                    "level_m"
+                  ],
+                  "properties": {
+                    "center_east_m": {
+                      "type": "number"
+                    },
+                    "center_north_m": {
+                      "type": "number"
+                    },
+                    "radius_m": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "level_m": {
+                      "type": "number",
+                      "description": "Ground level inside (below sea level for reclaimed land)."
+                    },
+                    "dike_crest_m": {
+                      "type": "number",
+                      "description": "Crest of the ring dike.",
+                      "minimum": 0
+                    }
+                  }
+                }
+              },
+              "center_east_m": {
+                "type": "number"
+              },
+              "length_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "mouth_width_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "convergence_length_m": {
+                "type": "number",
+                "description": "estuary: width e-folding length inland.",
+                "minimum": 0
+              },
+              "depth_m": {
+                "type": "number",
+                "description": "estuary: depth at the mouth.",
+                "minimum": 0
+              },
+              "bank_elevation_m": {
+                "type": "number"
+              },
+              "bank_width_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "wall_crest_m": {
+                "type": "number",
+                "description": "estuary: flood wall along the upper estuary (0 = none).",
+                "minimum": 0
+              },
+              "offshore_m": {
+                "type": "number",
+                "description": "barrier: distance of the barrier islands from the mainland.",
+                "minimum": 0
+              },
+              "barrier_elevation_m": {
+                "type": "number"
+              },
+              "lagoon_depth_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "inlet_spacing_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "mainland_elevation_m": {
+                "type": "number"
+              },
+              "mainland_width_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cliff_height_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "shore_elevation_m": {
+                "type": "number",
+                "description": "islands: elevation at the shore.",
+                "minimum": 0,
+                "default": 1.5
+              },
+              "islands": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "center_east_m",
+                    "center_north_m",
+                    "radius_m",
+                    "height_m"
+                  ],
+                  "properties": {
+                    "center_east_m": {
+                      "type": "number"
+                    },
+                    "center_north_m": {
+                      "type": "number"
+                    },
+                    "radius_m": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "height_m": {
+                      "type": "number",
+                      "description": "Highest point; at least the shore elevation.",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "center_east_m",
+              "center_north_m",
+              "radius_m",
+              "peak_per_km2"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "center_east_m": {
+                "type": "number"
+              },
+              "center_north_m": {
+                "type": "number"
+              },
+              "radius_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "peak_per_km2": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "cells": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "elevation_m"
+      ],
+      "description": "Per-cell data (row-major, y then x), e.g. a digital elevation model resampled to the grid.",
+      "properties": {
+        "elevation_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Ground or sea bed relative to today's mean sea level."
+        },
+        "sea": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "1 = sea; default: below 0 m and connected to the grid edge."
+        },
+        "coast_type": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "description": "0 rock, 1 sandy, 2 muddy."
+        },
+        "defence_crest_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Crest elevation of a flood defence; 0 or below ground = none."
+        },
+        "subsidence_mm_yr": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "population": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "region": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -1
+          }
+        },
+        "region_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    },
+    "rivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "path"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "description": "Polyline in metres from the sea upstream; rasterised into a 4-connected channel starting at the last land cell next to the sea."
+          },
+          "discharge_m3_s": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 1000000.0,
+            "default": 1000
+          },
+          "channel_depth_m": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 100,
+            "default": 5
+          },
+          "width_m": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50000,
+            "default": 500
+          },
+          "manning_n": {
+            "type": "number",
+            "minimum": 0.005,
+            "maximum": 0.2,
+            "default": 0.03
+          },
+          "bank_crest_m": {
+            "type": "number",
+            "description": "Dikes along the banks (0 = none).",
+            "minimum": 0
+          },
+          "valley_width_m": {
+            "type": "number",
+            "description": "Lower the land within this distance of the channel to a valley floor (terrain edit).",
+            "minimum": 0
+          },
+          "valley_floor_m": {
+            "type": "number",
+            "default": 2.0
+          },
+          "valley_gradient_m_per_km": {
+            "type": "number",
+            "minimum": 0,
+            "default": 0.2
+          }
+        }
+      }
+    },
+    "coast": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "high_tide_m": {
+          "type": "number",
+          "description": "Mean higher high water above mean sea level.",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 1.0
+        },
+        "surge_location_m": {
+          "type": "number",
+          "description": "Gumbel location of the annual maximum surge above high tide.",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.8
+        },
+        "surge_scale_m": {
+          "type": "number",
+          "description": "Gumbel scale: each scale of rise makes rare floods about e times more frequent.",
+          "minimum": 0.01,
+          "maximum": 5,
+          "default": 0.2
+        },
+        "design_return_period_years": {
+          "type": "number",
+          "minimum": 1.01,
+          "maximum": 100000,
+          "default": 100
+        },
+        "storm_wind_speed_m_s": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 90,
+          "default": 25
+        },
+        "storm_wind_toward_deg": {
+          "type": "number",
+          "description": "Direction the design-storm wind blows toward, clockwise from north.",
+          "minimum": -360,
+          "maximum": 360,
+          "default": 0
+        },
+        "drag_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.01,
+          "default": 0.0025
+        },
+        "minimum_setup_depth_m": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 100,
+          "default": 2
+        },
+        "storm_attenuation_m_per_km": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.2
+        },
+        "tidal_attenuation_m_per_km": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0
+        },
+        "river_attenuation_m_per_km": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.01
+        },
+        "active_profile_width_m": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 1000
+        },
+        "berm_height_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50,
+          "default": 2
+        },
+        "closure_depth_m": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 100,
+          "default": 10
+        },
+        "salt_limit_psu": {
+          "type": "number",
+          "minimum": 0.01,
+          "default": 1
+        },
+        "estuary_dispersion_m2_s": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 300
+        },
+        "island_max_area_km2": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1000
+        }
+      }
+    }
+  }
+}

@@ -378,9 +378,17 @@ CoupledForcing load_coupled_forcing(const std::string& path, double offset_secon
             for (std::size_t j = 0; j < source_count; ++j) rate[j] += std::max(0.0, oro[j]);
         }
         if (has_precipitation) {
-            const auto pr = required_number_array(required(atmosphere, "precipitation").at("frames").at(k), "rate_mm_h");
+            // rate_mm_h is the intensity while it precipitates; the cell-mean rate over the interval is
+            // rate x duration_fraction (the outcome contract: accumulation = rate x duration x interval).
+            const Json& outcome = required(atmosphere, "precipitation").at("frames").at(k);
+            const auto pr = required_number_array(outcome, "rate_mm_h");
             if (pr.size() != source_count) throw std::invalid_argument("coupled precipitation frame does not match its grid");
-            for (std::size_t j = 0; j < source_count; ++j) rate[j] += std::max(0.0, pr[j]);
+            std::vector<double> duration(source_count, 1.0);
+            if (outcome.contains("duration_fraction")) {
+                duration = required_number_array(outcome, "duration_fraction");
+                if (duration.size() != source_count) throw std::invalid_argument("coupled precipitation duration does not match its grid");
+            }
+            for (std::size_t j = 0; j < source_count; ++j) rate[j] += std::max(0.0, pr[j]) * std::min(1.0, std::max(0.0, duration[j]));
         }
         const auto temperature = required_number_array(required(required(frame, "fields"), "air_temperature"), "values");
         if (temperature.size() != source_count) throw std::invalid_argument("coupled temperature frame does not match its grid");
@@ -394,7 +402,7 @@ CoupledForcing load_coupled_forcing(const std::string& path, double offset_secon
         {"sources", Json::array()}, {"sampling", "nearest_cell_piecewise_constant_in_time"},
     };
     if (has_orography) provenance["sources"].push_back("coupled_atmosphere.orography.orographic_precipitation_rate_mm_h");
-    if (has_precipitation) provenance["sources"].push_back("coupled_atmosphere.precipitation.rate_mm_h");
+    if (has_precipitation) provenance["sources"].push_back("coupled_atmosphere.precipitation.rate_mm_h x duration_fraction");
     provenance["sources"].push_back("frames.fields.air_temperature");
     return result;
 }

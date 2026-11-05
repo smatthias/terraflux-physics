@@ -27,6 +27,15 @@ add_library(terraflux_weather_map
     src/weather/synthetic_terrain.cpp
     src/weather/catchment_hydrology.cpp
     src/weather/ocean_circulation.cpp
+    src/weather/ice_sheet.cpp
+    src/weather/sea_ice.cpp
+    src/weather/overturning_box.cpp
+    src/weather/marine_indicators.cpp
+    src/weather/sea_level.cpp
+    src/weather/coastal_flooding.cpp
+    src/weather/ocean_carbon.cpp
+    src/weather/ocean_biogeochemistry.cpp
+    src/weather/atmospheric_co2.cpp
     src/weather/observation_grid.cpp
     src/weather/temperature_observation_overlay.cpp
     src/weather/time_indexed_temperature_observations.cpp
@@ -85,6 +94,16 @@ target_link_libraries(terraflux-run-atmospheric-column
 
 add_executable(terraflux-run-catchment-hydrology src/weather/run_catchment_hydrology.cpp)
 target_link_libraries(terraflux-run-catchment-hydrology
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-polar-melt src/weather/run_polar_melt.cpp)
+target_link_libraries(terraflux-run-polar-melt
+    PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
+)
+
+add_executable(terraflux-run-coastal-flooding src/weather/run_coastal_flooding.cpp)
+target_link_libraries(terraflux-run-coastal-flooding
     PRIVATE terraflux_weather_map nlohmann_json::nlohmann_json
 )
 
@@ -201,6 +220,61 @@ if(BUILD_TESTING)
     add_test(NAME weather.ocean_circulation COMMAND terraflux-ocean-circulation-test)
     add_test(NAME weather.ocean_circulation_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_circulation_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    add_executable(terraflux-ocean-heat-rain-test tests/weather/ocean_heat_rain_test.cpp)
+    target_link_libraries(terraflux-ocean-heat-rain-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.ocean_heat_rain COMMAND terraflux-ocean-heat-rain-test)
+    add_executable(terraflux-polar-melt-test tests/weather/polar_melt_test.cpp)
+    target_link_libraries(terraflux-polar-melt-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.polar_melt COMMAND terraflux-polar-melt-test)
+    add_executable(terraflux-ocean-carbon-test tests/weather/ocean_carbon_test.cpp)
+    target_link_libraries(terraflux-ocean-carbon-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.ocean_carbon COMMAND terraflux-ocean-carbon-test)
+    add_test(NAME weather.ocean_carbon_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_carbon_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    add_test(NAME weather.viewer_ocean_carbon
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/ocean-carbon-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean-carbon/engine-timeline.json --check)
+    add_test(NAME weather.viewer_ocean_carbon_2100
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/ocean-carbon-2100-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean-carbon-2100/engine-timeline.json --check)
+    set_tests_properties(weather.viewer_ocean_carbon weather.viewer_ocean_carbon_2100 PROPERTIES TIMEOUT 600)
+    add_executable(terraflux-coastal-flooding-test tests/weather/coastal_flooding_test.cpp)
+    target_link_libraries(terraflux-coastal-flooding-test PRIVATE terraflux_weather_map)
+    add_test(NAME weather.coastal_flooding COMMAND terraflux-coastal-flooding-test)
+    add_test(NAME weather.coastal_flooding_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/coastal_flooding_check.py $<TARGET_FILE:terraflux-run-coastal-flooding>)
+    add_test(NAME weather.viewer_coastal_flooding
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --cli terraflux-run-coastal-flooding --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/coastal-flooding-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/coast/engine-timeline.json --check)
+    add_test(NAME weather.polar_melt_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/polar_melt_check.py $<TARGET_FILE:terraflux-run-polar-melt>)
+    add_test(NAME weather.viewer_polar_melt
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --cli terraflux-run-polar-melt --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/polar-melt-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/polar/engine-timeline.json --check)
+    add_test(NAME weather.polar_ocean_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/polar_ocean_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    # Regenerates the ten-year polar ocean fixture (about 5 minutes): excluded by `ctest -LE slow`. Ten years of
+    # sea ice turn last-bit differences between compilers into different weather at the ice edge (same climate):
+    # fields are compared by their relative RMS difference (10 %; the ocean fields differ by well under 1 %).
+    add_test(NAME weather.viewer_polar_ocean
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/polar-ocean-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/polar-ocean/engine-timeline.json --check --field-tolerance 0.1)
+    set_tests_properties(weather.viewer_polar_ocean PROPERTIES TIMEOUT 1200 LABELS slow)
+    add_test(NAME weather.ocean_heat_rain_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_heat_rain_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
+    add_test(NAME weather.viewer_ocean_heat_rain
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/ocean-heat-rain-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean-heat/engine-timeline.json --check)
+    add_test(NAME weather.viewer_ocean_streams
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/atlantic-streams-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/ocean/engine-timeline.json --check)
     add_executable(terraflux-weather-transport-test
         tests/weather/dry_scalar_transport_test.cpp
     )
@@ -237,6 +311,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(terraflux-run-atmospheric-column PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-catchment-hydrology PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-run-ocean-circulation PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-polar-melt PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(terraflux-run-coastal-flooding PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-estimate-rain-rate PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(terraflux-accumulate-rainfall PRIVATE -Wall -Wextra -Wpedantic)
     if(BUILD_TESTING)
@@ -252,6 +328,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terraflux-orography-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-catchment-hydrology-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-ocean-circulation-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-ocean-heat-rain-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-polar-melt-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-coastal-flooding-test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(terraflux-ocean-carbon-test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(terraflux-temperature-map-cli-test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()

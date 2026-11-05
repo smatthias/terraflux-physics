@@ -437,6 +437,228 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 0.5
+        },
+        "heat_capacity_j_kg_k": {
+          "type": "number",
+          "minimum": 3000,
+          "maximum": 4300,
+          "default": 3990,
+          "description": "Sea-water heat capacity for the heat budget and the surface fluxes."
+        },
+        "lens_salinity_deficit_psu": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 0.2,
+          "description": "Surface lens: the surface is fresher than the layer by at least this."
+        },
+        "thermal_layers": {
+          "type": "object",
+          "required": [
+            "count"
+          ],
+          "additionalProperties": false,
+          "description": "Layered temperature and salinity column: sigma layers of the active layer (geometric, top layer surface_layer_m at the initial thickness), two-band shortwave penetration, convective adjustment, Kraus-Turner wind mixing, bulk-Richardson shear mixing and implicit diffusion.",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 40
+            },
+            "surface_layer_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 5
+            },
+            "background_diffusivity_m2_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 1e-05
+            },
+            "wind_mixing_efficiency": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 0.5,
+              "description": "m0 of the Kraus-Turner energy budget m0 rho_0 u*^3 dt."
+            },
+            "bulk_richardson_number": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 0.65,
+              "description": "Critical bulk Richardson number of the shear mixing (Price, Weller & Pinkel 1986); 0 disables it."
+            },
+            "initial_mixed_layer_depth_m": {
+              "type": "number",
+              "minimum": 0,
+              "default": 30
+            },
+            "initial_thermocline_scale_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 150,
+              "description": "T(z) = T_deep + (T_s - T_deep) exp(-max(0, z - mld) / scale)."
+            },
+            "shortwave_red_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.58
+            },
+            "shortwave_red_depth_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 0.35
+            },
+            "shortwave_blue_depth_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 23
+            },
+            "mld_density_threshold_kg_m3": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 0.03
+            },
+            "ild_temperature_threshold_k": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 0.2
+            },
+            "initial_surface_temperature": {
+              "enum": [
+                "uniform",
+                "surface_temperature_target"
+              ],
+              "default": "uniform",
+              "description": "uniform: ocean.initial_temperature_k at the surface; surface_temperature_target: the forcing target of the first interval."
+            }
+          }
+        },
+        "lens_memory_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 864000,
+          "description": "e-folding memory of the fresh water each sea cell received, for attributing surface lenses."
+        },
+        "sea_ice": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Sea ice (zero-layer Semtner thermodynamics with a concentration): needs thermal_layers and forcing.air_sea. The covered fraction takes the ocean-ice heat flux and has its own surface energy balance; open water below the freezing point forms frazil; freezing rejects brine (ice keeps ice_salinity_psu), melt returns fresh water; ice shelters the water from the wind stress. The ice drifts freely with the upper-ocean current plus a share of the wind (Nansen), is carried upwind between sea cells (coasts are walls) and ridges where it converges, up to maximum_ridge_thickness_m.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "initial_thickness_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 1.5
+            },
+            "initial_concentration": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.9,
+              "description": "At most maximum_concentration."
+            },
+            "initial_band_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0.5,
+              "description": "Initial ice where the top layer is within this band above its freezing point."
+            },
+            "albedo_cold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.65
+            },
+            "albedo_melting": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.5
+            },
+            "conductivity_w_m_k": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 5,
+              "default": 2.03
+            },
+            "ice_salinity_psu": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 5
+            },
+            "minimum_thickness_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 1,
+              "default": 0.05
+            },
+            "new_ice_thickness_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 5,
+              "default": 0.5,
+              "description": "Thickness of new ice over open water (lead closing); at least minimum_thickness_m."
+            },
+            "heat_transfer_coefficient": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.1,
+              "default": 0.006,
+              "description": "Ocean-ice heat exchange coefficient (McPhee)."
+            },
+            "friction_velocity_m_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.2,
+              "default": 0.01
+            },
+            "maximum_concentration": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 1,
+              "default": 0.99
+            },
+            "drift": {
+              "type": "boolean",
+              "default": true
+            },
+            "wind_drift_factor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.1,
+              "default": 0.02,
+              "description": "Ice speed from the wind as a share of the 10 m wind speed."
+            },
+            "wind_turning_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "default": 30,
+              "description": "Turning of the wind drift to the right of the wind in the northern hemisphere (left in the southern)."
+            },
+            "maximum_drift_m_s": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 5,
+              "default": 1.5
+            },
+            "maximum_ridge_thickness_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 30,
+              "default": 4.0,
+              "description": "Ice stops moving into a cell at the maximum concentration that is at least this thick (a stand-in for the ice strength free drift lacks)."
+            }
+          }
         }
       }
     },
@@ -549,6 +771,14 @@
                   "exclusiveMinimum": 0,
                   "maximum": 0.01,
                   "default": 0.0013
+                },
+                "interpolation": {
+                  "enum": [
+                    "piecewise_constant",
+                    "linear"
+                  ],
+                  "default": "piecewise_constant",
+                  "description": "Sampling of the coupled frames in time."
                 }
               },
               "description": "Wind stress rho_air C_d |U| U and the surface temperature target from a coupled-wind timeline sampled at the nearest cell."
@@ -698,7 +928,462 @@
                 "exclusiveMinimum": 0,
                 "maximum": 1000000.0,
                 "default": 1
+              },
+              "chemistry": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "nitrate_umol_kg": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2000,
+                    "default": 80.0
+                  },
+                  "dic_umol_kg": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 6000,
+                    "default": 1900.0
+                  },
+                  "alkalinity_umol_kg": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 6000,
+                    "default": 1900.0
+                  },
+                  "oxygen_saturation": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2,
+                    "default": 1.0
+                  }
+                },
+                "description": "River water chemistry (needs biogeochemistry): nitrate, dissolved inorganic carbon, total alkalinity and O2 as a share of saturation."
               }
+            }
+          }
+        },
+        "air_sea": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Bulk air-sea exchange: evaporation (Dalton), sensible (Stanton), longwave (Berliand), shortwave (Zillman clear sky, Reed cloud), solved implicitly at the surface. The air is the surface-temperature target + offset + diurnal cycle + air masses, or a coupled-wind timeline; the wind speed is the 10 m wind equivalent to the stress.",
+          "properties": {
+            "air_temperature_offset_k": {
+              "type": "number",
+              "minimum": -30,
+              "maximum": 30,
+              "default": -1
+            },
+            "diurnal_amplitude_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 15,
+              "default": 0,
+              "description": "Air temperature cycle peaking at 15 h local solar time."
+            },
+            "relative_humidity_south": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 1,
+              "default": 0.8
+            },
+            "relative_humidity_north": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 1,
+              "default": 0.8
+            },
+            "cloud_fraction_south": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.4
+            },
+            "cloud_fraction_north": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.4
+            },
+            "surface_pressure_pa": {
+              "type": "number",
+              "minimum": 50000,
+              "maximum": 110000,
+              "default": 101325
+            },
+            "rain_saturates_air": {
+              "type": "boolean",
+              "default": true,
+              "description": "Analytic air only: under rain above 0.1 mm/h the air is at least 95 % humid and 90 % cloudy. A coupled atmosphere keeps its own humidity and cloud."
+            },
+            "shortwave": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "astronomical"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "w_m2"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "constant"
+                    },
+                    "w_m2": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1400
+                    }
+                  }
+                }
+              ]
+            },
+            "air_masses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "start_seconds",
+                  "duration_seconds",
+                  "center_east_m",
+                  "center_north_m",
+                  "radius_m"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "start_seconds": {
+                    "type": "number"
+                  },
+                  "duration_seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "temperature_anomaly_k": {
+                    "type": "number",
+                    "minimum": -40,
+                    "maximum": 40,
+                    "default": 0
+                  },
+                  "relative_humidity": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 1
+                  },
+                  "velocity_east_m_s": {
+                    "type": "number",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "velocity_north_m_s": {
+                    "type": "number",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  }
+                }
+              },
+              "description": "Moving Gaussian anomalies of air temperature and humidity (e.g. a cold, dry outbreak)."
+            },
+            "coupled_timeline_path": {
+              "type": "string",
+              "description": "Air temperature, humidity, pressure, cloud fraction, wind and storm wind speed from a coupled-wind timeline."
+            },
+            "coupled_time_offset_seconds": {
+              "type": "number",
+              "default": 0
+            },
+            "interpolation": {
+              "enum": [
+                "piecewise_constant",
+                "linear"
+              ],
+              "default": "piecewise_constant",
+              "description": "Sampling of the coupled frames in time."
+            },
+            "coefficients": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "air_density_kg_m3": {
+                  "type": "number",
+                  "minimum": 0.5,
+                  "maximum": 2,
+                  "default": 1.22
+                },
+                "air_heat_capacity_j_kg_k": {
+                  "type": "number",
+                  "minimum": 900,
+                  "maximum": 1100,
+                  "default": 1004
+                },
+                "heat_transfer_coefficient": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.01,
+                  "default": 0.0011
+                },
+                "moisture_transfer_coefficient": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.01,
+                  "default": 0.0012
+                },
+                "minimum_wind_m_s": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10,
+                  "default": 1
+                },
+                "surface_albedo": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.06
+                },
+                "surface_emissivity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.97
+                },
+                "longwave_cloud_factor": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.6
+                },
+                "saline_vapour_factor": {
+                  "type": "number",
+                  "minimum": 0.9,
+                  "maximum": 1,
+                  "default": 0.98
+                },
+                "fresh_water_density_kg_m3": {
+                  "type": "number",
+                  "minimum": 900,
+                  "maximum": 1100,
+                  "default": 1000
+                }
+              }
+            },
+            "seasonal_amplitude_south_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0,
+              "description": "Annual air temperature cycle (warmest on day 196), linear from south to north; analytic air only."
+            },
+            "seasonal_amplitude_north_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0
+            }
+          }
+        },
+        "rain": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Rain on the sea (fresh water at its own temperature into the surface) and on land (coastal land drains to the nearest sea cell through a linear reservoir). Needs events and/or a coupled timeline.",
+          "properties": {
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "start_seconds",
+                  "duration_seconds",
+                  "rate_mm_h"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "start_seconds": {
+                    "type": "number"
+                  },
+                  "duration_seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "rate_mm_h": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 500
+                  },
+                  "center_east_m": {
+                    "type": "number"
+                  },
+                  "center_north_m": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Gaussian footprint; omit for uniform rain."
+                  },
+                  "temperature_k": {
+                    "type": "number",
+                    "minimum": 250,
+                    "maximum": 320
+                  },
+                  "velocity_east_m_s": {
+                    "type": "number",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "velocity_north_m_s": {
+                    "type": "number",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  }
+                }
+              }
+            },
+            "coupled_timeline_path": {
+              "type": "string",
+              "description": "Cell-mean precipitation (rate x duration_fraction) plus orographic precipitation, with the wet-bulb temperature, from a coupled-wind timeline."
+            },
+            "coupled_time_offset_seconds": {
+              "type": "number",
+              "default": 0
+            },
+            "interpolation": {
+              "enum": [
+                "piecewise_constant",
+                "linear"
+              ],
+              "default": "piecewise_constant",
+              "description": "Sampling of the coupled frames in time."
+            },
+            "temperature_offset_k": {
+              "type": "number",
+              "minimum": -20,
+              "maximum": 20,
+              "default": -2,
+              "description": "Without air-sea exchange: rain at the surface-temperature target plus this."
+            },
+            "coastal_runoff": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "band_m": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Land within this distance of the sea drains directly to it; 0 = off."
+                },
+                "runoff_coefficient": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.6
+                },
+                "time_scale_s": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "default": 86400
+                }
+              }
+            }
+          }
+        },
+        "warming": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rate_k_per_year"
+          ],
+          "description": "Climate warming: dT = min(max_k, rate (t - start)) x amplification (linear from south to north), added to the surface-temperature target and the analytic air. Off during the spin-up (t counts from the start of the main run).",
+          "properties": {
+            "rate_k_per_year": {
+              "type": "number",
+              "minimum": -2,
+              "maximum": 2
+            },
+            "start_seconds": {
+              "type": "number",
+              "default": 0
+            },
+            "max_k": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 5
+            },
+            "amplification_south": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 1
+            },
+            "amplification_north": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 1
+            }
+          }
+        },
+        "hosing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_east_m",
+            "center_north_m",
+            "radius_m",
+            "ramp_sv_per_year",
+            "max_sv"
+          ],
+          "description": "Meltwater hosing: F = min(max_sv, ramp (t - start)) until end_seconds, then down at the same ramp, of fresh water at 0 degC spread evenly over the sea cells within the circle (glacial meltwater of the budgets).",
+          "properties": {
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "start_seconds": {
+              "type": "number",
+              "default": 0
+            },
+            "ramp_sv_per_year": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "max_sv": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "end_seconds": {
+              "type": "number",
+              "description": "After this time the hosing ramps down at the same rate to zero (default: never)."
             }
           }
         }
@@ -708,6 +1393,563 @@
       "type": "integer",
       "minimum": 1,
       "default": 1
+    },
+    "ice_sheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region",
+        "initial_dome"
+      ],
+      "description": "A coupled land ice sheet (shallow-ice flow, positive-degree-day surface mass balance, ocean-driven frontal melt): lives on the land cells of the region (bed = terrain), is driven by the air-sea air temperature lapse-rated to its surface and by the ocean thermal forcing at front_depth_m; its meltwater enters the nearest sea cells as liquid at 0 degC, its icebergs and frontal melt as ice that takes latent heat from the top layer. Needs thermal_layers and forcing.air_sea.",
+      "properties": {
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_east_m",
+            "center_north_m",
+            "radius_east_m",
+            "radius_north_m"
+          ],
+          "properties": {
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radius_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "initial_dome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "center_thickness_m"
+          ],
+          "description": "Elliptical (Vialov-like) initial dome; centre and radii default to the region.",
+          "properties": {
+            "center_thickness_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5000
+            },
+            "center_east_m": {
+              "type": "number"
+            },
+            "center_north_m": {
+              "type": "number"
+            },
+            "radius_east_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radius_north_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "precipitation_m_we_yr": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 0.4,
+          "description": "Snowfall at the reference air temperature."
+        },
+        "precipitation_reference_k": {
+          "type": "number",
+          "default": 263.15
+        },
+        "precipitation_per_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.2,
+          "default": 0.07,
+          "description": "Relative increase of snowfall per kelvin (Clausius-Clapeyron-like)."
+        },
+        "front_depth_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2000,
+          "default": 300,
+          "description": "Depth at which the ocean thermal forcing of the fronts is read."
+        },
+        "step_every": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 24,
+          "description": "The ice sheet steps once every this many ocean steps."
+        },
+        "physics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rate_factor_pa3_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1e-20,
+              "default": 2.4e-24
+            },
+            "degree_day_factor_snow_mm_k_day": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 86.4,
+              "default": 3
+            },
+            "degree_day_factor_ice_mm_k_day": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 86.4,
+              "default": 8
+            },
+            "pdd_standard_deviation_k": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 15,
+              "default": 5
+            },
+            "refreezing_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.6
+            },
+            "lapse_rate_k_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.012,
+              "default": 0.0065
+            },
+            "front_water_depth_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3000
+            },
+            "marine_front_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 1,
+              "description": "Share of the margin cells that end in the sea (tidewater) and melt at the front."
+            }
+          }
+        }
+      }
+    },
+    "biogeochemistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "levels_m"
+      ],
+      "description": "Ocean carbon, oxygen and nitrate on z-levels down to the seafloor (DIC, alkalinity, O2, NO3): transport with the current, rivers, mixing, air-sea CO2/O2 exchange, production, export and respiration, ventilation; habitability (hypoxic, anoxic, corrosive, metabolically stressed) and dead zones. Needs physics.thermal_layers, forcing.air_sea and atmosphere_co2.",
+      "properties": {
+        "levels_m": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 60,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 6000
+          },
+          "description": "Increasing depths of the level bottoms (m)."
+        },
+        "step_every": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Ocean steps per chemistry step."
+        },
+        "minimum_depth_m": {
+          "type": "number",
+          "minimum": 0.1,
+          "default": 5.0,
+          "description": "Seafloor depth floor for shallow sea cells."
+        },
+        "surface_dic_from_atmosphere": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the surface DIC in equilibrium with the air."
+        },
+        "profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dic": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "surface": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "deep": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "scale_m": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10000
+                }
+              },
+              "description": "value(z) = deep + (surface - deep) exp(-z / scale_m), umol/kg."
+            },
+            "alkalinity": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "surface": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "deep": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "scale_m": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10000
+                }
+              },
+              "description": "value(z) = deep + (surface - deep) exp(-z / scale_m), umol/kg."
+            },
+            "oxygen": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "surface": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "deep": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "scale_m": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10000
+                }
+              },
+              "description": "value(z) = deep + (surface - deep) exp(-z / scale_m), umol/kg."
+            },
+            "nitrate": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "surface": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "deep": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 6000
+                },
+                "scale_m": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10000
+                }
+              },
+              "description": "value(z) = deep + (surface - deep) exp(-z / scale_m), umol/kg."
+            }
+          }
+        },
+        "biology": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_growth_per_day": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0.6
+            },
+            "max_production_umol_n_kg_day": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 1.0
+            },
+            "nitrate_half_saturation_umol_kg": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 100,
+              "default": 1.0
+            },
+            "light_half_saturation_w_m2": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 1000,
+              "default": 30.0
+            },
+            "par_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.43
+            },
+            "light_attenuation_per_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 5,
+              "default": 0.06
+            },
+            "martin_exponent": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 3,
+              "default": 0.858
+            },
+            "rain_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.07
+            }
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "horizontal_diffusivity_m2_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100000.0,
+              "default": 500.0
+            },
+            "vertical_diffusivity_m2_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 1e-05
+            },
+            "ventilation_depth_m": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 6000,
+              "default": 150.0
+            },
+            "ventilation_time_years": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 10.0
+            }
+          }
+        },
+        "habitat": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hypoxia_umol_kg": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 400,
+              "default": 60.0
+            },
+            "anoxia_umol_kg": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 400,
+              "default": 5.0
+            },
+            "corrosive_omega": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 1.0
+            },
+            "dead_zone_column_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.2
+            },
+            "metabolic": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "critical_po2_kpa": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "default": 2.0
+                },
+                "reference_temperature_k": {
+                  "type": "number",
+                  "minimum": 250,
+                  "maximum": 330,
+                  "default": 288.15
+                },
+                "temperature_sensitivity_ev": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2,
+                  "default": 0.4
+                },
+                "ecological_threshold": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "default": 3.0
+                }
+              }
+            }
+          }
+        },
+        "river_chemistry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nitrate_umol_kg": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2000,
+              "default": 80.0
+            },
+            "dic_umol_kg": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 6000,
+              "default": 1900.0
+            },
+            "alkalinity_umol_kg": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 6000,
+              "default": 1900.0
+            },
+            "oxygen_saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 1.0
+            }
+          },
+          "description": "Default chemistry of rivers without their own."
+        }
+      }
+    },
+    "atmosphere_co2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "background_ppm"
+      ],
+      "description": "CO2 of the boundary-layer air over the region (ppm): the background of a scenario at the inflow and by ventilation, carried by the wind, raised by the sources, taken up by vegetation and by the ocean. Needs biogeochemistry.",
+      "properties": {
+        "background_ppm": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number",
+                "minimum": 100,
+                "maximum": 5000
+              }
+            ]
+          },
+          "description": "[year, ppm] points with increasing years, interpolated linearly (held beyond the ends)."
+        },
+        "boundary_layer_height_m": {
+          "type": "number",
+          "minimum": 50,
+          "maximum": 5000,
+          "default": 1000.0
+        },
+        "ventilation_hours": {
+          "type": "number",
+          "minimum": 0.16666666666666666,
+          "maximum": 27777,
+          "default": 48.0
+        },
+        "horizontal_diffusivity_m2_s": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000000.0,
+          "default": 5000.0
+        },
+        "land": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "photosynthesis_umol_per_j": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.02,
+              "description": "CO2 taken up per joule of photosynthetically active radiation."
+            },
+            "respiration_umol_m2_s": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 50,
+              "default": 1.0
+            }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "east_m",
+              "north_m",
+              "radius_m",
+              "mt_co2_per_year"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "east_m": {
+                "type": "number"
+              },
+              "north_m": {
+                "type": "number"
+              },
+              "radius_m": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Gaussian spread (m)."
+              },
+              "mt_co2_per_year": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10000.0
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

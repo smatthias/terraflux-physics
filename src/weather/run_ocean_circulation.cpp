@@ -7,8 +7,23 @@
 // currents, thickness, salinity and temperature per frame, the deep-water
 // formation sites, the detected streams with their core streamlines and
 // transport, and the river exchange points with their plumes.
+//
+// Optional extensions: `forcing.rain` (rain events, moving storms or the
+// precipitation of a coupled-wind timeline, falling on the sea and on coastal
+// land that drains to it), `forcing.air_sea` (bulk evaporation and heat
+// exchange with an analytic or coupled atmosphere, shortwave from the sun's
+// position) and `physics.thermal_layers` (the layered temperature and salinity
+// column). Each adds its own per-frame block; without them the output is the
+// 1.5-layer slab output unchanged.
+#include "terraflux/weather/atmospheric_co2.hpp"
+#include "terraflux/weather/ice_sheet.hpp"
+#include "terraflux/weather/marine_indicators.hpp"
+#include "terraflux/weather/moist_air.hpp"
+#include "terraflux/weather/ocean_biogeochemistry.hpp"
 #include "terraflux/weather/ocean_circulation.hpp"
+#include "terraflux/weather/sea_ice.hpp"
 #include "terraflux/weather/synthetic_terrain.hpp"
+#include "utc_time.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -96,6 +111,25 @@ double sig(double v, int digits = 5) {
     return std::round(v / scale) * scale;
 }
 
+// Significant-digit rounding that lands on the double nearest the decimal value (dividing by an exact
+// power of ten), so the JSON prints "301.59" rather than "301.59000000000003". Used by the extension blocks.
+double tidy(double v, int digits) {
+    if (v == 0.0 || !std::isfinite(v)) return v;
+    const int exponent = static_cast<int>(std::floor(std::log10(std::abs(v)))) - (digits - 1);
+    if (exponent < 0) {
+        const double inverse = std::pow(10.0, -exponent);
+        return std::round(v * inverse) / inverse;
+    }
+    const double scale = std::pow(10.0, exponent);
+    return std::round(v / scale) * scale;
+}
+
+Json tidy_array(const std::vector<double>& values, int digits) {
+    Json result = Json::array();
+    for (double v : values) result.push_back(tidy(v, digits));
+    return result;
+}
+
 Json rounded_array(const std::vector<double>& values, int digits = 5) {
     Json result = Json::array();
     for (double v : values) result.push_back(sig(v, digits));
@@ -138,6 +172,7 @@ struct TimeRequest {
     std::size_t steps{0};
     std::size_t spinup_steps{0};
     std::size_t snapshot_every{1};
+    bool initial_sst_from_target{false};   // layered column: start from the surface-temperature target
 };
 
 template <typename T>
@@ -283,6 +318,54 @@ OceanConfig parse_config(const Json& request, TimeRequest& time, std::vector<dou
         read_into(p, "stream_speed_threshold_m_s", ph.stream_speed_threshold_m_s);
         read_into(p, "plume_salinity_deficit_psu", ph.plume_salinity_deficit_psu);
         read_into(p, "front_gradient_psu_per_100km", ph.front_gradient_psu_per_100km);
+        read_into(p, "heat_capacity_j_kg_k", ph.heat_capacity_j_kg_k);
+        read_into(p, "lens_salinity_deficit_psu", ph.lens_salinity_deficit_psu);
+        read_into(p, "lens_memory_s", ph.lens_memory_s);
+        if (p.contains("thermal_layers")) {
+            const Json& t = required(p, "thermal_layers");
+            auto& th = c.thermal;
+            th.count = required_positive_size(t, "count");
+            read_into(t, "surface_layer_m", th.surface_layer_m);
+            read_into(t, "background_diffusivity_m2_s", th.background_diffusivity_m2_s);
+            read_into(t, "wind_mixing_efficiency", th.wind_mixing_efficiency);
+            read_into(t, "bulk_richardson_number", th.bulk_richardson_number);
+            read_into(t, "initial_mixed_layer_depth_m", th.initial_mixed_layer_depth_m);
+            read_into(t, "initial_thermocline_scale_m", th.initial_thermocline_scale_m);
+            read_into(t, "shortwave_red_fraction", th.shortwave_red_fraction);
+            read_into(t, "shortwave_red_depth_m", th.shortwave_red_depth_m);
+            read_into(t, "shortwave_blue_depth_m", th.shortwave_blue_depth_m);
+            read_into(t, "mld_density_threshold_kg_m3", th.mld_density_threshold_kg_m3);
+            read_into(t, "ild_temperature_threshold_k", th.ild_temperature_threshold_k);
+            const std::string initial = optional_string(t, "initial_surface_temperature", "uniform");
+            if (initial != "uniform" && initial != "surface_temperature_target") throw std::invalid_argument("thermal_layers.initial_surface_temperature must be uniform or surface_temperature_target");
+            time.initial_sst_from_target = initial == "surface_temperature_target";
+        }
+        if (p.contains("sea_ice")) {
+            const Json& si = required(p, "sea_ice");
+            auto& ice = c.sea_ice;
+            ice.enabled = si.contains("enabled") ? si.at("enabled").get<bool>() : true;
+            read_into(si, "initial_thickness_m", ice.initial_thickness_m);
+            read_into(si, "initial_concentration", ice.initial_concentration);
+            read_into(si, "initial_band_k", ice.initial_band_k);
+            if (si.contains("drift")) {
+                if (!si.at("drift").is_boolean()) throw std::invalid_argument("run request field must be boolean: drift");
+                ice.drift = si.at("drift").get<bool>();
+            }
+            read_into(si, "wind_drift_factor", ice.wind_drift_factor);
+            read_into(si, "wind_turning_deg", ice.wind_turning_deg);
+            read_into(si, "maximum_drift_m_s", ice.maximum_drift_m_s);
+            read_into(si, "maximum_ridge_thickness_m", ice.maximum_ridge_thickness_m);
+            auto& ip = ice.physics;
+            read_into(si, "albedo_cold", ip.albedo_cold);
+            read_into(si, "albedo_melting", ip.albedo_melting);
+            read_into(si, "conductivity_w_m_k", ip.conductivity_w_m_k);
+            read_into(si, "ice_salinity_psu", ip.ice_salinity_psu);
+            read_into(si, "minimum_thickness_m", ip.minimum_thickness_m);
+            read_into(si, "new_ice_thickness_m", ip.new_ice_thickness_m);
+            read_into(si, "heat_transfer_coefficient", ip.heat_transfer_coefficient);
+            read_into(si, "friction_velocity_m_s", ip.friction_velocity_m_s);
+            read_into(si, "maximum_concentration", ip.maximum_concentration);
+        }
     }
     validate_ocean_config(c);
     return c;
@@ -305,6 +388,29 @@ Json config_json(const OceanConfig& c, const TimeRequest& time) {
     };
 }
 
+// Echo of the extension settings (only written when an extension is active, so slab runs are unchanged).
+void extension_config_json(Json& request, const OceanConfig& c, bool air_sea, bool rain, const TimeRequest& time) {
+    const auto& p = c.physics;
+    request["physics"]["heat_capacity_j_kg_k"] = p.heat_capacity_j_kg_k;
+    request["physics"]["lens_salinity_deficit_psu"] = p.lens_salinity_deficit_psu;
+    request["physics"]["lens_memory_s"] = p.lens_memory_s;
+    if (c.thermal.count >= 2) {
+        const auto& t = c.thermal;
+        request["physics"]["thermal_layers"] = {{"count", t.count}, {"surface_layer_m", t.surface_layer_m}, {"background_diffusivity_m2_s", t.background_diffusivity_m2_s},
+            {"wind_mixing_efficiency", t.wind_mixing_efficiency}, {"bulk_richardson_number", t.bulk_richardson_number}, {"initial_mixed_layer_depth_m", t.initial_mixed_layer_depth_m}, {"initial_thermocline_scale_m", t.initial_thermocline_scale_m},
+            {"shortwave_red_fraction", t.shortwave_red_fraction}, {"shortwave_red_depth_m", t.shortwave_red_depth_m}, {"shortwave_blue_depth_m", t.shortwave_blue_depth_m},
+            {"mld_density_threshold_kg_m3", t.mld_density_threshold_kg_m3}, {"ild_temperature_threshold_k", t.ild_temperature_threshold_k},
+            {"initial_surface_temperature", time.initial_sst_from_target ? "surface_temperature_target" : "uniform"}};
+    }
+    if (air_sea) {
+        const auto& a = c.air_sea;
+        request["air_sea"] = {{"air_density_kg_m3", a.air_density_kg_m3}, {"air_heat_capacity_j_kg_k", a.air_heat_capacity_j_kg_k}, {"heat_transfer_coefficient", a.heat_transfer_coefficient},
+            {"moisture_transfer_coefficient", a.moisture_transfer_coefficient}, {"minimum_wind_m_s", a.minimum_wind_m_s}, {"surface_albedo", a.surface_albedo}, {"surface_emissivity", a.surface_emissivity},
+            {"longwave_cloud_factor", a.longwave_cloud_factor}, {"saline_vapour_factor", a.saline_vapour_factor}, {"fresh_water_density_kg_m3", a.fresh_water_density_kg_m3}};
+    }
+    if (rain) request["coastal"] = {{"band_m", c.coastal.band_m}, {"runoff_coefficient", c.coastal.runoff_coefficient}, {"runoff_time_scale_s", c.coastal.runoff_time_scale_s}};
+}
+
 // Forcing: analytic gyre wind (or uniform, or a coupled-wind timeline), meridional surface-temperature
 // and net-precipitation profiles, and rivers with constant, event-driven or catchment-fed discharge.
 struct DischargeEvent { double start_seconds, duration_seconds, discharge_m3_s; };
@@ -320,6 +426,87 @@ struct RiverRequest {
 struct CoupledWind {
     std::vector<double> elapsed;
     std::vector<std::vector<double>> stress_east, stress_north, temperature;
+    bool linear{false};                    // linear in time between frames (default: piecewise constant)
+};
+
+// A coupled-wind timeline sampled at the ocean cells for the air-sea exchange and the rain.
+struct CoupledAtmosphere {
+    std::vector<double> elapsed;
+    std::vector<std::vector<double>> air_temperature, specific_humidity, cloud, rain_mm_h, wet_bulb, wind_speed, storm_wind;
+    std::vector<double> pressure;          // static
+    bool has_humidity{false}, has_cloud{false}, has_rain{false}, has_wet_bulb{false}, has_storm_wind{false};
+    bool linear{false};
+};
+
+// Day of the year (1 = 1 January 00:00 UTC) plus the fraction of the day, from days since 1970-01-01.
+double fractional_day_of_year(std::int64_t days_since_epoch, double utc_hour) {
+    using terraflux::weather::detail::days_from_civil;
+    int year = 1970 + static_cast<int>(std::floor(static_cast<double>(days_since_epoch) / 365.2425));
+    while (days_from_civil(year, 1, 1) > days_since_epoch) --year;
+    while (days_from_civil(year + 1, 1, 1) <= days_since_epoch) ++year;
+    return static_cast<double>(days_since_epoch - days_from_civil(year, 1, 1)) + 1.0 + utc_hour / 24.0;
+}
+
+// Frame index and weight of the next frame at time t (weight 0 for piecewise constant).
+std::pair<std::size_t, double> frame_weight(const std::vector<double>& elapsed, double t, bool linear) {
+    std::size_t k = 0;
+    while (k + 1 < elapsed.size() && elapsed[k + 1] <= t) ++k;
+    if (!linear || k + 1 >= elapsed.size() || t <= elapsed[k]) return {k, 0.0};
+    return {k, (t - elapsed[k]) / (elapsed[k + 1] - elapsed[k])};
+}
+
+double sample(const std::vector<std::vector<double>>& series, std::pair<std::size_t, double> at, std::size_t i) {
+    const double a = series[at.first][i];
+    return at.second > 0.0 ? a + (series[at.first + 1][i] - a) * at.second : a;
+}
+
+struct AirMass {
+    double start_seconds, duration_seconds, east_m, north_m, radius_m, velocity_east_m_s, velocity_north_m_s, temperature_anomaly_k;
+    std::optional<double> relative_humidity;
+};
+
+struct RainEvent {
+    double start_seconds, duration_seconds, rate_mm_h, east_m, north_m, velocity_east_m_s, velocity_north_m_s;
+    std::optional<double> radius_m, temperature_k;
+};
+
+struct AirSeaRequest {
+    bool enabled{false};
+    double air_temperature_offset_k{-1.0};
+    double diurnal_amplitude_k{0.0};
+    double relative_humidity_south{0.8}, relative_humidity_north{0.8};
+    double cloud_south{0.4}, cloud_north{0.4};
+    double pressure_pa{101325.0};
+    std::string shortwave_kind{"astronomical"};
+    double shortwave_w_m2{200.0};
+    double seasonal_amplitude_south_k{0.0}, seasonal_amplitude_north_k{0.0};   // air temperature cycle, warmest mid-July
+    bool rain_saturates_air{true};
+    std::vector<AirMass> air_masses;
+    std::optional<CoupledAtmosphere> coupled;
+};
+
+// Global warming ramp: dT(t) = min(max_k, rate (t - start)) added to the surface-temperature target (and so to
+// the air), amplified toward the north: factor = south + (north - south) y / L_y (polar amplification).
+struct WarmingRequest {
+    bool enabled{false};
+    double rate_k_per_year{0.0}, start_seconds{0.0}, max_k{10.0};
+    double amplification_south{1.0}, amplification_north{2.0};
+};
+
+// Freshwater hosing: a classic experiment releasing fresh water (0 degC) uniformly over the sea cells of a region,
+// F(t) = min(max_sv, ramp (t - start)), to find the freshwater forcing at which the overturning stops.
+struct HosingRequest {
+    bool enabled{false};
+    double east_m{0.0}, north_m{0.0}, radius_m{1.0}, start_seconds{0.0}, ramp_sv_per_year{0.0}, max_sv{0.0};
+    double end_seconds{std::numeric_limits<double>::infinity()};   // after it the hosing ramps down at the same rate
+    std::vector<std::size_t> cells;
+};
+
+struct RainRequest {
+    bool enabled{false};
+    std::vector<RainEvent> events;
+    std::optional<CoupledAtmosphere> coupled;
+    double temperature_offset_k{-2.0};     // without air-sea exchange: rain at the surface-temperature target + offset
 };
 
 struct ForcingRequest {
@@ -336,6 +523,11 @@ struct ForcingRequest {
     std::vector<ColdPatch> cold_patches;
     double precipitation_south{-1.0e-8}, precipitation_north{1.0e-8};
     std::vector<RiverRequest> rivers;
+    AirSeaRequest air_sea;
+    RainRequest rain;
+    WarmingRequest warming;
+    HosingRequest hosing;
+    double start_epoch_seconds{0.0};
     Json provenance;
 };
 
@@ -416,8 +608,251 @@ void load_catchment_series(const std::string& path, double scale, RiverRequest& 
     provenance = {{"kind", "catchment_timeline"}, {"path", path}, {"scale", scale}, {"intervals", river.series_rate.size()}, {"source", "hydrology.frames[].cumulative_m3.ocean_discharge + edge_outflow"}};
 }
 
-ForcingRequest parse_forcing(const Json& request, const OceanConfig& c) {
+// Nearest coupled cell of every ocean cell; the ocean grid must lie inside the coupled grid.
+std::vector<std::size_t> coupled_map(const TransportGrid2D& source, const OceanConfig& c) {
+    const std::size_t count = c.grid.nx * c.grid.ny;
+    std::vector<std::size_t> map(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const double east = c.grid.origin_east_m + (static_cast<double>(i % c.grid.nx) + 0.5) * c.grid.spacing_east_m;
+        const double north = c.grid.origin_north_m + (static_cast<double>(i / c.grid.nx) + 0.5) * c.grid.spacing_north_m;
+        const double fx = (east - source.origin_east_m) / source.spacing_east_m, fy = (north - source.origin_north_m) / source.spacing_north_m;
+        if (fx < 0.0 || fy < 0.0 || fx >= static_cast<double>(source.nx) || fy >= static_cast<double>(source.ny)) throw std::invalid_argument("the ocean grid must lie within the coupled timeline grid (same local frame)");
+        map[i] = static_cast<std::size_t>(fy) * source.nx + static_cast<std::size_t>(fx);
+    }
+    return map;
+}
+
+std::string parse_interpolation(const Json& section) {
+    const std::string mode = optional_string(section, "interpolation", "piecewise_constant");
+    if (mode != "piecewise_constant" && mode != "linear") throw std::invalid_argument("coupled interpolation must be piecewise_constant or linear");
+    return mode;
+}
+
+CoupledAtmosphere load_coupled_atmosphere(const std::string& path, double offset, bool linear, const OceanConfig& c, Json& provenance) {
+    std::ifstream file(path);
+    if (!file) throw std::invalid_argument("cannot open coupled timeline: " + path);
+    Json timeline;
+    try { timeline = Json::parse(file); } catch (const Json::exception& error) { throw std::invalid_argument(std::string("invalid coupled timeline JSON: ") + error.what()); }
+    if (!timeline.is_object() || timeline.value("schema_version", "") != "terraflux.weather.timeline/v1") throw std::invalid_argument("coupled timeline must be a terraflux.weather.timeline/v1 document");
+    const Json& frames = required(timeline, "frames");
+    if (!frames.is_array() || frames.empty()) throw std::invalid_argument("coupled timeline has no frames");
+    const TransportGrid2D source = parse_grid(required(frames.at(static_cast<std::size_t>(0)), "grid"));
+    validate_transport_grid(source);
+    const std::size_t count = c.grid.nx * c.grid.ny, source_count = source.nx * source.ny;
+    const auto map = coupled_map(source, c);
+    const Json empty = Json::object();
+    const Json& atmosphere = timeline.contains("coupled_atmosphere") ? timeline.at("coupled_atmosphere") : empty;
+    CoupledAtmosphere a;
+    a.linear = linear;
+    a.has_humidity = atmosphere.contains("specific_humidity_kg_kg_by_frame");
+    a.has_cloud = atmosphere.contains("clouds");
+    a.has_rain = atmosphere.contains("precipitation") || atmosphere.contains("orography");
+    a.has_wet_bulb = atmosphere.contains("precipitation");
+    a.has_storm_wind = atmosphere.contains("storms") && atmosphere.at("storms").contains("frames");
+    auto mapped = [&](const std::vector<double>& values, const char* what) {
+        if (values.size() != source_count) throw std::invalid_argument(std::string("coupled ") + what + " does not match its grid");
+        std::vector<double> out(count);
+        for (std::size_t i = 0; i < count; ++i) out[i] = values[map[i]];
+        return out;
+    };
+    a.pressure.assign(count, 101325.0);
+    if (atmosphere.contains("pressure_pa")) a.pressure = mapped(required_number_array(atmosphere, "pressure_pa"), "pressure");
+    auto nth = [&](const char* section, std::size_t k) -> const Json& {
+        const Json& list = required(required(atmosphere, section), "frames");
+        if (!list.is_array() || list.size() != frames.size()) throw std::invalid_argument(std::string("coupled ") + section + " frames must match the timeline frames");
+        return list.at(k);
+    };
+    for (std::size_t k = 0; k < frames.size(); ++k) {
+        const Json& frame = frames.at(k);
+        const double t = required_number(frame, "elapsed_seconds") + offset;
+        if (!a.elapsed.empty() && t <= a.elapsed.back()) throw std::invalid_argument("coupled frames must have increasing times");
+        a.elapsed.push_back(t);
+        const Json& fields = required(frame, "fields");
+        a.air_temperature.push_back(mapped(required_number_array(required(fields, "air_temperature"), "values"), "air temperature"));
+        const auto ue = mapped(required_number_array(required(fields, "wind_east"), "values"), "wind"), un = mapped(required_number_array(required(fields, "wind_north"), "values"), "wind");
+        std::vector<double> speed(count);
+        for (std::size_t i = 0; i < count; ++i) speed[i] = std::hypot(ue[i], un[i]);
+        a.wind_speed.push_back(std::move(speed));
+        if (a.has_humidity) {
+            const Json& list = required(atmosphere, "specific_humidity_kg_kg_by_frame");
+            if (!list.is_array() || list.size() != frames.size() || !list.at(k).is_array()) throw std::invalid_argument("coupled humidity frames must match the timeline frames");
+            std::vector<double> q;
+            for (const Json& v : list.at(k)) { if (!v.is_number()) throw std::invalid_argument("coupled humidity must be numeric"); q.push_back(v.get<double>()); }
+            a.specific_humidity.push_back(mapped(q, "humidity"));
+        }
+        if (a.has_cloud) a.cloud.push_back(mapped(required_number_array(nth("clouds", k), "cloud_fraction"), "cloud fraction"));
+        if (a.has_storm_wind) a.storm_wind.push_back(mapped(required_number_array(nth("storms", k), "storm_wind_speed_m_s"), "storm wind"));
+        if (a.has_rain) {
+            std::vector<double> rate(count, 0.0);
+            if (atmosphere.contains("precipitation")) {
+                // rate_mm_h is the intensity while it precipitates; the cell-mean rate over the interval is
+                // rate x duration_fraction (accumulation = rate x duration x interval).
+                const Json& outcome = nth("precipitation", k);
+                const auto pr = mapped(required_number_array(outcome, "rate_mm_h"), "precipitation");
+                const auto duration = outcome.contains("duration_fraction") ? mapped(required_number_array(outcome, "duration_fraction"), "precipitation duration") : std::vector<double>(count, 1.0);
+                for (std::size_t i = 0; i < count; ++i) rate[i] += std::max(0.0, pr[i]) * std::min(1.0, std::max(0.0, duration[i]));
+                a.wet_bulb.push_back(mapped(required_number_array(nth("precipitation", k), "surface_wet_bulb_k"), "wet-bulb temperature"));
+            }
+            if (atmosphere.contains("orography")) {
+                const auto oro = mapped(required_number_array(nth("orography", k), "orographic_precipitation_rate_mm_h"), "orographic precipitation");
+                for (std::size_t i = 0; i < count; ++i) rate[i] += std::max(0.0, oro[i]);
+            }
+            a.rain_mm_h.push_back(std::move(rate));
+        }
+    }
+    Json sources = {"frames.fields.air_temperature", "frames.fields.wind_east", "frames.fields.wind_north"};
+    if (atmosphere.contains("pressure_pa")) sources.push_back("coupled_atmosphere.pressure_pa");
+    if (a.has_humidity) sources.push_back("coupled_atmosphere.specific_humidity_kg_kg_by_frame");
+    if (a.has_cloud) sources.push_back("coupled_atmosphere.clouds.frames[].cloud_fraction");
+    if (atmosphere.contains("precipitation")) { sources.push_back("coupled_atmosphere.precipitation.frames[].rate_mm_h x duration_fraction"); sources.push_back("coupled_atmosphere.precipitation.frames[].surface_wet_bulb_k"); }
+    if (a.has_storm_wind) sources.push_back("coupled_atmosphere.storms.frames[].storm_wind_speed_m_s (added in quadrature to the wind speed; drives the vertical mixing)");
+    if (atmosphere.contains("orography")) sources.push_back("coupled_atmosphere.orography.frames[].orographic_precipitation_rate_mm_h");
+    provenance = {{"kind", "coupled_timeline"}, {"path", path}, {"offset_seconds", offset}, {"frames", frames.size()},
+                  {"sampling", linear ? "nearest_cell_linear_in_time" : "nearest_cell_piecewise_constant_in_time"}, {"sources", sources}};
+    return a;
+}
+
+void parse_air_sea(const Json& section, ForcingRequest& f, OceanConfig& c, Json& provenance) {
+    auto& a = f.air_sea;
+    a.enabled = true;
+    a.air_temperature_offset_k = optional_number(section, "air_temperature_offset_k", a.air_temperature_offset_k);
+    a.diurnal_amplitude_k = optional_number(section, "diurnal_amplitude_k", a.diurnal_amplitude_k);
+    a.relative_humidity_south = optional_number(section, "relative_humidity_south", a.relative_humidity_south);
+    a.relative_humidity_north = optional_number(section, "relative_humidity_north", a.relative_humidity_north);
+    a.cloud_south = optional_number(section, "cloud_fraction_south", a.cloud_south);
+    a.cloud_north = optional_number(section, "cloud_fraction_north", a.cloud_north);
+    a.pressure_pa = optional_number(section, "surface_pressure_pa", a.pressure_pa);
+    a.seasonal_amplitude_south_k = optional_number(section, "seasonal_amplitude_south_k", a.seasonal_amplitude_south_k);
+    a.seasonal_amplitude_north_k = optional_number(section, "seasonal_amplitude_north_k", a.seasonal_amplitude_north_k);
+    if (a.seasonal_amplitude_south_k < 0.0 || a.seasonal_amplitude_south_k > 30.0 || a.seasonal_amplitude_north_k < 0.0 || a.seasonal_amplitude_north_k > 30.0) throw std::invalid_argument("air_sea seasonal amplitudes must lie within 0-30 K");
+    if (std::abs(a.air_temperature_offset_k) > 30.0 || a.diurnal_amplitude_k < 0.0 || a.diurnal_amplitude_k > 15.0) throw std::invalid_argument("air_sea air temperature offset must lie within +-30 K and the diurnal amplitude within 0-15 K");
+    for (double v : {a.relative_humidity_south, a.relative_humidity_north}) if (v < 0.05 || v > 1.0) throw std::invalid_argument("air_sea relative humidity must lie within 0.05-1");
+    for (double v : {a.cloud_south, a.cloud_north}) if (v < 0.0 || v > 1.0) throw std::invalid_argument("air_sea cloud fraction must lie within 0-1");
+    if (a.pressure_pa < 50000.0 || a.pressure_pa > 110000.0) throw std::invalid_argument("air_sea surface_pressure_pa must lie within 50-110 kPa");
+    if (section.contains("rain_saturates_air")) {
+        if (!section.at("rain_saturates_air").is_boolean()) throw std::invalid_argument("air_sea.rain_saturates_air must be boolean");
+        a.rain_saturates_air = section.at("rain_saturates_air").get<bool>();
+    }
+    Json shortwave = {{"kind", "astronomical"}, {"clear_sky", "Zillman (1972)"}, {"cloud", "Reed (1977) 1 - 0.62 C"}};
+    if (section.contains("shortwave")) {
+        const Json& sw = required(section, "shortwave");
+        a.shortwave_kind = optional_string(sw, "kind", "astronomical");
+        if (a.shortwave_kind == "constant") {
+            a.shortwave_w_m2 = required_number(sw, "w_m2");
+            if (a.shortwave_w_m2 < 0.0 || a.shortwave_w_m2 > 1400.0) throw std::invalid_argument("air_sea.shortwave.w_m2 must lie within 0-1400");
+            shortwave = {{"kind", "constant"}, {"w_m2", a.shortwave_w_m2}};
+        } else if (a.shortwave_kind != "astronomical") {
+            throw std::invalid_argument("air_sea.shortwave.kind must be astronomical or constant");
+        }
+    }
+    Json masses = Json::array();
+    if (section.contains("air_masses")) {
+        const Json& list = required(section, "air_masses");
+        if (!list.is_array()) throw std::invalid_argument("air_sea.air_masses must be an array");
+        for (const Json& m : list) {
+            AirMass am{required_number(m, "start_seconds"), required_number(m, "duration_seconds"), required_number(m, "center_east_m"), required_number(m, "center_north_m"),
+                       required_number(m, "radius_m"), optional_number(m, "velocity_east_m_s", 0.0), optional_number(m, "velocity_north_m_s", 0.0), optional_number(m, "temperature_anomaly_k", 0.0), std::nullopt};
+            if (m.contains("relative_humidity")) am.relative_humidity = required_number(m, "relative_humidity");
+            if (am.start_seconds < -1.0e9 || am.duration_seconds <= 0.0 || am.radius_m <= 0.0 || std::abs(am.temperature_anomaly_k) > 40.0 || std::abs(am.velocity_east_m_s) > 50.0 || std::abs(am.velocity_north_m_s) > 50.0 ||
+                (am.relative_humidity && (*am.relative_humidity < 0.05 || *am.relative_humidity > 1.0))) {
+                throw std::invalid_argument("air masses need duration > 0, radius > 0, |anomaly| <= 40 K, |velocity| <= 50 m/s and relative humidity within 0.05-1");
+            }
+            Json echo = {{"start_seconds", am.start_seconds}, {"duration_seconds", am.duration_seconds}, {"center_east_m", am.east_m}, {"center_north_m", am.north_m}, {"radius_m", am.radius_m},
+                         {"velocity_east_m_s", am.velocity_east_m_s}, {"velocity_north_m_s", am.velocity_north_m_s}, {"temperature_anomaly_k", am.temperature_anomaly_k}};
+            if (am.relative_humidity) echo["relative_humidity"] = *am.relative_humidity;
+            masses.push_back(echo);
+            a.air_masses.push_back(am);
+        }
+    }
+    Json coupled = {{"kind", "none"}};
+    if (section.contains("coupled_timeline_path")) {
+        a.coupled = load_coupled_atmosphere(required_string(section, "coupled_timeline_path"), optional_number(section, "coupled_time_offset_seconds", 0.0), parse_interpolation(section) == "linear", c, coupled);
+    }
+    if (section.contains("coefficients")) {
+        const Json& k = required(section, "coefficients");
+        auto& ac = c.air_sea;
+        read_into(k, "air_density_kg_m3", ac.air_density_kg_m3);
+        read_into(k, "air_heat_capacity_j_kg_k", ac.air_heat_capacity_j_kg_k);
+        read_into(k, "heat_transfer_coefficient", ac.heat_transfer_coefficient);
+        read_into(k, "moisture_transfer_coefficient", ac.moisture_transfer_coefficient);
+        read_into(k, "minimum_wind_m_s", ac.minimum_wind_m_s);
+        read_into(k, "surface_albedo", ac.surface_albedo);
+        read_into(k, "surface_emissivity", ac.surface_emissivity);
+        read_into(k, "longwave_cloud_factor", ac.longwave_cloud_factor);
+        read_into(k, "saline_vapour_factor", ac.saline_vapour_factor);
+        read_into(k, "fresh_water_density_kg_m3", ac.fresh_water_density_kg_m3);
+        validate_ocean_config(c);
+    }
+    provenance = {{"air_temperature", a.coupled ? Json("coupled_timeline") : Json("surface_temperature_target + offset + diurnal cycle + air masses")},
+                  {"air_temperature_offset_k", a.air_temperature_offset_k}, {"diurnal_amplitude_k", a.diurnal_amplitude_k},
+                  {"relative_humidity", {{"south", a.relative_humidity_south}, {"north", a.relative_humidity_north}, {"profile", "linear in north"}}},
+                  {"cloud_fraction", {{"south", a.cloud_south}, {"north", a.cloud_north}, {"profile", "linear in north"}}},
+                  {"surface_pressure_pa", a.pressure_pa}, {"rain_saturates_air", a.rain_saturates_air},
+                  {"wind_speed", "10 m wind equivalent to the wind stress"},
+                  {"shortwave", shortwave}, {"air_masses", masses}, {"coupled", coupled},
+                  {"bulk_formulae", "Dalton evaporation, Stanton sensible heat, Berliand longwave; surface energy balance implicit"}};
+    if (a.seasonal_amplitude_south_k > 0.0 || a.seasonal_amplitude_north_k > 0.0) {
+        provenance["seasonal_amplitude_k"] = {{"south", a.seasonal_amplitude_south_k}, {"north", a.seasonal_amplitude_north_k}, {"warmest_day_of_year", 196}};
+    }
+}
+
+void parse_rain(const Json& section, ForcingRequest& f, OceanConfig& c, Json& provenance) {
+    auto& r = f.rain;
+    r.enabled = true;
+    r.temperature_offset_k = optional_number(section, "temperature_offset_k", r.temperature_offset_k);
+    if (std::abs(r.temperature_offset_k) > 20.0) throw std::invalid_argument("rain.temperature_offset_k must lie within +-20 K");
+    Json events = Json::array();
+    if (section.contains("events")) {
+        const Json& list = required(section, "events");
+        if (!list.is_array()) throw std::invalid_argument("forcing.rain.events must be an array");
+        for (const Json& e : list) {
+            RainEvent ev{required_number(e, "start_seconds"), required_number(e, "duration_seconds"), required_number(e, "rate_mm_h"), 0.0, 0.0,
+                         optional_number(e, "velocity_east_m_s", 0.0), optional_number(e, "velocity_north_m_s", 0.0), std::nullopt, std::nullopt};
+            if (ev.duration_seconds <= 0.0 || ev.rate_mm_h < 0.0 || ev.rate_mm_h > 500.0 || std::abs(ev.velocity_east_m_s) > 50.0 || std::abs(ev.velocity_north_m_s) > 50.0) {
+                throw std::invalid_argument("rain events need duration > 0, a rate within 0-500 mm/h and |velocity| <= 50 m/s");
+            }
+            Json echo = {{"start_seconds", ev.start_seconds}, {"duration_seconds", ev.duration_seconds}, {"rate_mm_h", ev.rate_mm_h}, {"velocity_east_m_s", ev.velocity_east_m_s}, {"velocity_north_m_s", ev.velocity_north_m_s}};
+            if (e.contains("radius_m")) {
+                ev.radius_m = required_number(e, "radius_m");
+                ev.east_m = required_number(e, "center_east_m");
+                ev.north_m = required_number(e, "center_north_m");
+                if (*ev.radius_m <= 0.0) throw std::invalid_argument("rain event radius_m must be positive");
+                echo["radius_m"] = *ev.radius_m;
+                echo["center_east_m"] = ev.east_m;
+                echo["center_north_m"] = ev.north_m;
+            }
+            if (e.contains("temperature_k")) {
+                ev.temperature_k = required_number(e, "temperature_k");
+                if (*ev.temperature_k < 250.0 || *ev.temperature_k > 320.0) throw std::invalid_argument("rain event temperature_k must lie within 250-320 K");
+                echo["temperature_k"] = *ev.temperature_k;
+            }
+            events.push_back(echo);
+            r.events.push_back(ev);
+        }
+    }
+    Json coupled = {{"kind", "none"}};
+    if (section.contains("coupled_timeline_path")) {
+        r.coupled = load_coupled_atmosphere(required_string(section, "coupled_timeline_path"), optional_number(section, "coupled_time_offset_seconds", 0.0), parse_interpolation(section) == "linear", c, coupled);
+        if (!r.coupled->has_rain) throw std::invalid_argument("the rain coupled timeline carries no precipitation or orography frames");
+    }
+    if (r.events.empty() && !r.coupled) throw std::invalid_argument("forcing.rain needs events and/or a coupled_timeline_path");
+    Json coastal = {{"band_m", 0.0}};
+    if (section.contains("coastal_runoff")) {
+        const Json& cr = required(section, "coastal_runoff");
+        c.coastal.band_m = optional_number(cr, "band_m", c.coastal.band_m);
+        c.coastal.runoff_coefficient = optional_number(cr, "runoff_coefficient", c.coastal.runoff_coefficient);
+        c.coastal.runoff_time_scale_s = optional_number(cr, "time_scale_s", c.coastal.runoff_time_scale_s);
+        validate_ocean_config(c);
+        coastal = {{"band_m", c.coastal.band_m}, {"runoff_coefficient", c.coastal.runoff_coefficient}, {"time_scale_s", c.coastal.runoff_time_scale_s},
+                   {"routing", "nearest sea cell within the band; linear reservoir; the rest of the rain is a land loss; land beyond the band is left to rivers"}};
+    }
+    provenance = {{"events", events}, {"coupled", coupled}, {"temperature_offset_k", r.temperature_offset_k}, {"coastal_runoff", coastal},
+                  {"temperature", "event temperature if given; else the coupled wet-bulb temperature; else the wet-bulb of the air-sea atmosphere; else the surface-temperature target + offset"}};
+}
+
+ForcingRequest parse_forcing(const Json& request, OceanConfig& c, const TimeRequest& time) {
     ForcingRequest f;
+    f.start_epoch_seconds = terraflux::weather::detail::utc_seconds(time.start_time_utc);
     const Json& section = required(request, "forcing");
     Json wind_provenance;
     if (section.contains("wind")) {
@@ -442,6 +877,10 @@ ForcingRequest parse_forcing(const Json& request, const OceanConfig& c) {
             wind_provenance = {{"kind", "uniform"}, {"stress_east_pa", f.uniform_east}, {"stress_north_pa", f.uniform_north}};
         } else if (f.wind_kind == "coupled_timeline") {
             f.coupled = load_coupled_wind(required_string(w, "path"), optional_number(w, "offset_seconds", 0.0), c, f.air_density, f.drag_coefficient, wind_provenance);
+            if (w.contains("interpolation")) {
+                f.coupled->linear = parse_interpolation(w) == "linear";
+                wind_provenance["sampling"] = f.coupled->linear ? "nearest_cell_linear_in_time" : "nearest_cell_piecewise_constant_in_time";
+            }
         } else {
             throw std::invalid_argument("forcing.wind.kind must be gyre, uniform or coupled_timeline");
         }
@@ -510,7 +949,65 @@ ForcingRequest parse_forcing(const Json& request, const OceanConfig& c) {
                     {"surface_temperature", {{"south_k", f.temperature_south_k}, {"north_k", f.temperature_north_k}, {"profile", "linear in north, Gaussian cold patches blended in"}, {"cold_patches", patches}}},
                     {"net_precipitation", {{"south_m_s", f.precipitation_south}, {"north_m_s", f.precipitation_north}, {"profile", "linear in north"}}},
                     {"rivers", rivers}};
+    if (section.contains("air_sea")) {
+        Json provenance;
+        parse_air_sea(required(section, "air_sea"), f, c, provenance);
+        f.provenance["air_sea"] = provenance;
+    }
+    if (section.contains("rain")) {
+        Json provenance;
+        parse_rain(required(section, "rain"), f, c, provenance);
+        f.provenance["rain"] = provenance;
+    }
+    if (c.coastal.band_m > 0.0 && !f.rain.enabled) throw std::invalid_argument("coastal runoff needs forcing.rain");
+    if (section.contains("warming")) {
+        const Json& w = required(section, "warming");
+        auto& wr = f.warming;
+        wr.enabled = true;
+        wr.rate_k_per_year = required_number(w, "rate_k_per_year");
+        wr.start_seconds = optional_number(w, "start_seconds", 0.0);
+        wr.max_k = optional_number(w, "max_k", wr.max_k);
+        wr.amplification_south = optional_number(w, "amplification_south", wr.amplification_south);
+        wr.amplification_north = optional_number(w, "amplification_north", wr.amplification_north);
+        if (std::abs(wr.rate_k_per_year) > 2.0 || wr.max_k < 0.0 || wr.max_k > 20.0 || wr.amplification_south < 0.0 || wr.amplification_south > 5.0 || wr.amplification_north < 0.0 || wr.amplification_north > 5.0) {
+            throw std::invalid_argument("forcing.warming needs |rate| <= 2 K/yr, max_k within 0-20 and amplifications within 0-5");
+        }
+        f.provenance["warming"] = {{"rate_k_per_year", wr.rate_k_per_year}, {"start_seconds", wr.start_seconds}, {"max_k", wr.max_k}, {"amplification_south", wr.amplification_south},
+                                   {"amplification_north", wr.amplification_north}, {"profile", "dT = min(max_k, rate (t - start)) x amplification, linear from south to north, added to the surface-temperature target and the air"}};
+    }
+    if (section.contains("hosing")) {
+        const Json& h = required(section, "hosing");
+        auto& hr = f.hosing;
+        hr.enabled = true;
+        hr.east_m = required_number(h, "center_east_m");
+        hr.north_m = required_number(h, "center_north_m");
+        hr.radius_m = required_number(h, "radius_m");
+        hr.start_seconds = optional_number(h, "start_seconds", 0.0);
+        hr.ramp_sv_per_year = required_number(h, "ramp_sv_per_year");
+        hr.max_sv = required_number(h, "max_sv");
+        hr.end_seconds = optional_number(h, "end_seconds", hr.end_seconds);
+        if (!(hr.end_seconds > hr.start_seconds)) throw std::invalid_argument("forcing.hosing.end_seconds must come after start_seconds");
+        if (!(hr.radius_m > 0.0) || hr.ramp_sv_per_year < 0.0 || hr.ramp_sv_per_year > 1.0 || hr.max_sv < 0.0 || hr.max_sv > 5.0) throw std::invalid_argument("forcing.hosing needs a positive radius, a ramp within 0-1 Sv/yr and max_sv within 0-5");
+        const auto& g = c.grid;
+        for (std::size_t i = 0; i < c.ocean.size(); ++i) {
+            if (!c.ocean[i]) continue;
+            const double e = g.origin_east_m + (static_cast<double>(i % g.nx) + 0.5) * g.spacing_east_m - hr.east_m, n = g.origin_north_m + (static_cast<double>(i / g.nx) + 0.5) * g.spacing_north_m - hr.north_m;
+            if (std::hypot(e, n) <= hr.radius_m) hr.cells.push_back(i);
+        }
+        if (hr.cells.empty()) throw std::invalid_argument("forcing.hosing region holds no sea cell");
+        f.provenance["hosing"] = {{"center_east_m", hr.east_m}, {"center_north_m", hr.north_m}, {"radius_m", hr.radius_m}, {"start_seconds", hr.start_seconds}, {"ramp_sv_per_year", hr.ramp_sv_per_year},
+                                  {"max_sv", hr.max_sv}, {"cells", hr.cells.size()}, {"profile", "F = min(max_sv, ramp (t - start)) until end_seconds, then down at the same ramp; fresh water at 0 degC spread evenly over the region's sea cells"}};
+        if (std::isfinite(hr.end_seconds)) f.provenance["hosing"]["end_seconds"] = hr.end_seconds;
+    }
     return f;
+}
+
+double hosing_sv(const HosingRequest& h, double t) {
+    if (!h.enabled) return 0.0;
+    const double year = 365.25 * 86400.0;
+    auto up = [&](double time) { return std::min(h.max_sv, std::max(0.0, h.ramp_sv_per_year * (time - h.start_seconds) / year)); };
+    if (t <= h.end_seconds) return up(t);
+    return std::max(0.0, up(h.end_seconds) - h.ramp_sv_per_year * (t - h.end_seconds) / year);
 }
 
 // Forcing for the interval starting at `elapsed`.
@@ -532,6 +1029,10 @@ OceanForcing forcing_at(const ForcingRequest& f, double elapsed, double dt, cons
             out.target_temperature_k[i] += (cp.temperature_k - out.target_temperature_k[i]) * w;
         }
         out.net_precipitation_m_s[i] = f.precipitation_south + (f.precipitation_north - f.precipitation_south) * frac;
+        if (f.warming.enabled) {
+            const double warming = std::min(f.warming.max_k, std::max(0.0, f.warming.rate_k_per_year * (mid - f.warming.start_seconds) / (365.25 * 86400.0)));
+            out.target_temperature_k[i] += warming * (f.warming.amplification_south + (f.warming.amplification_north - f.warming.amplification_south) * frac);
+        }
         if (f.wind_kind == "gyre") {
             double taper = 1.0;
             if (f.wall_taper_m > 0.0) taper = (1.0 - std::exp(-(y / f.wall_taper_m) * (y / f.wall_taper_m))) * (1.0 - std::exp(-((ly - y) / f.wall_taper_m) * ((ly - y) / f.wall_taper_m)));
@@ -540,13 +1041,24 @@ OceanForcing forcing_at(const ForcingRequest& f, double elapsed, double dt, cons
         }
         else if (f.wind_kind == "uniform") { out.wind_stress_east_pa[i] = f.uniform_east; out.wind_stress_north_pa[i] = f.uniform_north; }
     }
+    if (f.hosing.enabled) {
+        out.glacial_meltwater_m3_s.assign(count, 0.0);
+        const double sv = hosing_sv(f.hosing, mid);
+        for (std::size_t i : f.hosing.cells) out.glacial_meltwater_m3_s[i] = sv * 1.0e6 / static_cast<double>(f.hosing.cells.size());
+    }
     if (f.coupled) {
         const auto& w = *f.coupled;
-        std::size_t k = 0;
-        while (k + 1 < w.elapsed.size() && w.elapsed[k + 1] <= mid) ++k;
-        out.wind_stress_east_pa = w.stress_east[k];
-        out.wind_stress_north_pa = w.stress_north[k];
-        out.target_temperature_k = w.temperature[k];
+        const auto at = frame_weight(w.elapsed, mid, w.linear);
+        out.wind_stress_east_pa = w.stress_east[at.first];
+        out.wind_stress_north_pa = w.stress_north[at.first];
+        out.target_temperature_k = w.temperature[at.first];
+        if (at.second > 0.0) {
+            for (std::size_t i = 0; i < count; ++i) {
+                out.wind_stress_east_pa[i] = sample(w.stress_east, at, i);
+                out.wind_stress_north_pa[i] = sample(w.stress_north, at, i);
+                out.target_temperature_k[i] = sample(w.temperature, at, i);
+            }
+        }
     }
     for (const auto& r : f.rivers) {
         RiverSource s = r.source;
@@ -568,6 +1080,117 @@ OceanForcing forcing_at(const ForcingRequest& f, double elapsed, double dt, cons
         const double speed = std::sqrt(tau / (f.air_density * f.drag_coefficient));
         wind_east[i] = speed * out.wind_stress_east_pa[i] / tau;
         wind_north[i] = speed * out.wind_stress_north_pa[i] / tau;
+    }
+    auto cell_east = [&](std::size_t i) { return g.origin_east_m + (static_cast<double>(i % g.nx) + 0.5) * g.spacing_east_m; };
+    auto cell_north = [&](std::size_t i) { return g.origin_north_m + (static_cast<double>(i / g.nx) + 0.5) * g.spacing_north_m; };
+    // Rain: moving Gaussian (or uniform) events plus the coupled precipitation; explicit event temperatures
+    // are blended by their share of the rain, the rest takes the default rain temperature set below.
+    std::vector<double> explicit_rain(count, 0.0), explicit_heat(count, 0.0);
+    if (f.rain.enabled) {
+        out.rain_m_s.assign(count, 0.0);
+        out.rain_temperature_k.assign(count, 0.0);
+        if (f.rain.coupled) {
+            const auto& a = *f.rain.coupled;
+            const auto at = frame_weight(a.elapsed, mid, a.linear);
+            for (std::size_t i = 0; i < count; ++i) out.rain_m_s[i] += std::max(0.0, sample(a.rain_mm_h, at, i)) / 3.6e6;
+        }
+        for (const auto& e : f.rain.events) {
+            if (mid < e.start_seconds || mid >= e.start_seconds + e.duration_seconds) continue;
+            const double ce = e.east_m + e.velocity_east_m_s * (mid - e.start_seconds), cn = e.north_m + e.velocity_north_m_s * (mid - e.start_seconds);
+            for (std::size_t i = 0; i < count; ++i) {
+                double weight = 1.0;
+                if (e.radius_m) {
+                    const double de = cell_east(i) - ce, dn = cell_north(i) - cn;
+                    weight = std::exp(-(de * de + dn * dn) / (*e.radius_m * *e.radius_m));
+                }
+                const double rate = e.rate_mm_h * weight / 3.6e6;
+                out.rain_m_s[i] += rate;
+                if (e.temperature_k) { explicit_rain[i] += rate; explicit_heat[i] += rate * *e.temperature_k; }
+            }
+        }
+        for (std::size_t i = 0; i < count; ++i) {
+            const double scale = out.rain_m_s[i] > 500.0 / 3.6e6 ? (500.0 / 3.6e6) / out.rain_m_s[i] : 1.0;
+            out.rain_m_s[i] *= scale;
+            explicit_rain[i] *= scale;
+            explicit_heat[i] *= scale;
+        }
+    }
+    // Air-sea atmosphere: coupled fields or the analytic air (target + offset + diurnal cycle + air masses).
+    if (f.air_sea.enabled) {
+        const auto& a = f.air_sea;
+        out.air_temperature_k.assign(count, 0.0);
+        out.air_specific_humidity_kg_kg.assign(count, 0.0);
+        out.surface_pressure_pa.assign(count, a.pressure_pa);
+        out.wind_speed_m_s.assign(count, 0.0);
+        out.cloud_fraction.assign(count, 0.0);
+        out.shortwave_down_w_m2.assign(count, 0.0);
+        const double epoch = f.start_epoch_seconds + mid, days = std::floor(epoch / 86400.0);
+        const double utc_hour = (epoch - days * 86400.0) / 3600.0;
+        const double day_of_year = fractional_day_of_year(static_cast<std::int64_t>(days), utc_hour);
+        const double lat0 = g.geographic_anchor_latitude_deg, lon0 = g.geographic_anchor_longitude_deg;
+        for (std::size_t i = 0; i < count; ++i) {
+            const double lat = lat0 + cell_north(i) / 111195.0, lon = lon0 + cell_east(i) / (111195.0 * std::cos(lat0 * kPi / 180.0));
+            const double frac = (static_cast<double>(i / g.nx) + 0.5) / static_cast<double>(g.ny);
+            double ta, rh = a.relative_humidity_south + (a.relative_humidity_north - a.relative_humidity_south) * frac, cloud = a.cloud_south + (a.cloud_north - a.cloud_south) * frac;
+            double q = -1.0, pressure = a.pressure_pa, wind = std::hypot(wind_east[i], wind_north[i]);
+            if (a.coupled) {
+                const auto& ca = *a.coupled;
+                const auto at = frame_weight(ca.elapsed, mid, ca.linear);
+                ta = sample(ca.air_temperature, at, i);
+                pressure = ca.pressure[i];
+                if (ca.has_humidity) q = sample(ca.specific_humidity, at, i);
+                if (ca.has_cloud) cloud = sample(ca.cloud, at, i);
+                wind = sample(ca.wind_speed, at, i);
+                if (ca.has_storm_wind) {
+                    // The vortex speed is known but not its direction: it enters the fluxes and the mixing, not the momentum.
+                    const double storm = sample(ca.storm_wind, at, i);
+                    wind = std::sqrt(wind * wind + storm * storm);
+                    if (out.mixing_stress_pa.empty()) out.mixing_stress_pa.assign(count, 0.0);
+                    out.mixing_stress_pa[i] = std::min(20.0, std::max(std::hypot(out.wind_stress_east_pa[i], out.wind_stress_north_pa[i]), f.air_density * f.drag_coefficient * wind * wind));
+                }
+            } else {
+                const double local_hour = std::fmod(utc_hour + lon / 15.0 + 48.0, 24.0);
+                const double seasonal_amplitude = a.seasonal_amplitude_south_k + (a.seasonal_amplitude_north_k - a.seasonal_amplitude_south_k) * frac;
+                ta = out.target_temperature_k[i] + a.air_temperature_offset_k + a.diurnal_amplitude_k * std::cos(2.0 * kPi * (local_hour - 15.0) / 24.0)
+                     + seasonal_amplitude * std::cos(2.0 * kPi * (day_of_year - 196.0) / 365.25);
+                for (const auto& m : a.air_masses) {
+                    if (mid < m.start_seconds || mid >= m.start_seconds + m.duration_seconds) continue;
+                    const double de = cell_east(i) - (m.east_m + m.velocity_east_m_s * (mid - m.start_seconds)), dn = cell_north(i) - (m.north_m + m.velocity_north_m_s * (mid - m.start_seconds));
+                    const double w = std::exp(-(de * de + dn * dn) / (m.radius_m * m.radius_m));
+                    ta += m.temperature_anomaly_k * w;
+                    if (m.relative_humidity) rh += (*m.relative_humidity - rh) * w;
+                }
+            }
+            // Rain moistens and clouds the analytic air; a coupled atmosphere carries its own humidity and cloud.
+            if (!a.coupled && f.rain.enabled && a.rain_saturates_air && out.rain_m_s[i] > 0.1 / 3.6e6) {
+                rh = std::max(rh, 0.95);
+                cloud = std::max(cloud, 0.9);
+            }
+            ta = std::min(330.0, std::max(200.0, ta));
+            if (q < 0.0) q = std::min(1.0, std::max(0.05, rh)) * saturation_specific_humidity_kg_kg(ta, pressure);
+            q = std::min(q, 0.049);
+            out.air_temperature_k[i] = ta;
+            out.air_specific_humidity_kg_kg[i] = q;
+            out.surface_pressure_pa[i] = pressure;
+            out.wind_speed_m_s[i] = std::min(80.0, wind);
+            out.cloud_fraction[i] = std::min(1.0, std::max(0.0, cloud));
+            out.shortwave_down_w_m2[i] = a.shortwave_kind == "constant" ? a.shortwave_w_m2
+                : std::min(1400.0, surface_shortwave_w_m2(solar_cosine_zenith(lat, lon, day_of_year, utc_hour), vapour_pressure_pa(q, pressure), out.cloud_fraction[i]));
+        }
+    }
+    // Default rain temperature: coupled wet bulb, the wet bulb of the air-sea atmosphere, or the target + offset.
+    if (f.rain.enabled) {
+        std::pair<std::size_t, double> at{0, 0.0};
+        const bool coupled_wet_bulb = f.rain.coupled && f.rain.coupled->has_wet_bulb;
+        if (coupled_wet_bulb) at = frame_weight(f.rain.coupled->elapsed, mid, f.rain.coupled->linear);
+        for (std::size_t i = 0; i < count; ++i) {
+            double fallback = out.target_temperature_k[i] + f.rain.temperature_offset_k;
+            if (coupled_wet_bulb) fallback = sample(f.rain.coupled->wet_bulb, at, i);
+            else if (f.air_sea.enabled) fallback = wet_bulb_temperature_k(out.air_temperature_k[i], out.air_specific_humidity_kg_kg[i], out.surface_pressure_pa[i]);
+            fallback = std::min(320.0, std::max(250.0, fallback));
+            const double rest = out.rain_m_s[i] - explicit_rain[i];
+            out.rain_temperature_k[i] = out.rain_m_s[i] > 0.0 ? (explicit_heat[i] + std::max(0.0, rest) * fallback) / (explicit_rain[i] + std::max(0.0, rest)) : fallback;
+        }
     }
     return out;
 }
@@ -620,6 +1243,560 @@ Json frame_json(const OceanState& s, const OceanDiagnostics& d, const OceanConfi
     (void)c;
 }
 
+// ---- Land ice sheet coupled to the ocean ---------------------------------------------------------------
+
+struct IceSheetCoupling {
+    bool enabled{false};
+    IceSheetConfig config;
+    std::vector<double> initial_thickness;
+    double precipitation_m_we_yr{0.4}, precipitation_reference_k{263.15}, precipitation_per_k{0.07};
+    double front_depth_m{300.0};
+    std::size_t step_every{24};
+    Json provenance;
+};
+
+// ---- Carbon: atmospheric CO2 over the region and the ocean's carbon, oxygen and habitability -----------------
+
+struct Co2Source {
+    std::string name;
+    double east_m{0.0}, north_m{0.0}, radius_m{1.0}, mt_co2_per_year{0.0};
+};
+
+struct CarbonCoupling {
+    bool enabled{false};
+    MarineBgcConfig bgc;
+    AtmosphericCo2Config atmosphere;
+    std::vector<double> background_years, background_ppm;
+    std::vector<Co2Source> sources;
+    std::vector<double> emission_mol_m2_s;         // static per cell
+    double photosynthesis_umol_per_j{0.0};          // land uptake per joule of PAR (umol CO2 per J)
+    double respiration_umol_m2_s{0.0};
+    RiverChemistry river_default;
+    std::vector<RiverChemistry> river_chemistry;    // per river, in request order
+    std::size_t step_every{4};
+    Json provenance;
+    double background(double year) const {
+        if (year <= background_years.front()) return background_ppm.front();
+        if (year >= background_years.back()) return background_ppm.back();
+        std::size_t k = 1;
+        while (background_years[k] < year) ++k;
+        const double w = (year - background_years[k - 1]) / (background_years[k] - background_years[k - 1]);
+        return background_ppm[k - 1] + (background_ppm[k] - background_ppm[k - 1]) * w;
+    }
+};
+
+MarineTracerProfile parse_profile(const Json& j, MarineTracerProfile p) {
+    p.surface = optional_number(j, "surface", p.surface);
+    p.deep = optional_number(j, "deep", p.deep);
+    p.scale_m = optional_number(j, "scale_m", p.scale_m);
+    return p;
+}
+
+RiverChemistry parse_river_chemistry(const Json& j, RiverChemistry r) {
+    r.nitrate_umol_kg = optional_number(j, "nitrate_umol_kg", r.nitrate_umol_kg);
+    r.dic_umol_kg = optional_number(j, "dic_umol_kg", r.dic_umol_kg);
+    r.alkalinity_umol_kg = optional_number(j, "alkalinity_umol_kg", r.alkalinity_umol_kg);
+    r.oxygen_saturation = optional_number(j, "oxygen_saturation", r.oxygen_saturation);
+    if (r.nitrate_umol_kg < 0.0 || r.nitrate_umol_kg > 2000.0 || r.dic_umol_kg < 0.0 || r.dic_umol_kg > 6000.0 || r.alkalinity_umol_kg <= 0.0 || r.alkalinity_umol_kg > 6000.0 ||
+        r.oxygen_saturation < 0.0 || r.oxygen_saturation > 2.0) {
+        throw std::invalid_argument("river chemistry out of range");
+    }
+    return r;
+}
+
+CarbonCoupling parse_carbon(const Json& request, const OceanConfig& c, const std::vector<double>& elevation) {
+    CarbonCoupling out;
+    if (!request.contains("biogeochemistry") && !request.contains("atmosphere_co2")) return out;
+    if (!request.contains("biogeochemistry") || !request.contains("atmosphere_co2")) throw std::invalid_argument("biogeochemistry and atmosphere_co2 go together");
+    if (c.thermal.count < 2) throw std::invalid_argument("biogeochemistry needs the layered column (thermal_layers)");
+    out.enabled = true;
+    const Json& j = required(request, "biogeochemistry");
+    auto& b = out.bgc;
+    b.grid = c.grid;
+    b.sea = c.ocean;
+    const std::size_t count = c.ocean.size();
+    b.seafloor_depth_m.assign(count, 0.0);
+    const double floor_min = optional_number(j, "minimum_depth_m", 5.0);
+    for (std::size_t i = 0; i < count; ++i) if (c.ocean[i]) b.seafloor_depth_m[i] = std::max(floor_min, -elevation[i]);
+    // The ocean's sponge is the open boundary of the chemistry too: it exchanges water with the ocean outside.
+    if (!c.sponge.empty()) { b.open_boundary = c.sponge; for (std::size_t i = 0; i < count; ++i) if (!c.ocean[i]) b.open_boundary[i] = 0.0; }
+    b.open_boundary_time_s = c.physics.sponge_time_scale_s;
+    b.level_bottoms_m.clear();
+    for (const Json& v : required(j, "levels_m")) {
+        if (!v.is_number()) throw std::invalid_argument("biogeochemistry.levels_m must hold numbers");
+        b.level_bottoms_m.push_back(v.get<double>());
+    }
+    if (j.contains("step_every")) out.step_every = required_positive_size(j, "step_every");
+    const Json profiles = j.value("profiles", Json::object());
+    b.dic = parse_profile(profiles.value("dic", Json::object()), b.dic);
+    b.alkalinity = parse_profile(profiles.value("alkalinity", Json::object()), b.alkalinity);
+    b.oxygen = parse_profile(profiles.value("oxygen", Json::object()), b.oxygen);
+    b.nitrate = parse_profile(profiles.value("nitrate", Json::object()), b.nitrate);
+    if (j.contains("surface_dic_from_atmosphere")) b.surface_dic_from_atmosphere = required(j, "surface_dic_from_atmosphere").get<bool>();
+    const Json bio = j.value("biology", Json::object());
+    read_into(bio, "max_growth_per_day", b.max_growth_per_day);
+    read_into(bio, "max_production_umol_n_kg_day", b.max_production_umol_n_kg_day);
+    read_into(bio, "nitrate_half_saturation_umol_kg", b.nitrate_half_saturation_umol_kg);
+    read_into(bio, "light_half_saturation_w_m2", b.light_half_saturation_w_m2);
+    read_into(bio, "par_fraction", b.par_fraction);
+    read_into(bio, "light_attenuation_per_m", b.light_attenuation_per_m);
+    read_into(bio, "martin_exponent", b.martin_exponent);
+    read_into(bio, "rain_ratio", b.rain_ratio);
+    const Json tr = j.value("transport", Json::object());
+    read_into(tr, "horizontal_diffusivity_m2_s", b.horizontal_diffusivity_m2_s);
+    read_into(tr, "vertical_diffusivity_m2_s", b.vertical_diffusivity_m2_s);
+    read_into(tr, "ventilation_depth_m", b.ventilation_depth_m);
+    if (tr.contains("ventilation_time_years")) b.ventilation_time_s = required_number(tr, "ventilation_time_years") * 365.25 * 86400.0;
+    const Json hab = j.value("habitat", Json::object());
+    read_into(hab, "hypoxia_umol_kg", b.hypoxia_umol_kg);
+    read_into(hab, "anoxia_umol_kg", b.anoxia_umol_kg);
+    read_into(hab, "corrosive_omega", b.corrosive_omega);
+    read_into(hab, "dead_zone_column_fraction", b.dead_zone_column_fraction);
+    const Json met = hab.value("metabolic", Json::object());
+    read_into(met, "critical_po2_kpa", b.metabolic.critical_po2_kpa);
+    read_into(met, "reference_temperature_k", b.metabolic.reference_temperature_k);
+    read_into(met, "temperature_sensitivity_ev", b.metabolic.temperature_sensitivity_ev);
+    read_into(met, "ecological_threshold", b.metabolic.ecological_threshold);
+    validate_bgc_config(b);
+    out.river_default = parse_river_chemistry(j.value("river_chemistry", Json::object()), out.river_default);
+    const Json forcing = request.value("forcing", Json::object());
+    for (const Json& r : forcing.value("rivers", Json::array())) out.river_chemistry.push_back(r.contains("chemistry") ? parse_river_chemistry(r.at("chemistry"), out.river_default) : out.river_default);
+    // The air.
+    const Json& a = required(request, "atmosphere_co2");
+    auto& at = out.atmosphere;
+    at.grid = c.grid;
+    read_into(a, "boundary_layer_height_m", at.boundary_layer_height_m);
+    if (a.contains("ventilation_hours")) at.ventilation_time_s = required_number(a, "ventilation_hours") * 3600.0;
+    read_into(a, "horizontal_diffusivity_m2_s", at.horizontal_diffusivity_m2_s);
+    validate_atmospheric_co2(at);
+    for (const Json& p : required(a, "background_ppm")) {
+        if (!p.is_array() || p.size() != 2 || !p[0].is_number() || !p[1].is_number()) throw std::invalid_argument("atmosphere_co2.background_ppm points must be [year, ppm]");
+        const double year = p[0].get<double>(), ppm = p[1].get<double>();
+        if ((!out.background_years.empty() && year <= out.background_years.back()) || ppm < 100.0 || ppm > 5000.0) throw std::invalid_argument("atmosphere_co2.background_ppm: increasing years and 100-5000 ppm");
+        out.background_years.push_back(year);
+        out.background_ppm.push_back(ppm);
+    }
+    if (out.background_years.empty()) throw std::invalid_argument("atmosphere_co2.background_ppm needs at least one point");
+    const Json land = a.value("land", Json::object());
+    out.photosynthesis_umol_per_j = optional_number(land, "photosynthesis_umol_per_j", 0.02);
+    out.respiration_umol_m2_s = optional_number(land, "respiration_umol_m2_s", 1.0);
+    if (out.photosynthesis_umol_per_j < 0.0 || out.photosynthesis_umol_per_j > 1.0 || out.respiration_umol_m2_s < 0.0 || out.respiration_umol_m2_s > 50.0) throw std::invalid_argument("atmosphere_co2.land rates out of range");
+    const auto& g = c.grid;
+    const double area = g.spacing_east_m * g.spacing_north_m;
+    out.emission_mol_m2_s.assign(count, 0.0);
+    Json sources = Json::array();
+    for (const Json& src : a.value("sources", Json::array())) {
+        Co2Source cs;
+        cs.name = optional_string(src, "name", "source");
+        cs.east_m = required_number(src, "east_m");
+        cs.north_m = required_number(src, "north_m");
+        cs.radius_m = required_number(src, "radius_m");
+        cs.mt_co2_per_year = required_number(src, "mt_co2_per_year");
+        if (!(cs.radius_m > 0.0) || cs.mt_co2_per_year < 0.0 || cs.mt_co2_per_year > 1.0e4) throw std::invalid_argument("CO2 sources need a positive radius and 0-10000 Mt CO2/yr");
+        // Spread as a Gaussian over the cells, normalised so the total is the source's emission.
+        std::vector<double> weight(count, 0.0);
+        double total = 0.0;
+        std::size_t peak = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            const double de = g.origin_east_m + (static_cast<double>(i % g.nx) + 0.5) * g.spacing_east_m - cs.east_m;
+            const double dn = g.origin_north_m + (static_cast<double>(i / g.nx) + 0.5) * g.spacing_north_m - cs.north_m;
+            weight[i] = std::exp(-(de * de + dn * dn) / (cs.radius_m * cs.radius_m));
+            total += weight[i];
+            if (weight[i] > weight[peak]) peak = i;
+        }
+        if (!(total > 0.0) || weight[peak] < 1.0e-6) throw std::invalid_argument("CO2 source " + cs.name + " lies outside the grid");
+        const double mol_s = cs.mt_co2_per_year * 1.0e12 / 44.01 / (365.25 * 86400.0);
+        for (std::size_t i = 0; i < count; ++i) out.emission_mol_m2_s[i] += mol_s * weight[i] / total / area;
+        sources.push_back({{"name", cs.name}, {"east_m", cs.east_m}, {"north_m", cs.north_m}, {"radius_m", cs.radius_m}, {"mt_co2_per_year", cs.mt_co2_per_year}, {"peak_cell", peak}});
+        out.sources.push_back(cs);
+    }
+    Json background = Json::array();
+    for (std::size_t k = 0; k < out.background_years.size(); ++k) background.push_back({out.background_years[k], out.background_ppm[k]});
+    Json levels = Json::array();
+    for (double v : b.level_bottoms_m) levels.push_back(v);
+    std::size_t open_cells = 0;
+    for (double v : b.open_boundary) if (v > 0.0) ++open_cells;
+    Json rivers = Json::array();
+    for (std::size_t r = 0; r < out.river_chemistry.size(); ++r) {
+        const RiverChemistry& rc = out.river_chemistry[r];
+        rivers.push_back({{"river", r}, {"nitrate_umol_kg", rc.nitrate_umol_kg}, {"dic_umol_kg", rc.dic_umol_kg}, {"alkalinity_umol_kg", rc.alkalinity_umol_kg}, {"oxygen_saturation", rc.oxygen_saturation}});
+    }
+    out.provenance = {{"levels_m", levels}, {"step_every", out.step_every},
+                      {"river_chemistry", rivers},
+                      {"open_boundary", {{"cells", open_cells}, {"relaxation_days", b.open_boundary_time_s / 86400.0}, {"source", open_cells ? "the ocean's sponge" : "none (closed basin)"}}}, {"background_ppm", background}, {"sources", sources},
+                      {"boundary_layer_height_m", at.boundary_layer_height_m}, {"ventilation_hours", at.ventilation_time_s / 3600.0}, {"horizontal_diffusivity_m2_s", at.horizontal_diffusivity_m2_s},
+                      {"land", {{"photosynthesis_umol_per_j", out.photosynthesis_umol_per_j}, {"respiration_umol_m2_s", out.respiration_umol_m2_s}}},
+                      {"biology", {{"max_growth_per_day", b.max_growth_per_day}, {"max_production_umol_n_kg_day", b.max_production_umol_n_kg_day}, {"nitrate_half_saturation_umol_kg", b.nitrate_half_saturation_umol_kg},
+                                   {"light_half_saturation_w_m2", b.light_half_saturation_w_m2}, {"par_fraction", b.par_fraction}, {"light_attenuation_per_m", b.light_attenuation_per_m},
+                                   {"martin_exponent", b.martin_exponent}, {"rain_ratio", b.rain_ratio}, {"carbon_to_nitrogen", b.carbon_to_nitrogen}, {"oxygen_to_nitrogen", b.oxygen_to_nitrogen}}},
+                      {"transport", {{"horizontal_diffusivity_m2_s", b.horizontal_diffusivity_m2_s}, {"vertical_diffusivity_m2_s", b.vertical_diffusivity_m2_s}, {"ventilation_depth_m", b.ventilation_depth_m},
+                                     {"ventilation_time_years", b.ventilation_time_s / (365.25 * 86400.0)}}},
+                      {"habitat", {{"hypoxia_umol_kg", b.hypoxia_umol_kg}, {"anoxia_umol_kg", b.anoxia_umol_kg}, {"corrosive_omega", b.corrosive_omega}, {"dead_zone_column_fraction", b.dead_zone_column_fraction},
+                                   {"metabolic", {{"critical_po2_kpa", b.metabolic.critical_po2_kpa}, {"reference_temperature_k", b.metabolic.reference_temperature_k},
+                                                  {"temperature_sensitivity_ev", b.metabolic.temperature_sensitivity_ev}, {"ecological_threshold", b.metabolic.ecological_threshold}}}}},
+                      {"profiles", {{"dic", {{"surface", b.dic.surface}, {"deep", b.dic.deep}, {"scale_m", b.dic.scale_m}}}, {"alkalinity", {{"surface", b.alkalinity.surface}, {"deep", b.alkalinity.deep}, {"scale_m", b.alkalinity.scale_m}}},
+                                    {"oxygen", {{"surface", b.oxygen.surface}, {"deep", b.oxygen.deep}, {"scale_m", b.oxygen.scale_m}}}, {"nitrate", {{"surface", b.nitrate.surface}, {"deep", b.nitrate.deep}, {"scale_m", b.nitrate.scale_m}}},
+                                    {"surface_dic_from_atmosphere", b.surface_dic_from_atmosphere}}}};
+    return out;
+}
+
+// Calendar year (decimal) of a model time.
+double calendar_year(double epoch_seconds) { return 1970.0 + epoch_seconds / (365.2425 * 86400.0); }
+
+// The ocean state as the biogeochemistry sees it: temperature and salinity interpolated onto its levels (the
+// deep water below the active layer), the mixed layer, the current, the air and the rivers with their chemistry.
+MarineBgcForcing bgc_forcing(const CarbonCoupling& cc, const OceanState& s, const OceanForcing& f, const OceanConfig& c, const std::vector<double>& co2_ppm) {
+    const std::size_t count = c.ocean.size(), L = cc.bgc.level_bottoms_m.size(), layers = c.thermal.count;
+    const std::vector<double> sigma = thermal_layer_fractions(c);
+    MarineBgcForcing out;
+    out.temperature_k.assign(count * L, 288.15);
+    out.salinity_psu.assign(count * L, c.initial_salinity_psu);
+    out.mixed_layer_depth_m.assign(count, 0.0);
+    out.current_east_m_s.assign(count, 0.0);
+    out.current_north_m_s.assign(count, 0.0);
+    out.active_layer_thickness_m.assign(count, 0.0);
+    out.wind_speed_m_s.assign(count, 0.0);
+    out.shortwave_w_m2.assign(count, 0.0);
+    out.atmospheric_pco2_uatm.assign(count, 400.0);
+    if (c.sea_ice.enabled) out.ice_fraction = s.ice_concentration;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (!c.ocean[i]) continue;
+        for (std::size_t k = 0; k < L; ++k) {
+            const double z = level_top_m(cc.bgc, k) + 0.5 * (cc.bgc.level_bottoms_m[k] - level_top_m(cc.bgc, k));
+            double t = c.physics.deep_temperature_k, sal = c.physics.deep_salinity_psu, top = 0.0;
+            for (std::size_t m = 0; m < layers; ++m) {
+                const double bottom = top + sigma[m] * s.thickness_m[i];
+                if (z < bottom) { t = s.layer_temperature_k[i * layers + m]; sal = s.layer_salinity_psu[i * layers + m]; break; }
+                top = bottom;
+            }
+            out.temperature_k[i * L + k] = std::min(313.0, std::max(271.2, t));
+            out.salinity_psu[i * L + k] = std::min(45.0, std::max(0.0, sal));
+        }
+        out.mixed_layer_depth_m[i] = s.mixed_layer_depth_m.empty() ? c.physics.mixed_layer_depth_m : s.mixed_layer_depth_m[i];
+        out.current_east_m_s[i] = s.u_centre_m_s[i];
+        out.current_north_m_s[i] = s.v_centre_m_s[i];
+        out.active_layer_thickness_m[i] = s.thickness_m[i];
+        out.wind_speed_m_s[i] = f.wind_speed_m_s.empty() ? 5.0 : f.wind_speed_m_s[i];
+        out.shortwave_w_m2[i] = f.shortwave_down_w_m2.empty() ? 0.0 : f.shortwave_down_w_m2[i];
+        const double pressure = f.surface_pressure_pa.empty() ? 101325.0 : f.surface_pressure_pa[i];
+        out.atmospheric_pco2_uatm[i] = co2_ppm[i] * pressure / 101325.0 * 0.98;   // dry-air mole fraction in moist air at the surface
+    }
+    for (std::size_t r = 0; r < f.rivers.size(); ++r) {
+        MarineBgcRiver river;
+        river.cell = f.rivers[r].cell;
+        river.discharge_m3_s = f.rivers[r].discharge_m3_s;
+        river.chemistry = r < cc.river_chemistry.size() ? cc.river_chemistry[r] : cc.river_default;
+        out.rivers.push_back(river);
+    }
+    return out;
+}
+
+AtmosphericCo2Forcing co2_forcing(const CarbonCoupling& cc, const OceanForcing& f, const OceanConfig& c, const std::vector<double>& wind_east, const std::vector<double>& wind_north,
+                                  const MarineBgcState& bgc, double year) {
+    const std::size_t count = c.ocean.size();
+    AtmosphericCo2Forcing out;
+    out.background_ppm = cc.background(year);
+    out.wind_east_m_s = wind_east;
+    out.wind_north_m_s = wind_north;
+    out.emission_mol_m2_s = cc.emission_mol_m2_s;
+    out.land_uptake_mol_m2_s.assign(count, 0.0);
+    out.ocean_uptake_mol_m2_s.assign(count, 0.0);
+    for (std::size_t i = 0; i < count; ++i) {
+        if (c.ocean[i]) { out.ocean_uptake_mol_m2_s[i] = bgc.co2_flux_mol_m2_s.empty() ? 0.0 : bgc.co2_flux_mol_m2_s[i]; continue; }
+        // Land: photosynthesis in the light minus respiration (net ecosystem exchange).
+        const double par = (f.shortwave_down_w_m2.empty() ? 0.0 : f.shortwave_down_w_m2[i]) * 0.43;
+        out.land_uptake_mol_m2_s[i] = (cc.photosynthesis_umol_per_j * par - cc.respiration_umol_m2_s) * 1.0e-6;
+    }
+    return out;
+}
+
+Json carbon_frame_json(const CarbonCoupling& cc, const MarineBgcState& b, const AtmosphericCo2State& a, const MarineBgcForcing& bf, const OceanConfig& c, double year, double background,
+                       const MarineBgcState& start) {
+    const std::size_t count = c.ocean.size(), L = cc.bgc.level_bottoms_m.size();
+    const MarineHabitat h = assess_habitat(b, bf, cc.bgc);
+    const double year_s = 365.25 * 86400.0, area = c.grid.spacing_east_m * c.grid.spacing_north_m, mt = 44.01e-12;
+    auto sea_array = [&](const std::vector<double>& v, double scale, int digits) {
+        Json out = Json::array();
+        for (std::size_t i = 0; i < count; ++i) out.push_back(c.ocean[i] ? tidy(v[i] * scale, digits) : 0.0);
+        return out;
+    };
+    Json column_class = Json::array(), dead = Json::array();
+    double ocean_ppm = 0.0, land_ppm = 0.0, max_ppm = 0.0, uptake = 0.0, production = 0.0;
+    std::size_t nsea = 0, nland = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        column_class.push_back(h.column_class[i]);
+        if (c.ocean[i] && h.dead_zone[i]) dead.push_back(i);
+        if (c.ocean[i]) { ocean_ppm += a.ppm[i]; ++nsea; uptake += b.co2_flux_mol_m2_s[i] * area; production += b.production_mol_c_m2_s[i] * area; }
+        else { land_ppm += a.ppm[i]; ++nland; }
+        max_ppm = std::max(max_ppm, a.ppm[i]);
+    }
+    Json level_o2 = Json::array(), level_ph = Json::array(), level_omega = Json::array(), level_class = Json::array();
+    for (std::size_t k = 0; k < L; ++k) {
+        Json o = Json::array(), p = Json::array(), w = Json::array(), cl = Json::array();
+        for (std::size_t i = 0; i < count; ++i) {
+            const std::size_t ik = i * L + k;
+            const bool present = c.ocean[i] && k < b.levels[i];
+            o.push_back(present ? tidy(b.oxygen[ik], 3) : 0.0);
+            p.push_back(present ? tidy(h.level_ph[ik], 4) : 0.0);
+            w.push_back(present ? tidy(h.level_omega_aragonite[ik], 3) : 0.0);
+            cl.push_back(present ? h.level_class[ik] : -1);
+        }
+        level_o2.push_back(o); level_ph.push_back(p); level_omega.push_back(w); level_class.push_back(cl);
+    }
+    Json surface_nitrate = Json::array();
+    for (std::size_t i = 0; i < count; ++i) surface_nitrate.push_back(c.ocean[i] ? tidy(b.nitrate[i * L], 3) : 0.0);
+    const double sea_km2 = std::max(h.sea_area_km2, 1e-9);
+    return {
+        {"year", tidy(year, 7)},
+        {"atmosphere", {{"co2_ppm", tidy_array(a.ppm, 5)}, {"background_ppm", tidy(background, 5)}, {"max_ppm", tidy(max_ppm, 5)},
+                        {"ocean_mean_ppm", tidy(nsea ? ocean_ppm / nsea : 0.0, 5)}, {"land_mean_ppm", tidy(nland ? land_ppm / nland : 0.0, 5)},
+                        {"emitted_mt_co2", tidy(a.emitted_mol * mt, 5)}, {"land_uptake_mt_co2", tidy(a.land_uptake_mol * mt, 5)}, {"ocean_uptake_mt_co2", tidy(a.ocean_uptake_mol * mt, 5)},
+                        {"ventilation_mt_co2", tidy(a.ventilation_mol * mt, 5)}, {"transport_mt_co2", tidy(a.transport_mol * mt, 5)},
+                        {"background_shift_mt_co2", tidy(a.background_shift_mol * mt, 5)}, {"excess_mt_co2", tidy(a.inventory_excess_mol * mt, 5)}}},
+        {"ocean", {
+            {"co2_flux_mol_m2_yr", sea_array(b.co2_flux_mol_m2_s, year_s, 4)}, {"surface_pco2_uatm", sea_array(h.surface_pco2_uatm, 1.0, 5)},
+            {"surface_ph", sea_array(h.surface_ph, 1.0, 5)}, {"surface_omega_aragonite", sea_array(h.surface_omega_aragonite, 1.0, 4)}, {"bottom_omega_aragonite", sea_array(h.bottom_omega_aragonite, 1.0, 4)},
+            {"bottom_oxygen_umol_kg", sea_array(h.bottom_oxygen_umol_kg, 1.0, 4)}, {"minimum_oxygen_umol_kg", sea_array(h.minimum_oxygen_umol_kg, 1.0, 4)},
+            {"minimum_oxygen_depth_m", sea_array(h.minimum_oxygen_depth_m, 1.0, 4)}, {"habitable_fraction", sea_array(h.habitable_fraction, 1.0, 3)},
+            {"production_g_c_m2_day", sea_array(b.production_mol_c_m2_s, 12.011 * 86400.0, 4)}, {"surface_nitrate_umol_kg", surface_nitrate},
+            {"column_class", column_class}, {"dead_zone_cells", dead},
+            {"level_oxygen_umol_kg", level_o2}, {"level_ph", level_ph}, {"level_omega_aragonite", level_omega}, {"level_class", level_class},
+            {"totals", {{"sea_area_km2", tidy(h.sea_area_km2, 6)}, {"dead_zone_area_km2", tidy(h.dead_zone_area_km2, 6)}, {"anoxic_area_km2", tidy(h.anoxic_area_km2, 6)},
+                        {"corrosive_area_km2", tidy(h.corrosive_area_km2, 6)}, {"volume_km3", tidy(h.volume_km3, 6)}, {"hypoxic_volume_km3", tidy(h.hypoxic_volume_km3, 6)},
+                        {"habitable_volume_pct", tidy(h.habitable_volume_km3 / std::max(h.volume_km3, 1e-9) * 100.0, 5)}, {"dead_zone_pct", tidy(h.dead_zone_area_km2 / sea_km2 * 100.0, 5)},
+                        {"mean_surface_ph", tidy(h.mean_surface_ph, 5)}, {"mean_surface_omega_aragonite", tidy(h.mean_surface_omega_aragonite, 5)},
+                        {"uptake_mt_co2_yr", tidy(uptake * year_s * mt, 5)}, {"production_mt_c_yr", tidy(production * year_s * 12.011e-12, 5)}}},
+            {"budget", {{"carbon_inventory_mol", b.carbon_inventory_mol}, {"carbon_change_mol", b.carbon_inventory_mol - start.carbon_inventory_mol},
+                        {"air_sea_carbon_mol", b.air_sea_carbon_mol}, {"river_carbon_mol", b.river_carbon_mol}, {"export_carbon_mol", b.export_carbon_mol},
+                        {"ventilation_carbon_mol", b.ventilation_carbon_mol}, {"boundary_carbon_mol", b.boundary_carbon_mol}, {"transport_carbon_mol", b.transport_carbon_mol},
+                        {"nitrogen_change_mol", b.nitrogen_inventory_mol - start.nitrogen_inventory_mol}, {"river_nitrogen_mol", b.river_nitrogen_mol}, {"export_nitrogen_mol", b.export_nitrogen_mol},
+                        {"ventilation_nitrogen_mol", b.ventilation_nitrogen_mol}, {"boundary_nitrogen_mol", b.boundary_nitrogen_mol}, {"denitrified_nitrogen_mol", b.denitrified_nitrogen_mol},
+                        {"transport_nitrogen_mol", b.transport_nitrogen_mol},
+                        {"oxygen_change_mol", b.oxygen_inventory_mol - start.oxygen_inventory_mol}, {"air_sea_oxygen_mol", b.air_sea_oxygen_mol}, {"river_oxygen_mol", b.river_oxygen_mol},
+                        {"ventilation_oxygen_mol", b.ventilation_oxygen_mol}, {"boundary_oxygen_mol", b.boundary_oxygen_mol}, {"transport_oxygen_mol", b.transport_oxygen_mol},
+                        {"sulfidic_oxygen_demand_mol", b.sulfidic_oxygen_demand_mol}}},
+        }},
+    };
+}
+
+IceSheetCoupling parse_ice_sheet(const Json& request, const OceanConfig& c, const std::vector<double>& elevation) {
+    IceSheetCoupling out;
+    if (!request.contains("ice_sheet")) return out;
+    const Json& j = required(request, "ice_sheet");
+    out.enabled = true;
+    auto& cfg = out.config;
+    cfg.grid = c.grid;
+    cfg.ocean = c.ocean;
+    const std::size_t count = c.ocean.size();
+    cfg.bed_elevation_m.resize(count);
+    for (std::size_t i = 0; i < count; ++i) cfg.bed_elevation_m[i] = c.ocean[i] ? std::min(0.0, elevation[i]) : std::max(0.0, elevation[i]);
+    const Json& region = required(j, "region");
+    const double ce = required_number(region, "center_east_m"), cn = required_number(region, "center_north_m");
+    const double ae = required_number(region, "radius_east_m"), an = required_number(region, "radius_north_m");
+    if (!(ae > 0.0 && an > 0.0)) throw std::invalid_argument("ice_sheet.region radii must be positive");
+    cfg.ice_domain.assign(count, 0);
+    std::size_t cells = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        const double e = c.grid.origin_east_m + (static_cast<double>(i % c.grid.nx) + 0.5) * c.grid.spacing_east_m - ce;
+        const double n = c.grid.origin_north_m + (static_cast<double>(i / c.grid.nx) + 0.5) * c.grid.spacing_north_m - cn;
+        if (!c.ocean[i] && std::hypot(e / ae, n / an) < 1.0) { cfg.ice_domain[i] = 1; ++cells; }
+    }
+    if (cells == 0) throw std::invalid_argument("ice_sheet.region holds no land cell");
+    if (j.contains("physics")) {
+        const Json& ph = required(j, "physics");
+        auto& q = cfg.physics;
+        read_into(ph, "rate_factor_pa3_s", q.rate_factor_pa3_s);
+        if (ph.contains("degree_day_factor_snow_mm_k_day")) q.degree_day_factor_snow_m_k_s = required_number(ph, "degree_day_factor_snow_mm_k_day") / 1000.0 / 86400.0;
+        if (ph.contains("degree_day_factor_ice_mm_k_day")) q.degree_day_factor_ice_m_k_s = required_number(ph, "degree_day_factor_ice_mm_k_day") / 1000.0 / 86400.0;
+        read_into(ph, "pdd_standard_deviation_k", q.pdd_standard_deviation_k);
+        read_into(ph, "refreezing_fraction", q.refreezing_fraction);
+        read_into(ph, "lapse_rate_k_m", q.lapse_rate_k_m);
+        read_into(ph, "front_water_depth_m", q.front_water_depth_m);
+        read_into(ph, "marine_front_fraction", q.marine_front_fraction);
+    }
+    validate_ice_sheet_config(cfg);
+    const Json& dome = required(j, "initial_dome");
+    const auto thickness = elliptical_dome(cfg, optional_number(dome, "center_east_m", ce), optional_number(dome, "center_north_m", cn), optional_number(dome, "radius_east_m", ae),
+                                           optional_number(dome, "radius_north_m", an), required_number(dome, "center_thickness_m"));
+    out.initial_thickness.assign(count, 0.0);
+    for (std::size_t i = 0; i < count; ++i) if (cfg.ice_domain[i]) out.initial_thickness[i] = thickness[i];
+    out.precipitation_m_we_yr = optional_number(j, "precipitation_m_we_yr", out.precipitation_m_we_yr);
+    out.precipitation_reference_k = optional_number(j, "precipitation_reference_k", out.precipitation_reference_k);
+    out.precipitation_per_k = optional_number(j, "precipitation_per_k", out.precipitation_per_k);
+    out.front_depth_m = optional_number(j, "front_depth_m", out.front_depth_m);
+    if (j.contains("step_every")) out.step_every = required_positive_size(j, "step_every");
+    if (out.precipitation_m_we_yr < 0.0 || out.precipitation_m_we_yr > 5.0 || out.precipitation_per_k < 0.0 || out.precipitation_per_k > 0.2 || out.front_depth_m < 0.0 || out.front_depth_m > 2000.0 || out.step_every > 1000) {
+        throw std::invalid_argument("ice_sheet precipitation, front depth or step_every out of range");
+    }
+    out.provenance = {{"region", {{"center_east_m", ce}, {"center_north_m", cn}, {"radius_east_m", ae}, {"radius_north_m", an}}}, {"cells", cells},
+                      {"bed", "terrain elevation of the region's land cells"}, {"initial_center_thickness_m", required_number(dome, "center_thickness_m")},
+                      {"precipitation_m_we_yr", out.precipitation_m_we_yr}, {"precipitation_reference_k", out.precipitation_reference_k}, {"precipitation_per_k", out.precipitation_per_k},
+                      {"front_depth_m", out.front_depth_m}, {"step_every", out.step_every},
+                      {"coupling", "air temperature of the air-sea forcing over the land, reduced by the lapse rate to the ice surface; ocean thermal forcing at the front depth from the layered column; meltwater liquid at 0 degC, icebergs and frontal melt as ice melting in the top layer"}};
+    return out;
+}
+
+// Ocean thermal forcing at the glacier fronts: temperature above the local freezing point in the layer that
+// holds the front depth (the bulk layer for the slab).
+std::vector<double> front_thermal_forcing(const OceanState& s, const OceanConfig& c, double depth) {
+    const std::size_t count = c.ocean.size(), layers = c.thermal.count >= 2 ? c.thermal.count : 0;
+    std::vector<double> tf(count, 0.0);
+    const std::vector<double> sigma = layers ? thermal_layer_fractions(c) : std::vector<double>{};
+    for (std::size_t i = 0; i < count; ++i) {
+        if (!c.ocean[i]) continue;
+        double t = s.temperature_k[i], sal = s.salinity_psu[i], z = std::min(depth, s.thickness_m[i]);
+        if (layers) {
+            double top = 0.0;
+            for (std::size_t k = 0; k < layers; ++k) {
+                const double bottom = top + sigma[k] * s.thickness_m[i];
+                if (z <= bottom || k + 1 == layers) { t = s.layer_temperature_k[i * layers + k]; sal = s.layer_salinity_psu[i * layers + k]; break; }
+                top = bottom;
+            }
+        }
+        tf[i] = std::min(30.0, std::max(-5.0, t - seawater_freezing_point_k(sal, z)));
+    }
+    return tf;
+}
+
+// The snowfall scales with the annual-mean air (the surface-temperature target plus the air offset, with warming but
+// without the seasonal and daily cycles) so that the seasons do not move the snow into the summer; a coupled
+// atmosphere has no separate annual mean and its air temperature is used.
+IceSheetForcing ice_sheet_forcing(const IceSheetCoupling& ice, const IceSheetState& state, const OceanForcing& air, const OceanState& ocean, const OceanConfig& c, const ForcingRequest& request) {
+    const bool analytic_air = request.air_sea.enabled && !request.air_sea.coupled;
+    const std::size_t count = c.ocean.size();
+    IceSheetForcing f;
+    f.air_temperature_k.assign(count, 273.15);
+    f.precipitation_m_s.assign(count, 0.0);
+    for (std::size_t i = 0; i < count; ++i) {
+        const double ta = air.air_temperature_k.empty() ? air.target_temperature_k[i] : air.air_temperature_k[i];
+        f.air_temperature_k[i] = std::min(330.0, std::max(180.0, ta));
+        if (c.ocean[i]) continue;
+        const double annual = analytic_air ? air.target_temperature_k[i] + request.air_sea.air_temperature_offset_k : ta;
+        const double surface_t = annual - ice.config.physics.lapse_rate_k_m * std::max(0.0, state.surface_elevation_m[i]);
+        double p = ice.precipitation_m_we_yr * std::exp(ice.precipitation_per_k * (surface_t - ice.precipitation_reference_k)) / (365.25 * 86400.0);
+        if (!air.rain_m_s.empty()) p += air.rain_m_s[i];
+        f.precipitation_m_s[i] = std::min(1.0e-5, p);
+    }
+    f.ocean_thermal_forcing_k = front_thermal_forcing(ocean, c, ice.front_depth_m);
+    return f;
+}
+
+// Mean of a per-cell field over the sea.
+double sea_mean(const std::vector<double>& v, const std::vector<unsigned char>& water) {
+    long double sum = 0.0L;
+    std::size_t n = 0;
+    for (std::size_t i = 0; i < v.size(); ++i) if (water[i]) { sum += v[i]; ++n; }
+    return n ? static_cast<double>(sum / n) : 0.0;
+}
+
+Json sea_array(const std::vector<double>& v, const std::vector<unsigned char>& water, double scale = 1.0, int digits = 4) {
+    Json out = Json::array();
+    for (std::size_t i = 0; i < v.size(); ++i) out.push_back(water[i] ? tidy(v[i] * scale, digits) : 0.0);
+    return out;
+}
+
+// The extension blocks of one frame: rain and coastal runoff, the air-sea exchange, the layered column,
+// the surface lenses and the heat budget.
+void add_extension_blocks(Json& frame, const OceanState& s, const OceanDiagnostics& d, const OceanForcing& f, const OceanConfig& c, bool air_sea, bool rain, bool polar, double heat_error) {
+    const std::size_t count = c.grid.nx * c.grid.ny;
+    const auto& water = c.ocean;
+    if (rain) {
+        Json rate = Json::array(), store = Json::array();
+        double max_rate = 0.0;
+        std::size_t raining_sea = 0, raining_land = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            const double mm_h = f.rain_m_s.empty() ? 0.0 : f.rain_m_s[i] * 3.6e6;
+            rate.push_back(tidy(mm_h, 4));
+            store.push_back(water[i] ? 0.0 : tidy(s.coastal_store_m[i] * 1000.0, 4));
+            max_rate = std::max(max_rate, mm_h);
+            if (mm_h > 0.1) ++(water[i] ? raining_sea : raining_land);
+        }
+        frame["rain"] = {
+            {"rate_mm_h", rate}, {"coastal_store_mm", store}, {"coastal_inflow_m3_s", sea_array(s.coastal_inflow_m3_s, water)},
+            {"rain_on_sea_m3_s", tidy(s.rain_sea_m3_s, 5)}, {"rain_on_coastal_sea_m3_s", tidy(s.rain_coastal_sea_m3_s, 5)}, {"rain_on_coast_m3_s", tidy(s.rain_coast_m3_s, 5)},
+            {"rain_inland_m3_s", tidy(s.rain_inland_m3_s, 5)}, {"coastal_runoff_m3_s", tidy(s.coastal_runoff_m3_s, 5)}, {"coastal_loss_m3_s", tidy(s.coastal_loss_m3_s, 5)},
+            {"coastal_storage_m3", s.coastal_storage_m3}, {"coastal_balance_error_m3", s.coastal_balance_error_m3},
+            {"max_rate_mm_h", tidy(max_rate, 5)}, {"raining_sea_cells", raining_sea}, {"raining_land_cells", raining_land},
+        };
+    }
+    if (air_sea) {
+        Json rh = Json::array(), evaporation = Json::array();
+        double max_evaporation = 0.0;
+        for (std::size_t i = 0; i < count; ++i) {
+            rh.push_back(tidy(relative_humidity_fraction(f.air_temperature_k[i], f.air_specific_humidity_kg_kg[i], f.surface_pressure_pa[i]), 3));
+            evaporation.push_back(water[i] ? tidy(s.evaporation_m_s[i] * 8.64e7, 3) : 0.0);
+            if (water[i]) max_evaporation = std::max(max_evaporation, s.evaporation_m_s[i] * 8.64e7);
+        }
+        // The air temperature and the 10 m wind are the forecast frame's fields; the incoming shortwave is
+        // shortwave_w_m2 / (1 - albedo). Fluxes carry three significant digits (about 1 W/m2).
+        frame["air_sea"] = {
+            {"relative_humidity", rh}, {"cloud_fraction", tidy_array(f.cloud_fraction, 3)},
+            {"shortwave_w_m2", sea_array(s.shortwave_w_m2, water, 1.0, 3)}, {"longwave_w_m2", sea_array(s.longwave_w_m2, water, 1.0, 3)}, {"sensible_w_m2", sea_array(s.sensible_w_m2, water, 1.0, 3)},
+            {"latent_w_m2", sea_array(s.latent_w_m2, water, 1.0, 3)}, {"rain_heat_w_m2", sea_array(s.rain_heat_w_m2, water, 1.0, 3)}, {"net_heat_w_m2", sea_array(s.net_heat_w_m2, water, 1.0, 3)},
+            {"evaporation_mm_day", evaporation}, {"evaporation_m3_s", tidy(s.evaporation_m3_s, 5)},
+            {"mean_evaporation_mm_day", tidy(sea_mean(s.evaporation_m_s, water) * 8.64e7, 5)}, {"max_evaporation_mm_day", tidy(max_evaporation, 5)},
+            {"mean_shortwave_w_m2", tidy(sea_mean(s.shortwave_w_m2, water), 5)}, {"mean_longwave_w_m2", tidy(sea_mean(s.longwave_w_m2, water), 5)},
+            {"mean_sensible_w_m2", tidy(sea_mean(s.sensible_w_m2, water), 5)}, {"mean_latent_w_m2", tidy(sea_mean(s.latent_w_m2, water), 5)},
+            {"mean_rain_heat_w_m2", tidy(sea_mean(s.rain_heat_w_m2, water), 5)}, {"mean_net_heat_w_m2", tidy(sea_mean(s.net_heat_w_m2, water), 5)},
+        };
+    }
+    if (c.thermal.count >= 2) {
+        const std::size_t layers = c.thermal.count;
+        Json temperature = Json::array(), salinity = Json::array();
+        for (std::size_t k = 0; k < layers; ++k) {
+            Json t = Json::array(), sal = Json::array();
+            for (std::size_t i = 0; i < count; ++i) {
+                t.push_back(water[i] ? tidy(s.layer_temperature_k[i * layers + k], 5) : 0.0);
+                sal.push_back(water[i] ? tidy(s.layer_salinity_psu[i * layers + k], 5) : 0.0);
+            }
+            temperature.push_back(std::move(t));
+            salinity.push_back(std::move(sal));
+        }
+        frame["thermal"] = {
+            {"layer_temperature_k", temperature}, {"layer_salinity_psu", salinity}, {"sst_k", sea_array(s.sst_k, water, 1.0, 5)},
+            {"mixed_layer_depth_m", sea_array(s.mixed_layer_depth_m, water)}, {"isothermal_layer_depth_m", sea_array(s.isothermal_layer_depth_m, water)},
+            {"mean_sst_k", tidy(d.mean_sst_k, 5)}, {"min_sst_k", tidy(d.min_sst_k, 5)}, {"max_sst_k", tidy(d.max_sst_k, 5)},
+            {"mean_mixed_layer_depth_m", tidy(d.mean_mixed_layer_depth_m, 5)}, {"max_mixed_layer_depth_m", tidy(d.max_mixed_layer_depth_m, 5)}, {"barrier_layer_cells", d.barrier_layer_cells},
+        };
+    }
+    Json lenses = Json::array();
+    for (std::size_t k = 0; k < d.lenses.size() && k < 20; ++k) {
+        const auto& l = d.lenses[k];
+        lenses.push_back({{"kind", l.kind}, {"source_shares", {{"rain", tidy(l.rain_share, 3)}, {"coastal_runoff", tidy(l.coastal_runoff_share, 3)}, {"river", tidy(l.river_share, 3)}}}, {"freshest_cell", l.freshest_cell}, {"cells", l.cell_count}, {"area_km2", tidy(l.area_m2 / 1.0e6, 5)}, {"min_surface_salinity_psu", tidy(l.minimum_surface_salinity_psu, 5)},
+                          {"max_deficit_psu", tidy(l.maximum_deficit_psu, 5)}, {"freshwater_m3", tidy(l.freshwater_m3, 5)}, {"mean_sst_k", tidy(l.mean_sst_k, 5)}});
+    }
+    frame["surface_lenses"] = lenses;
+    frame["heat_budget"] = {{"heat_content_j", s.heat_content_j}, {"heat_balance_error_j", heat_error}, {"surface_heat_w", tidy(s.surface_heat_w, 5)}, {"cumulative_surface_heat_j", s.cumulative_surface_heat_j}};
+    frame["cumulative_m3"]["rain_sea"] = s.cumulative_rain_sea_m3;
+    frame["cumulative_m3"]["rain_coast"] = s.cumulative_rain_coast_m3;
+    frame["cumulative_m3"]["rain_inland"] = s.cumulative_rain_inland_m3;
+    frame["cumulative_m3"]["coastal_runoff"] = s.cumulative_coastal_runoff_m3;
+    frame["cumulative_m3"]["coastal_loss"] = s.cumulative_coastal_loss_m3;
+    frame["cumulative_m3"]["evaporation"] = s.cumulative_evaporation_m3;
+    if (c.sea_ice.enabled) {
+        double extent = 0.0;
+        const double area = c.grid.spacing_east_m * c.grid.spacing_north_m;
+        for (std::size_t i = 0; i < count; ++i) if (water[i] && s.ice_concentration[i] > 0.15) extent += area;
+        Json surface = Json::array();
+        for (std::size_t i = 0; i < count; ++i) surface.push_back(water[i] && s.ice_concentration[i] > 0.0 ? tidy(s.ice_surface_temperature_k[i], 5) : 0.0);
+        frame["sea_ice"] = {{"ice_thickness_m", sea_array(s.ice_thickness_m, water, 1.0, 4)}, {"ice_concentration", sea_array(s.ice_concentration, water, 1.0, 3)}, {"ice_surface_temperature_k", surface}, {"ocean_to_ice_heat_w_m2", sea_array(s.ocean_to_ice_heat_w_m2, water, 1.0, 3)},
+                            {"ice_drift_east_m_s", sea_array(s.ice_drift_east_m_s, water, 1.0, 3)}, {"ice_drift_north_m_s", sea_array(s.ice_drift_north_m_s, water, 1.0, 3)},
+                            {"ice_area_km2", tidy(s.ice_area_m2 / 1.0e6, 5)}, {"ice_extent_km2", tidy(extent / 1.0e6, 5)}, {"ice_volume_km3", tidy(s.ice_volume_m3 / 1.0e9, 5)},
+                            {"ice_water_m3_s", tidy(s.ice_water_m3_s, 5)}, {"cumulative_ice_water_m3", s.cumulative_ice_water_m3}};
+    }
+    if (!polar) return;
+    if (c.thermal.count >= 2) {
+        Json oxygen = Json::array();
+        for (std::size_t i = 0; i < count; ++i) oxygen.push_back(water[i] ? tidy(oxygen_solubility_umol_kg(std::min(313.0, std::max(270.2, s.sst_k[i])), std::min(42.0, s.surface_salinity_psu[i])), 4) : 0.0);
+        frame["thermal"]["surface_oxygen_umol_kg"] = oxygen;
+    }
+    // Glacial fresh water (ice-sheet meltwater, icebergs, hosing) is a fourth lens source in polar runs.
+    for (std::size_t k = 0; k < frame["surface_lenses"].size(); ++k) frame["surface_lenses"][k]["source_shares"]["glacial"] = tidy(d.lenses[k].glacial_share, 3);
+    frame["glacial"] = {{"meltwater_m3_s", tidy(s.glacial_meltwater_m3_s, 5)}, {"ice_m3_s", tidy(s.glacial_ice_m3_s, 5)}, {"cumulative_m3", s.cumulative_glacial_m3}};
+    frame["cumulative_m3"]["ice_water"] = s.cumulative_ice_water_m3;
+    frame["cumulative_m3"]["glacial"] = s.cumulative_glacial_m3;
+}
+
 Json forecast_frame_json(const std::vector<double>& temperature, const std::vector<double>& wind_east, const std::vector<double>& wind_north, double elapsed, const TimeRequest& time, const TransportGrid2D& grid) {
     return {
         {"schema_version", "terraflux.weather.forecast/v1"},
@@ -658,30 +1835,145 @@ int main(int argc, char** argv) {
         TimeRequest time;
         std::vector<double> elevation;
         Json basin_provenance;
-        const OceanConfig config = parse_config(request, time, elevation, basin_provenance);
-        const ForcingRequest forcing = parse_forcing(request, config);
-        OceanState state = initialize_ocean(config);
+        OceanConfig config = parse_config(request, time, elevation, basin_provenance);
+        const ForcingRequest forcing = parse_forcing(request, config, time);
+        const bool air_sea = forcing.air_sea.enabled, rain = forcing.rain.enabled, layers = config.thermal.count >= 2;
+        const IceSheetCoupling ice = parse_ice_sheet(request, config, elevation);
+        const CarbonCoupling carbon = parse_carbon(request, config, elevation);
+        if (carbon.enabled && !forcing.air_sea.enabled) throw std::invalid_argument("biogeochemistry needs forcing.air_sea (wind, sunshine, air pressure)");
+        const bool polar = config.sea_ice.enabled || ice.enabled || forcing.hosing.enabled || forcing.warming.enabled;
+        const bool extended = air_sea || rain || layers || polar;
         std::vector<double> wind_east, wind_north;
+        if (time.initial_sst_from_target) {
+            // The column starts from the surface-temperature target of the first interval.
+            const OceanForcing first = forcing_at(forcing, -static_cast<double>(time.spinup_steps) * config.timestep_seconds, config.timestep_seconds, config, wind_east, wind_north);
+            config.initial_surface_temperature_k = first.target_temperature_k;
+            for (std::size_t i = 0; i < config.ocean.size(); ++i) config.initial_surface_temperature_k[i] = std::min(310.0, std::max(270.0, config.initial_surface_temperature_k[i]));
+            validate_ocean_config(config);
+        }
+        OceanState state = initialize_ocean(config);
 
+        // The land ice sheet steps every `step_every` ocean steps; its meltwater and ice feed the ocean in between.
+        const std::size_t count = config.ocean.size();
+        IceSheetState ice_state;
+        std::vector<double> ice_liquid(count, 0.0), ice_solid(count, 0.0), smb_sum(count, 0.0), melt_sum(count, 0.0);
+        double ice_interval = 0.0;
+        if (ice.enabled) ice_state = initialize_ice_sheet(ice.config, ice.initial_thickness);
+        // Carbon: the air's CO2 and the ocean's carbon, oxygen and nitrate step every `step_every` ocean steps.
+        MarineBgcState bgc_state, carbon_start;
+        AtmosphericCo2State co2_state;
+        if (carbon.enabled) {
+            const double t0 = -static_cast<double>(time.spinup_steps) * config.timestep_seconds;
+            const OceanForcing first = forcing_at(forcing, t0, config.timestep_seconds, config, wind_east, wind_north);
+            co2_state = initialize_atmospheric_co2(carbon.atmosphere, carbon.background(calendar_year(forcing.start_epoch_seconds + t0)));
+            bgc_state = initialize_bgc(carbon.bgc, bgc_forcing(carbon, state, first, config, co2_state.ppm));
+        }
+        std::size_t global_step = 0;
+        // Sea-air CO2 flux and production are reported as means over the interval since the previous frame (both
+        // follow the sun).
+        std::vector<double> co2_flux_sum(count, 0.0), production_sum(count, 0.0);
+        double carbon_interval = 0.0;
+        auto step = [&](double elapsed) {
+            OceanForcing f = forcing_at(forcing, elapsed, config.timestep_seconds, config, wind_east, wind_north);
+            if (ice.enabled) {
+                if (global_step % ice.step_every == 0) {
+                    const double span = static_cast<double>(ice.step_every) * config.timestep_seconds;
+                    ice_state = advance_ice_sheet(ice_state, ice_sheet_forcing(ice, ice_state, f, state, config, forcing), ice.config, span);
+                    for (std::size_t i = 0; i < count; ++i) {
+                        ice_liquid[i] = std::max(0.0, ice_state.runoff_to_sea_m3_s[i] - ice_state.frontal_melt_to_sea_m3_s[i]);
+                        ice_solid[i] = ice_state.icebergs_to_sea_m3_s[i] + ice_state.frontal_melt_to_sea_m3_s[i];
+                        smb_sum[i] += ice_state.smb_m_s[i] * span;
+                        melt_sum[i] += ice_state.melt_m_s[i] * span;
+                    }
+                    ice_interval += span;
+                }
+                if (f.glacial_meltwater_m3_s.empty()) f.glacial_meltwater_m3_s.assign(count, 0.0);
+                f.glacial_ice_m3_s.assign(count, 0.0);
+                for (std::size_t i = 0; i < count; ++i) { f.glacial_meltwater_m3_s[i] += ice_liquid[i]; f.glacial_ice_m3_s[i] = ice_solid[i]; }
+            }
+            state = advance_ocean(state, f, config);
+            ++global_step;
+            if (carbon.enabled && global_step % carbon.step_every == 0) {
+                const double span = static_cast<double>(carbon.step_every) * config.timestep_seconds;
+                const double year = calendar_year(forcing.start_epoch_seconds + elapsed + config.timestep_seconds);
+                co2_state = advance_atmospheric_co2(co2_state, co2_forcing(carbon, f, config, wind_east, wind_north, bgc_state, year), carbon.atmosphere, span);
+                bgc_state = advance_bgc(bgc_state, bgc_forcing(carbon, state, f, config, co2_state.ppm), carbon.bgc, span);
+                for (std::size_t i = 0; i < count; ++i) { co2_flux_sum[i] += bgc_state.co2_flux_mol_m2_s[i] * span; production_sum[i] += bgc_state.production_mol_c_m2_s[i] * span; }
+                carbon_interval += span;
+            }
+            return f;
+        };
         // Spin-up (not recorded): the gyres need the Rossby-wave crossing time to establish.
         for (std::size_t k = 0; k < time.spinup_steps; ++k) {
-            const double elapsed = -static_cast<double>(time.spinup_steps - k) * config.timestep_seconds;
-            state = advance_ocean(state, forcing_at(forcing, elapsed, config.timestep_seconds, config, wind_east, wind_north), config);
+            if (k + time.snapshot_every == time.spinup_steps) { std::fill(co2_flux_sum.begin(), co2_flux_sum.end(), 0.0); std::fill(production_sum.begin(), production_sum.end(), 0.0); carbon_interval = 0.0; }
+            step(-static_cast<double>(time.spinup_steps - k) * config.timestep_seconds);
         }
+        if (ice.enabled) { ice_state.cumulative_sea_level_rise_m = 0.0; ice_state.cumulative_freshwater_m3 = 0.0; std::fill(smb_sum.begin(), smb_sum.end(), 0.0); std::fill(melt_sum.begin(), melt_sum.end(), 0.0); ice_interval = 0.0; }
+        const double initial_ice_volume = ice.enabled ? ice_state.volume_m3 : 0.0;
         state.elapsed_seconds = 0.0;
         state.cumulative_river_m3 = state.cumulative_net_precipitation_m3 = state.cumulative_sinking_m3 = state.cumulative_sponge_m3 = 0.0;
-        const double initial_volume = state.volume_m3, initial_salt = state.salt_kg;
+        state.cumulative_rain_sea_m3 = state.cumulative_rain_coast_m3 = state.cumulative_rain_inland_m3 = 0.0;
+        state.cumulative_coastal_runoff_m3 = state.cumulative_coastal_loss_m3 = state.cumulative_evaporation_m3 = state.cumulative_surface_heat_j = 0.0;
+        state.cumulative_ice_water_m3 = state.cumulative_glacial_m3 = 0.0;
+        const double initial_volume = state.volume_m3, initial_salt = state.salt_kg, initial_heat = state.heat_content_j, initial_store = state.coastal_storage_m3;
+        if (carbon.enabled) {
+            // The carbon budgets count from the end of the spin-up.
+            for (double* v : {&bgc_state.air_sea_carbon_mol, &bgc_state.river_carbon_mol, &bgc_state.export_carbon_mol, &bgc_state.ventilation_carbon_mol, &bgc_state.air_sea_oxygen_mol,
+                              &bgc_state.river_oxygen_mol, &bgc_state.ventilation_oxygen_mol, &bgc_state.sulfidic_oxygen_demand_mol, &bgc_state.river_nitrogen_mol, &bgc_state.export_nitrogen_mol,
+                              &bgc_state.ventilation_nitrogen_mol, &bgc_state.denitrified_nitrogen_mol, &bgc_state.transport_carbon_mol, &bgc_state.transport_nitrogen_mol, &bgc_state.transport_oxygen_mol,
+                              &bgc_state.boundary_carbon_mol, &bgc_state.boundary_nitrogen_mol, &bgc_state.boundary_oxygen_mol, &co2_state.emitted_mol, &co2_state.land_uptake_mol, &co2_state.ocean_uptake_mol, &co2_state.ventilation_mol, &co2_state.transport_mol, &co2_state.background_shift_mol}) *v = 0.0;
+            carbon_start = bgc_state;
+        }
+        const double initial_co2_excess = co2_state.inventory_excess_mol;
 
         Json frames = Json::array(), ocean_frames = Json::array();
         OceanForcing current = forcing_at(forcing, 0.0, config.timestep_seconds, config, wind_east, wind_north);
+        double heat_error = 0.0;   // largest per-step heat-budget error since the previous frame
         auto record = [&]() {
-            frames.push_back(forecast_frame_json(current.target_temperature_k, wind_east, wind_north, state.elapsed_seconds, time, config.grid));
-            ocean_frames.push_back(frame_json(state, diagnose_ocean(state, current, config), config));
+            frames.push_back(forecast_frame_json(air_sea ? current.air_temperature_k : current.target_temperature_k, wind_east, wind_north, state.elapsed_seconds, time, config.grid));
+            const OceanDiagnostics diagnostics = diagnose_ocean(state, current, config);
+            Json frame = frame_json(state, diagnostics, config);
+            if (extended) add_extension_blocks(frame, state, diagnostics, current, config, air_sea, rain, polar, heat_error);
+            if (forcing.hosing.enabled) frame["hosing_sv"] = tidy(hosing_sv(forcing.hosing, state.elapsed_seconds - 0.5 * config.timestep_seconds), 5);
+            if (ice.enabled) {
+                const double per_year = ice_interval > 0.0 ? 365.25 * 86400.0 / ice_interval : 0.0;
+                Json smb = Json::array(), melt = Json::array();
+                double smb_total = 0.0;
+                const double area = config.grid.spacing_east_m * config.grid.spacing_north_m;
+                for (std::size_t i = 0; i < count; ++i) { smb.push_back(tidy(smb_sum[i] * per_year, 3)); melt.push_back(tidy(melt_sum[i] * per_year, 3)); if (ice.config.ice_domain[i] || ice_state.thickness_m[i] > 0.0) smb_total += smb_sum[i] * per_year * area; }
+                const auto tf = front_thermal_forcing(state, config, ice.front_depth_m);
+                double tf_sum = 0.0;
+                std::size_t fronts = 0;
+                for (std::size_t i = 0; i < count; ++i) if (ice_solid[i] > 0.0 || ice_liquid[i] > 0.0) { tf_sum += tf[i]; ++fronts; }
+                frame["ice_sheet"] = {{"ice_thickness_m", tidy_array(ice_state.thickness_m, 4)}, {"surface_elevation_m", tidy_array(ice_state.surface_elevation_m, 4)},
+                                      {"smb_m_ice_yr", smb}, {"melt_m_ice_yr", melt}, {"volume_m3", ice_state.volume_m3}, {"sea_level_equivalent_m", tidy(ice_state.sea_level_equivalent_m, 5)},
+                                      {"sea_level_rise_m", tidy((initial_ice_volume - ice_state.volume_m3) * ice.config.physics.ice_density_kg_m3 / ice.config.physics.fresh_water_density_kg_m3 / ice.config.physics.global_ocean_area_m2, 5)},
+                                      {"runoff_m3_s", tidy(ice_state.runoff_m3_s, 5)}, {"calving_m3_s", tidy(ice_state.calving_m3_s, 5)}, {"frontal_ablation_m3_s", tidy(ice_state.frontal_ablation_m3_s, 5)},
+                                      {"smb_gt_yr", tidy(smb_total * 917.0 / 1.0e12, 5)}, {"mean_front_thermal_forcing_k", fronts ? tidy(tf_sum / static_cast<double>(fronts), 4) : 0.0}};
+                std::fill(smb_sum.begin(), smb_sum.end(), 0.0);
+                std::fill(melt_sum.begin(), melt_sum.end(), 0.0);
+                ice_interval = 0.0;
+            }
+            if (carbon.enabled) {
+                const double year = calendar_year(forcing.start_epoch_seconds + state.elapsed_seconds);
+                MarineBgcState reported = bgc_state;
+                if (carbon_interval > 0.0) {
+                    for (std::size_t i = 0; i < count; ++i) { reported.co2_flux_mol_m2_s[i] = co2_flux_sum[i] / carbon_interval; reported.production_mol_c_m2_s[i] = production_sum[i] / carbon_interval; }
+                }
+                frame["carbon"] = carbon_frame_json(carbon, reported, co2_state, bgc_forcing(carbon, state, current, config, co2_state.ppm), config, year, carbon.background(year), carbon_start);
+                frame["carbon"]["ocean"]["averaging_hours"] = tidy(carbon_interval / 3600.0, 5);
+                std::fill(co2_flux_sum.begin(), co2_flux_sum.end(), 0.0);
+                std::fill(production_sum.begin(), production_sum.end(), 0.0);
+                carbon_interval = 0.0;
+                frame["carbon"]["atmosphere"]["initial_excess_mt_co2"] = tidy(initial_co2_excess * 44.01e-12, 5);
+            }
+            ocean_frames.push_back(std::move(frame));
+            heat_error = 0.0;
         };
         record();
         for (std::size_t k = 0; k < time.steps; ++k) {
-            current = forcing_at(forcing, state.elapsed_seconds, config.timestep_seconds, config, wind_east, wind_north);
-            state = advance_ocean(state, current, config);
+            current = step(state.elapsed_seconds);
+            if (std::abs(state.heat_balance_error_j) > std::abs(heat_error)) heat_error = state.heat_balance_error_j;
             if ((k + 1) % time.snapshot_every == 0 || k + 1 == time.steps) record();
         }
 
@@ -714,6 +2006,57 @@ int main(int argc, char** argv) {
                 {"frames", ocean_frames},
             }},
         };
+        if (extended) {
+            Json& ocean = output["ocean"];
+            Json processes = Json::array();
+            if (rain) processes.push_back("rain");
+            if (rain && config.coastal.band_m > 0.0) processes.push_back("coastal_runoff");
+            if (air_sea) processes.push_back("air_sea");
+            if (layers) processes.push_back("thermal_layers");
+            if (config.sea_ice.enabled) processes.push_back("sea_ice");
+            if (ice.enabled) processes.push_back("ice_sheet");
+            if (forcing.warming.enabled) processes.push_back("warming");
+            if (forcing.hosing.enabled) processes.push_back("hosing");
+            if (carbon.enabled) { processes.push_back("biogeochemistry"); processes.push_back("atmosphere_co2"); }
+            if (config.sea_ice.enabled) {
+                const auto& ip = config.sea_ice.physics;
+                ocean["request"]["physics"]["sea_ice"] = {{"initial_thickness_m", config.sea_ice.initial_thickness_m}, {"initial_concentration", config.sea_ice.initial_concentration},
+                    {"initial_band_k", config.sea_ice.initial_band_k}, {"albedo_cold", ip.albedo_cold}, {"albedo_melting", ip.albedo_melting}, {"conductivity_w_m_k", ip.conductivity_w_m_k},
+                    {"ice_salinity_psu", ip.ice_salinity_psu}, {"minimum_thickness_m", ip.minimum_thickness_m}, {"new_ice_thickness_m", ip.new_ice_thickness_m},
+                    {"heat_transfer_coefficient", ip.heat_transfer_coefficient}, {"friction_velocity_m_s", ip.friction_velocity_m_s}, {"maximum_concentration", ip.maximum_concentration},
+                    {"drift", config.sea_ice.drift}, {"wind_drift_factor", config.sea_ice.wind_drift_factor}, {"wind_turning_deg", config.sea_ice.wind_turning_deg}, {"maximum_drift_m_s", config.sea_ice.maximum_drift_m_s}, {"maximum_ridge_thickness_m", config.sea_ice.maximum_ridge_thickness_m}};
+            }
+            if (ice.enabled) {
+                Json domain = Json::array();
+                for (unsigned char v : ice.config.ice_domain) domain.push_back(v != 0);
+                ocean["ice_sheet"] = {{"domain", domain}, {"bed_elevation_m", tidy_array(ice.config.bed_elevation_m, 5)}, {"initial_volume_m3", initial_ice_volume},
+                                      {"initial_sea_level_equivalent_m", tidy(initial_ice_volume * 917.0 / 1000.0 / ice.config.physics.global_ocean_area_m2, 5)}, {"source", ice.provenance}};
+            }
+            ocean["processes"] = processes;
+            if (carbon.enabled) {
+                Json floor = Json::array();
+                for (std::size_t i = 0; i < count; ++i) floor.push_back(config.ocean[i] ? tidy(carbon.bgc.seafloor_depth_m[i], 4) : 0.0);
+                ocean["carbon"] = carbon.provenance;
+                ocean["carbon"]["seafloor_depth_m"] = floor;
+                ocean["carbon"]["method"] = "z_level_npzd_lite_carbonate_wanninkhof_metabolic_index";
+                ocean["carbon"]["emission_mol_m2_s"] = tidy_array(carbon.emission_mol_m2_s, 4);
+                ocean["carbon"]["initial_inventory_mol"] = {{"carbon", carbon_start.carbon_inventory_mol}, {"nitrogen", carbon_start.nitrogen_inventory_mol}, {"oxygen", carbon_start.oxygen_inventory_mol}};
+            }
+            ocean["initial_heat_content_j"] = initial_heat;
+            extension_config_json(ocean["request"], config, air_sea, rain, time);
+            if (layers) {
+                Json fractions = Json::array();
+                for (double v : thermal_layer_fractions(config)) fractions.push_back(v);
+                ocean["thermal_layers"] = {{"count", config.thermal.count}, {"fractions", fractions}, {"coordinate", "sigma fractions of the active-layer thickness, top first"}};
+            }
+            if (rain) {
+                Json receiver = Json::array();
+                const auto receivers = coastal_receivers(config);
+                for (std::size_t i = 0; i < receivers.size(); ++i) receiver.push_back(receivers[i] >= receivers.size() ? -1 : static_cast<long long>(receivers[i]));
+                ocean["coastal"] = {{"band_m", config.coastal.band_m}, {"runoff_coefficient", config.coastal.runoff_coefficient}, {"runoff_time_scale_s", config.coastal.runoff_time_scale_s},
+                                    {"receiver", receiver}, {"initial_storage_m3", initial_store}};
+            }
+        }
         std::ofstream output_file(output_path);
         if (!output_file) throw std::runtime_error("cannot write output: " + output_path);
         output_file << output.dump(2) << '\n';

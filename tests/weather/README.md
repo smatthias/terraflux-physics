@@ -90,12 +90,68 @@ The catchment hydrology suite (`weather.catchment_hydrology`, plus `weather.catc
 
 The ocean circulation suite (`weather.ocean_circulation`, plus `weather.ocean_circulation_cli` running the CLI on a coarse basin with rivers, a meltwater pulse, a catchment-fed river and coupled-wind forcing) covers: the Stommel/Sverdrup gyre on a β-plane (western boundary current carrying the Sverdrup transport within 30 %, interior balance, western intensification, gyre sense, stream detection with a northward core streamline, budgets) against the f-plane without intensification, the reference Stommel width and Sverdrup transport; exact river dilution and salt conservation, the surface freshwater content and surface salinity, exact evaporation/rain laws; plume deflection to the right (NH) and left (SH); deep-water formation in a cold north with uniform upwelling, budgets, the northward surface branch and a meltwater river weakening the overturning by more than 30 %; EOS and wind-stress helpers; contract rejections; and a pinned regression.
 
+The ocean heat and rain suite (`weather.ocean_heat_rain`, plus `weather.ocean_heat_rain_cli` running a re-timed version of the example and the ocean under the engine's hurricane run, and `weather.viewer_ocean_heat_rain` / `weather.viewer_ocean_streams` regenerating both ocean fixtures) covers: the bulk air-sea formulae against hand calculations (Dalton evaporation, latent heat = L_v E, sensible heat, Berliand longwave, gustiness floor, condensation, albedo); the sun's position and the Zillman/Reed shortwave; the sigma-layer geometry and the two-band shortwave penetration (each layer absorbs exactly its share); the initial thermocline; rain on the open sea (exact volume, salt conservation, a fresh, cool and stable rain lens that the wind erodes); coastal rain (receivers within the band, coastal/inland split, the land budget, the exact linear-reservoir recession, nearshore freshening); evaporation (volume loss, the concentration law, a saltier surface, cooling, humidity dependence); calm sunshine forming a shallow warm layer and Kraus–Turner wind mixing deepening it; bulk-Richardson shear mixing to the critical value; convective deepening under a cold-air outbreak; layer–bulk consistency under a gyre; deep-water formation under an outbreak and its suppression by a fresh rain cap; the legacy slab's heat budget; contract rejections; and a pinned regression. Every case checks the volume, salt and heat budgets at every step.
+
+The polar melt suite (`weather.polar_melt`) covers:
+
+- positive degree days (limits, quadrature);
+- Vialov and elliptic domes and routing to the nearest sea cell;
+- the ice-sheet surface mass balance: snowfall, ice and snow melt, refreezing, runoff only to the sea, the lapse-rate melt–elevation feedback;
+- flow that conserves ice, spreads the dome and never goes negative;
+- calving with the matching sea-level rise;
+- Rignot frontal melt and the retreat of the face;
+- the seawater freezing point and the sea-ice surface balance (closure, thin ice, summer melt, albedo);
+- sea-ice growth in a −30 °C winter with energy closure and brine rejection; open water freezing without supercooling;
+- the seasonal column from perennial to ice-free under warming, and thinning by Atlantic-water heat;
+- the overturning:
+  - Stommel's closed form and the calibration to 17 Sv, steady for a century;
+  - bistability, the collapse past the threshold, hysteresis and recovery only with net evaporation, a recovering sub-threshold pulse, polar amplification lowering the threshold;
+  - the recovery time growing towards the threshold and matching the decay of a perturbation;
+  - early-warning statistics and Kendall's τ;
+- oxygen solubility reference values;
+- the ocean kernel's sea ice (freezing over with brine rejection, summer melt, melt from below by warm water, free drift with Nansen turning by hemisphere, conservation, packing, ridging to the ridge thickness and melt over warm water) and glacial meltwater and icebergs (volume, no salt, latent cooling, a glacier lens), with volume, salt and heat budgets every step;
+- contract rejections.
+
+Related CTest cases:
+
+- `weather.polar_melt_cli` runs a fast variant of the polar melt CLI with every event, checking contract, identities, physics, schemas and rejections.
+- `weather.polar_ocean_cli` runs one year of the polar ocean example with hosing and warming against a control. It checks budgets with sea-ice and glacial water, map–total identities, the hosing ramp, a weaker next-winter overturning, a glacial lens and rejections.
+- `weather.viewer_polar_melt` and `weather.viewer_polar_ocean` regenerate the two fixtures and compare them. The latter takes about 5 minutes and has the label `slow`.
+
+The coastal flooding suite (`weather.coastal_flooding`) covers:
+
+- the sea-level budget (thermal expansion against its closed form, the glacier store, Antarctica above its threshold, reference year, fingerprints);
+- Gumbel return levels and how a rise shortens return periods;
+- wind setup against the exact uniform-depth solution, deeper seas setting up less and shallow shelves more;
+- flooding with connectivity (a ridge protecting a depression), defences holding until overtopped, subsidence;
+- storm attenuation inland;
+- rivers carrying the storm far inland, tidal reach and salt intrusion growing with the rise;
+- the Bruun rule on sandy but not rocky shores;
+- islands drowning monotonically, with people and regions adding up;
+- contract rejections.
+
+`weather.coastal_flooding_cli` runs the example and a per-cell request: contract, map–total identities, AR6-range rise, expected regional behaviour and rejections. `weather.viewer_coastal_flooding` regenerates the fixture.
+
+The ocean carbon suite (`weather.ocean_carbon`) covers:
+
+- the carbonate chemistry: the constants against published values at 25 °C and S 35, the alkalinity reconstructed to 10⁻⁶, equilibrium DIC, acidification on doubling CO₂ (−0.3 pH, −⅓ aragonite saturation), the Revelle factor and its rise, pCO₂ rising by about 4 %/K;
+- Schmidt numbers, the transfer velocity and the metabolic index;
+- a closed turbid shelf column conserving nitrogen, carbon and alkalinity, with the oxygen balance closed by denitrification and sulfide; its bottom water turning hypoxic under summer stratification, classified a dead zone, and winter mixing restoring it;
+- a deep column equilibrating with an 800 ppm atmosphere over a year and acidifying; export taking its nitrogen along;
+- the transport: a uniform field stays uniform in a converging current; a blob moves downstream through a channel open at both ends; a converging onshore current over a sloping shelf with a river and an open boundary closes the carbon and nitrogen budgets to 10⁻⁹ with no residual; uniform water stays uniform there;
+- a river fertilising the sea at its mouth and starving the bottom water below the plume; thin bottom remainders merging into the level above;
+- the air: the steady state of a city plume, its drift downwind, the budget with wind and under a rising background, ocean uptake drawing the air down;
+- contract rejections.
+
+`weather.ocean_carbon_cli` runs the example basin for 20 summer days: the contract (shapes, habitat classes against the oxygen thresholds, dead zones against bottom oxygen, areas and uptake against the maps), the carbon, nitrogen and air budgets, the air and the sea seeing the same exchange, the refinery plume, river nitrate at the delta, clean rivers against nitrate-laden ones, a 900 ppm against a 420 ppm atmosphere, schemas and nine rejected requests. `weather.viewer_ocean_carbon` and `weather.viewer_ocean_carbon_2100` regenerate the two fixtures (about a minute each).
+
 Build and run the registered CTest case with:
 
 ~~~sh
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+ctest --test-dir build --output-on-failure -LE slow   # skip the 5-minute polar ocean fixture check
 ~~~
 
 Keep expected results and tolerances tied to the model assumptions and numerical resolution. Do not treat a visually plausible result as physical validation.

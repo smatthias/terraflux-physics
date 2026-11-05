@@ -1,0 +1,289 @@
+{
+ "schema_version": "terraflux.coastal.flooding-run/v1",
+ "time": {
+  "reference_year": 2020,
+  "output_years": [
+   2020,
+   2030,
+   2040,
+   2050,
+   2060,
+   2070,
+   2080,
+   2090,
+   2100,
+   2125,
+   2150,
+   2175,
+   2200,
+   2250,
+   2300
+  ],
+  "map_years": [
+   2020,
+   2040,
+   2060,
+   2080,
+   2100,
+   2150,
+   2200,
+   2250,
+   2300
+  ]
+ },
+ "sea_level": {
+  "polar_timeline_path": "viewer/public/polar/engine-timeline.json",
+  "fingerprints": {
+   "greenland": 0.6,
+   "antarctic": 1.1,
+   "glaciers": 1.0
+  }
+ },
+ "map_scenario": "high (about SSP5-8.5)",
+ "grid": {
+  "nx": 140,
+  "ny": 84,
+  "spacing_m": 3000.0,
+  "anchor_latitude_deg": 53.0,
+  "anchor_longitude_deg": 5.0
+ },
+ "synthetic_coast": {
+  "coastline_north_m": 110000.0,
+  "shelf": {
+   "depth_at_coast_m": 3.0,
+   "slope": 0.0004,
+   "max_depth_m": 60.0
+  },
+  "land": {
+   "elevation_at_coast_m": 4.5,
+   "slope": 0.0004,
+   "max_elevation_m": 250.0
+  },
+  "roughness_m": 0.3,
+  "seed": 11,
+  "rural_population_per_km2": 40.0,
+  "features": [
+   {
+    "kind": "delta",
+    "name": "Delta Lowlands",
+    "west_m": 15000.0,
+    "east_m": 150000.0,
+    "protrusion_m": 30000.0,
+    "inland_m": 45000.0,
+    "elevation_m": 0.9,
+    "gradient_m_per_km": 0.045,
+    "front_depth_factor": 0.35,
+    "sea_dike_crest_m": 5.5,
+    "subsidence_mm_yr": 5.0,
+    "population_per_km2": 450.0,
+    "polders": [
+     {
+      "center_east_m": 60000.0,
+      "center_north_m": 108000.0,
+      "radius_m": 18000.0,
+      "level_m": -2.0,
+      "dike_crest_m": 3.5
+     },
+     {
+      "center_east_m": 112000.0,
+      "center_north_m": 122000.0,
+      "radius_m": 13000.0,
+      "level_m": -1.2,
+      "dike_crest_m": 3.0
+     }
+    ]
+   },
+   {
+    "kind": "estuary",
+    "name": "Estuary City",
+    "center_east_m": 205000.0,
+    "length_m": 60000.0,
+    "mouth_width_m": 16000.0,
+    "convergence_length_m": 20000.0,
+    "depth_m": 14.0,
+    "bank_elevation_m": 2.3,
+    "bank_width_m": 12000.0,
+    "wall_crest_m": 4.2,
+    "subsidence_mm_yr": 1.5,
+    "population_per_km2": 300.0
+   },
+   {
+    "kind": "barrier",
+    "name": "Barrier Coast",
+    "west_m": 250000.0,
+    "east_m": 336000.0,
+    "offshore_m": 9000.0,
+    "barrier_elevation_m": 2.4,
+    "lagoon_depth_m": 2.0,
+    "inlet_spacing_m": 27000.0,
+    "mainland_elevation_m": 1.6,
+    "mainland_width_m": 15000.0,
+    "population_per_km2": 150.0,
+    "subsidence_mm_yr": 1.0
+   },
+   {
+    "kind": "cliffs",
+    "name": "Cliff Coast",
+    "west_m": 345000.0,
+    "east_m": 420000.0,
+    "cliff_height_m": 22.0,
+    "population_per_km2": 60.0
+   },
+   {
+    "kind": "islands",
+    "name": "Low Islands",
+    "population_per_km2": 400.0,
+    "islands": [
+     {
+      "center_east_m": 352000.0,
+      "center_north_m": 62000.0,
+      "radius_m": 4500.0,
+      "height_m": 2.6
+     },
+     {
+      "center_east_m": 374000.0,
+      "center_north_m": 40000.0,
+      "radius_m": 3600.0,
+      "height_m": 2.2
+     },
+     {
+      "center_east_m": 396000.0,
+      "center_north_m": 68000.0,
+      "radius_m": 5200.0,
+      "height_m": 3.2
+     },
+     {
+      "center_east_m": 410000.0,
+      "center_north_m": 36000.0,
+      "radius_m": 3200.0,
+      "height_m": 2.0
+     },
+     {
+      "center_east_m": 330000.0,
+      "center_north_m": 30000.0,
+      "radius_m": 4000.0,
+      "height_m": 2.4
+     }
+    ],
+    "shore_elevation_m": 1.5
+   }
+  ],
+  "cities": [
+   {
+    "name": "Delta Capital",
+    "center_east_m": 64000.0,
+    "center_north_m": 110000.0,
+    "radius_m": 9000.0,
+    "peak_per_km2": 6000.0
+   },
+   {
+    "name": "Estuary City",
+    "center_east_m": 205000.0,
+    "center_north_m": 152000.0,
+    "radius_m": 8000.0,
+    "peak_per_km2": 8000.0
+   },
+   {
+    "name": "Lagoon Town",
+    "center_east_m": 290000.0,
+    "center_north_m": 113000.0,
+    "radius_m": 5000.0,
+    "peak_per_km2": 3000.0
+   },
+   {
+    "name": "Island Capital",
+    "center_east_m": 396000.0,
+    "center_north_m": 68000.0,
+    "radius_m": 3000.0,
+    "peak_per_km2": 4000.0
+   }
+  ]
+ },
+ "rivers": [
+  {
+   "name": "Great River",
+   "path": [
+    [
+     85000.0,
+     70000.0
+    ],
+    [
+     85000.0,
+     140000.0
+    ],
+    [
+     92000.0,
+     190000.0
+    ],
+    [
+     100000.0,
+     250000.0
+    ]
+   ],
+   "discharge_m3_s": 6000.0,
+   "width_m": 900.0,
+   "channel_depth_m": 10.0,
+   "bank_crest_m": 5.5,
+   "valley_width_m": 6000.0,
+   "valley_floor_m": 2.5,
+   "valley_gradient_m_per_km": 0.06
+  },
+  {
+   "name": "Estuary River",
+   "path": [
+    [
+     205000.0,
+     165000.0
+    ],
+    [
+     205000.0,
+     200000.0
+    ],
+    [
+     218000.0,
+     250000.0
+    ]
+   ],
+   "discharge_m3_s": 1200.0,
+   "width_m": 400.0,
+   "channel_depth_m": 7.0,
+   "valley_width_m": 6000.0,
+   "valley_floor_m": 2.6,
+   "valley_gradient_m_per_km": 0.08
+  },
+  {
+   "name": "Lagoon River",
+   "path": [
+    [
+     302000.0,
+     106000.0
+    ],
+    [
+     302000.0,
+     180000.0
+    ]
+   ],
+   "discharge_m3_s": 120.0,
+   "width_m": 60.0,
+   "channel_depth_m": 3.0,
+   "valley_width_m": 3000.0,
+   "valley_floor_m": 1.8,
+   "valley_gradient_m_per_km": 0.1
+  }
+ ],
+ "coast": {
+  "high_tide_m": 1.2,
+  "surge_location_m": 0.6,
+  "surge_scale_m": 0.22,
+  "design_return_period_years": 100.0,
+  "storm_wind_speed_m_s": 26.0,
+  "storm_wind_toward_deg": 15.0,
+  "storm_attenuation_m_per_km": 0.2,
+  "river_attenuation_m_per_km": 0.01,
+  "active_profile_width_m": 1000.0,
+  "berm_height_m": 2.0,
+  "closure_depth_m": 10.0,
+  "salt_limit_psu": 1.0,
+  "estuary_dispersion_m2_s": 1200.0
+ }
+}

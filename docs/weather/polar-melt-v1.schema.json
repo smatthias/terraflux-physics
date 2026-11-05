@@ -1,0 +1,866 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/polar-melt-v1.schema.json",
+  "title": "TerraFlux polar melt block v1 (timeline.polar)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "output_years",
+    "scenarios",
+    "equilibrium_diagram",
+    "greenland_frames",
+    "land_mask",
+    "calibration"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.polar.melt/v1"
+    },
+    "method": {
+      "const": "ice_sheet_sia_pdd_frontal_sea_ice_column_stommel_box"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "request": {
+      "type": "object"
+    },
+    "start_year": {
+      "type": "integer"
+    },
+    "end_year": {
+      "type": "integer"
+    },
+    "timestep_days": {
+      "type": "number"
+    },
+    "output_years": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Calendar year of each frame and series entry (annual means of that year).",
+      "minItems": 2
+    },
+    "map_scenario": {
+      "type": "string"
+    },
+    "land_mask": {
+      "type": "array",
+      "items": {
+        "type": "boolean"
+      }
+    },
+    "spinup": {
+      "type": "object"
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flow_constant_m3_s",
+        "present_freshwater_sv",
+        "threshold_sv",
+        "recovery_time_years"
+      ],
+      "properties": {
+        "flow_constant_m3_s": {
+          "type": "number"
+        },
+        "present_freshwater_sv": {
+          "type": "number"
+        },
+        "north_target_k": {
+          "type": "number"
+        },
+        "south_target_k": {
+          "type": "number"
+        },
+        "threshold_sv": {
+          "type": "number"
+        },
+        "recovery_time_years": {
+          "type": "number"
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "control",
+          "series",
+          "events",
+          "trajectory"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "control": {
+            "type": "boolean"
+          },
+          "initial_overturning_sv": {
+            "type": "number"
+          },
+          "series": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "global_warming_k",
+              "overturning_sv",
+              "heat_transport_pw",
+              "threshold_sv",
+              "freshwater_sv",
+              "freshwater_greenland_sv",
+              "freshwater_arctic_sv",
+              "freshwater_hydrological_sv",
+              "recovery_time_years",
+              "north_temperature_k",
+              "south_temperature_k",
+              "north_salinity_psu",
+              "south_salinity_psu",
+              "greenland_volume_m3",
+              "greenland_sea_level_equivalent_m",
+              "sea_level_rise_m",
+              "greenland_area_km2",
+              "greenland_smb_gt_yr",
+              "greenland_melt_gt_yr",
+              "ocean_thermal_forcing_k",
+              "arctic_ice_march_m",
+              "arctic_ice_september_m",
+              "arctic_min_concentration",
+              "arctic_ice_free_days",
+              "arctic_summer_water_temperature_k",
+              "arctic_atlantic_heat_w_m2",
+              "north_atlantic_temperature_change_k",
+              "tropical_atlantic_temperature_change_k",
+              "north_oxygen_change_pct",
+              "south_oxygen_change_pct"
+            ],
+            "properties": {
+              "global_warming_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "overturning_sv": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "heat_transport_pw": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "threshold_sv": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "freshwater_sv": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "freshwater_greenland_sv": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "freshwater_arctic_sv": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "freshwater_hydrological_sv": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "recovery_time_years": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "north_temperature_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "south_temperature_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "north_salinity_psu": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "south_salinity_psu": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "greenland_volume_m3": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "greenland_sea_level_equivalent_m": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "sea_level_rise_m": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "greenland_area_km2": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "greenland_smb_gt_yr": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "greenland_melt_gt_yr": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "ocean_thermal_forcing_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "arctic_ice_march_m": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "arctic_ice_september_m": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "arctic_min_concentration": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "arctic_ice_free_days": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "arctic_summer_water_temperature_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "arctic_atlantic_heat_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "north_atlantic_temperature_change_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "tropical_atlantic_temperature_change_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "north_oxygen_change_pct": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "south_oxygen_change_pct": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "sea_level_rise_vs_control_m": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "events": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "first_ice_free_september",
+              "greenland_negative_smb",
+              "threshold_crossed",
+              "overturning_weakened_25pct",
+              "overturning_weakened_50pct",
+              "overturning_collapsed"
+            ],
+            "properties": {
+              "first_ice_free_september": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "year",
+                      "global_warming_k"
+                    ],
+                    "properties": {
+                      "year": {
+                        "type": "integer"
+                      },
+                      "global_warming_k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "greenland_negative_smb": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "year",
+                      "global_warming_k"
+                    ],
+                    "properties": {
+                      "year": {
+                        "type": "integer"
+                      },
+                      "global_warming_k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "threshold_crossed": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "year",
+                      "global_warming_k"
+                    ],
+                    "properties": {
+                      "year": {
+                        "type": "integer"
+                      },
+                      "global_warming_k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "overturning_weakened_25pct": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "year",
+                      "global_warming_k"
+                    ],
+                    "properties": {
+                      "year": {
+                        "type": "integer"
+                      },
+                      "global_warming_k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "overturning_weakened_50pct": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "year",
+                      "global_warming_k"
+                    ],
+                    "properties": {
+                      "year": {
+                        "type": "integer"
+                      },
+                      "global_warming_k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "overturning_collapsed": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "year",
+                      "global_warming_k"
+                    ],
+                    "properties": {
+                      "year": {
+                        "type": "integer"
+                      },
+                      "global_warming_k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "trajectory": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "[freshwater forcing Sv, overturning Sv] every output interval."
+          },
+          "early_warning": {
+            "type": "object"
+          },
+          "ensemble": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "members",
+              "member_count",
+              "collapsed_members"
+            ],
+            "properties": {
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_count": {
+                "type": "integer"
+              },
+              "collapsed_members": {
+                "type": "integer"
+              },
+              "threshold_crossed_members": {
+                "type": "integer"
+              },
+              "earliest_collapse": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "median_collapse_of_collapsed": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "latest_collapse": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "earliest_threshold_crossing": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "equilibrium_diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "warmest"
+      ],
+      "properties": {
+        "present_freshwater_sv": {
+          "type": "number"
+        },
+        "start": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "threshold_sv",
+            "stable_strong",
+            "unstable",
+            "reversed"
+          ],
+          "properties": {
+            "target_difference_k": {
+              "type": "number"
+            },
+            "threshold_sv": {
+              "type": "number"
+            },
+            "overturning_at_threshold_sv": {
+              "type": "number"
+            },
+            "stable_strong": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "unstable": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "reversed": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        "warmest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "threshold_sv",
+            "stable_strong",
+            "unstable",
+            "reversed"
+          ],
+          "properties": {
+            "target_difference_k": {
+              "type": "number"
+            },
+            "threshold_sv": {
+              "type": "number"
+            },
+            "overturning_at_threshold_sv": {
+              "type": "number"
+            },
+            "stable_strong": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "unstable": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "reversed": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        "warmest_warming_k": {
+          "type": "number"
+        }
+      }
+    },
+    "greenland_frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "year",
+          "elapsed_seconds",
+          "ice_thickness_m",
+          "surface_elevation_m",
+          "smb_m_ice_yr",
+          "melt_m_ice_yr"
+        ],
+        "properties": {
+          "year": {
+            "type": "integer"
+          },
+          "elapsed_seconds": {
+            "type": "number"
+          },
+          "ice_thickness_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "surface_elevation_m": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "smb_m_ice_yr": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "melt_m_ice_yr": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "volume_m3": {
+            "type": "number"
+          },
+          "sea_level_rise_m": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

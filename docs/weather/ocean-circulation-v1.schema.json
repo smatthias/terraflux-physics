@@ -260,8 +260,35 @@
               },
               "sponge": {
                 "type": "number"
+              },
+              "rain_sea": {
+                "type": "number"
+              },
+              "rain_coast": {
+                "type": "number"
+              },
+              "rain_inland": {
+                "type": "number"
+              },
+              "coastal_runoff": {
+                "type": "number"
+              },
+              "coastal_loss": {
+                "type": "number"
+              },
+              "evaporation": {
+                "type": "number"
+              },
+              "ice_water": {
+                "type": "number",
+                "description": "Polar runs: net water from sea ice (melt minus freezing) since the first frame."
+              },
+              "glacial": {
+                "type": "number",
+                "description": "Polar runs: glacial fresh water (ice-sheet meltwater, icebergs, frontal melt, hosing) since the first frame."
               }
-            }
+            },
+            "description": "volume = initial + river + net_precipitation + sponge + rain_sea + coastal_runoff - evaporation + ice_water + glacial; rain_coast = coastal_runoff + coastal_loss + storage change."
           },
           "streams": {
             "type": "array",
@@ -385,7 +412,7 @@
                 },
                 "deflection_deg": {
                   "type": "number",
-                  "description": "Bearing of the plume's freshwater centroid from the mouth, clockwise from north.",
+                  "description": "Bearing of the plume's freshwater centroid from the mouth, clockwise from north; 0 when the plume is centred on its mouth (within a millionth of a cell), e.g. a one-cell plume.",
                   "minimum": 0,
                   "exclusiveMaximum": 360
                 }
@@ -416,7 +443,1213 @@
           "stream_count": {
             "type": "integer",
             "minimum": 0
+          },
+          "rain": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rate_mm_h",
+              "coastal_store_mm",
+              "coastal_inflow_m3_s",
+              "rain_on_sea_m3_s",
+              "rain_on_coastal_sea_m3_s",
+              "rain_on_coast_m3_s",
+              "rain_inland_m3_s",
+              "coastal_runoff_m3_s",
+              "coastal_loss_m3_s",
+              "coastal_storage_m3",
+              "coastal_balance_error_m3",
+              "max_rate_mm_h",
+              "raining_sea_cells",
+              "raining_land_cells"
+            ],
+            "properties": {
+              "rate_mm_h": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": "Rain rate over the last step, land and sea."
+              },
+              "coastal_store_mm": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": "Water on coastal land waiting to drain (0 at sea)."
+              },
+              "coastal_inflow_m3_s": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": "Coastal runoff received by each sea cell."
+              },
+              "rain_on_sea_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rain_on_coastal_sea_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rain_on_coast_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rain_inland_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "coastal_runoff_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "coastal_loss_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "coastal_storage_m3": {
+                "type": "number",
+                "minimum": 0
+              },
+              "max_rate_mm_h": {
+                "type": "number",
+                "minimum": 0
+              },
+              "coastal_balance_error_m3": {
+                "type": "number"
+              },
+              "raining_sea_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "raining_land_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "air_sea": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "relative_humidity",
+              "cloud_fraction",
+              "shortwave_w_m2",
+              "longwave_w_m2",
+              "sensible_w_m2",
+              "latent_w_m2",
+              "rain_heat_w_m2",
+              "net_heat_w_m2",
+              "evaporation_mm_day",
+              "evaporation_m3_s",
+              "mean_evaporation_mm_day",
+              "max_evaporation_mm_day",
+              "mean_shortwave_w_m2",
+              "mean_longwave_w_m2",
+              "mean_sensible_w_m2",
+              "mean_latent_w_m2",
+              "mean_rain_heat_w_m2",
+              "mean_net_heat_w_m2"
+            ],
+            "description": "Fluxes of the last step, positive into the ocean, at the end-of-step surface temperature (0 on land). The air temperature and the 10 m wind are the forecast frame fields.",
+            "properties": {
+              "relative_humidity": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "cloud_fraction": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "shortwave_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "longwave_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "sensible_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "latent_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "rain_heat_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "net_heat_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "evaporation_mm_day": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Negative = condensation."
+              },
+              "evaporation_m3_s": {
+                "type": "number"
+              },
+              "mean_evaporation_mm_day": {
+                "type": "number"
+              },
+              "max_evaporation_mm_day": {
+                "type": "number"
+              },
+              "mean_shortwave_w_m2": {
+                "type": "number"
+              },
+              "mean_longwave_w_m2": {
+                "type": "number"
+              },
+              "mean_sensible_w_m2": {
+                "type": "number"
+              },
+              "mean_latent_w_m2": {
+                "type": "number"
+              },
+              "mean_rain_heat_w_m2": {
+                "type": "number"
+              },
+              "mean_net_heat_w_m2": {
+                "type": "number"
+              }
+            }
+          },
+          "thermal": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layer_temperature_k",
+              "layer_salinity_psu",
+              "sst_k",
+              "mixed_layer_depth_m",
+              "isothermal_layer_depth_m",
+              "mean_sst_k",
+              "min_sst_k",
+              "max_sst_k",
+              "mean_mixed_layer_depth_m",
+              "max_mixed_layer_depth_m",
+              "barrier_layer_cells"
+            ],
+            "properties": {
+              "layer_temperature_k": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "description": "One array per layer, top first (0 on land)."
+              },
+              "layer_salinity_psu": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 45
+                  }
+                },
+                "description": "One array per layer, top first."
+              },
+              "sst_k": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Top-layer temperature."
+              },
+              "mixed_layer_depth_m": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": "Density criterion."
+              },
+              "isothermal_layer_depth_m": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": "Temperature criterion; deeper than the mixed layer = barrier layer."
+              },
+              "mean_sst_k": {
+                "type": "number"
+              },
+              "min_sst_k": {
+                "type": "number"
+              },
+              "max_sst_k": {
+                "type": "number"
+              },
+              "mean_mixed_layer_depth_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "max_mixed_layer_depth_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "barrier_layer_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "surface_oxygen_umol_kg": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Polar runs: dissolved-oxygen saturation at the sea surface (Garcia & Gordon 1992) from SST and surface salinity; 0 on land. A physical capacity, not a biogeochemical tracer."
+              }
+            }
+          },
+          "surface_lenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "freshest_cell",
+                "cells",
+                "area_km2",
+                "min_surface_salinity_psu",
+                "max_deficit_psu",
+                "freshwater_m3",
+                "mean_sst_k",
+                "source_shares"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "river",
+                    "coastal_runoff",
+                    "rain",
+                    "glacial",
+                    "other"
+                  ],
+                  "description": "Largest share of the fresh water its cells received recently; other = nothing recorded."
+                },
+                "freshest_cell": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "cells": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "area_km2": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "min_surface_salinity_psu": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 45
+                },
+                "max_deficit_psu": {
+                  "type": "number"
+                },
+                "freshwater_m3": {
+                  "type": "number"
+                },
+                "mean_sst_k": {
+                  "type": "number"
+                },
+                "source_shares": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "rain",
+                    "coastal_runoff",
+                    "river"
+                  ],
+                  "properties": {
+                    "rain": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "coastal_runoff": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "river": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "glacial": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Polar runs only: share of ice-sheet meltwater, icebergs and hosing."
+                    }
+                  }
+                }
+              }
+            },
+            "description": "Connected water whose surface is fresher than the layer by the lens deficit, largest first (at most 20)."
+          },
+          "heat_budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "heat_content_j",
+              "heat_balance_error_j",
+              "surface_heat_w",
+              "cumulative_surface_heat_j"
+            ],
+            "properties": {
+              "heat_content_j": {
+                "type": "number"
+              },
+              "heat_balance_error_j": {
+                "type": "number",
+                "description": "Largest per-step residual since the previous frame."
+              },
+              "surface_heat_w": {
+                "type": "number"
+              },
+              "cumulative_surface_heat_j": {
+                "type": "number"
+              }
+            }
+          },
+          "hosing_sv": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Hosing rate at the frame time."
+          },
+          "glacial": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "meltwater_m3_s",
+              "ice_m3_s",
+              "cumulative_m3"
+            ],
+            "description": "Glacial fresh water entering the sea: liquid meltwater (ice-sheet runoff and hosing, at 0 degC) and ice (icebergs and frontal melt) that melts taking latent heat from the top layer.",
+            "properties": {
+              "meltwater_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "ice_m3_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cumulative_m3": {
+                "type": "number"
+              }
+            }
+          },
+          "sea_ice": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ice_thickness_m",
+              "ice_concentration",
+              "ice_surface_temperature_k",
+              "ocean_to_ice_heat_w_m2",
+              "ice_area_km2",
+              "ice_extent_km2",
+              "ice_volume_km3",
+              "ice_water_m3_s",
+              "cumulative_ice_water_m3",
+              "ice_drift_east_m_s",
+              "ice_drift_north_m_s"
+            ],
+            "description": "Sea ice: air_sea fluxes are those of the open fraction, net_heat_w_m2 = shortwave + longwave + sensible + latent - ocean_to_ice_heat_w_m2.",
+            "properties": {
+              "ice_thickness_m": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Thickness of the covered part; 0 on land and open water."
+              },
+              "ice_concentration": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Ice-covered fraction 0-1."
+              },
+              "ice_surface_temperature_k": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Ice surface temperature where there is ice (at most melting); 0 elsewhere."
+              },
+              "ocean_to_ice_heat_w_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Heat the water gives the ice per cell area."
+              },
+              "ice_area_km2": {
+                "type": "number",
+                "description": "Sum of concentration x cell area."
+              },
+              "ice_extent_km2": {
+                "type": "number",
+                "description": "Area of cells above 15 % concentration."
+              },
+              "ice_volume_km3": {
+                "type": "number",
+                "description": "Sum of concentration x thickness x cell area."
+              },
+              "ice_water_m3_s": {
+                "type": "number",
+                "description": "Water the ice gives the ocean (melt positive, freezing negative)."
+              },
+              "cumulative_ice_water_m3": {
+                "type": "number"
+              },
+              "ice_drift_east_m_s": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Free-drift ice velocity at the cell centre (0 without ice)."
+              },
+              "ice_drift_north_m_s": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "ice_sheet": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ice_thickness_m",
+              "surface_elevation_m",
+              "smb_m_ice_yr",
+              "melt_m_ice_yr",
+              "volume_m3",
+              "sea_level_equivalent_m",
+              "sea_level_rise_m",
+              "smb_gt_yr",
+              "runoff_m3_s",
+              "calving_m3_s",
+              "frontal_ablation_m3_s",
+              "mean_front_thermal_forcing_k"
+            ],
+            "description": "The coupled ice sheet at the frame time.",
+            "properties": {
+              "ice_thickness_m": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Ice thickness, only inside the ice-sheet domain."
+              },
+              "surface_elevation_m": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Bed plus ice."
+              },
+              "smb_m_ice_yr": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Surface mass balance (snowfall - runoff)."
+              },
+              "melt_m_ice_yr": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Surface melt."
+              },
+              "volume_m3": {
+                "type": "number"
+              },
+              "sea_level_equivalent_m": {
+                "type": "number",
+                "description": "volume x 917 / 1000 / 3.618e14 m2 (global ocean)."
+              },
+              "sea_level_rise_m": {
+                "type": "number",
+                "description": "(initial volume - volume) x 0.917 / 3.618e14."
+              },
+              "smb_gt_yr": {
+                "type": "number"
+              },
+              "runoff_m3_s": {
+                "type": "number",
+                "description": "Surface meltwater reaching the sea."
+              },
+              "calving_m3_s": {
+                "type": "number",
+                "description": "Ice flux into sea cells (icebergs)."
+              },
+              "frontal_ablation_m3_s": {
+                "type": "number",
+                "description": "Ocean-driven melt at the marine fronts."
+              },
+              "mean_front_thermal_forcing_k": {
+                "type": "number",
+                "description": "Ocean temperature above freezing at the front depth, mean over the fronts."
+              }
+            }
+          },
+          "carbon": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "year",
+              "atmosphere",
+              "ocean"
+            ],
+            "description": "Atmospheric CO2 and ocean carbon, oxygen and habitability at the frame time (with biogeochemistry and atmosphere_co2).",
+            "properties": {
+              "year": {
+                "type": "number",
+                "description": "Decimal calendar year."
+              },
+              "atmosphere": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "co2_ppm",
+                  "background_ppm",
+                  "max_ppm",
+                  "ocean_mean_ppm",
+                  "land_mean_ppm",
+                  "emitted_mt_co2",
+                  "land_uptake_mt_co2",
+                  "ocean_uptake_mt_co2",
+                  "ventilation_mt_co2",
+                  "transport_mt_co2",
+                  "background_shift_mt_co2",
+                  "excess_mt_co2",
+                  "initial_excess_mt_co2"
+                ],
+                "properties": {
+                  "co2_ppm": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Boundary-layer CO2 per cell (ppm), land and sea."
+                  },
+                  "background_ppm": {
+                    "type": "number",
+                    "description": "Scenario background at the frame time."
+                  },
+                  "max_ppm": {
+                    "type": "number"
+                  },
+                  "ocean_mean_ppm": {
+                    "type": "number"
+                  },
+                  "land_mean_ppm": {
+                    "type": "number"
+                  },
+                  "emitted_mt_co2": {
+                    "type": "number",
+                    "description": "Cumulative since the end of the spin-up (Mt CO2), like the other *_mt_co2 terms."
+                  },
+                  "land_uptake_mt_co2": {
+                    "type": "number",
+                    "description": "Net ecosystem uptake (negative: respiration wins)."
+                  },
+                  "ocean_uptake_mt_co2": {
+                    "type": "number",
+                    "description": "Into the sea (negative: outgassing)."
+                  },
+                  "ventilation_mt_co2": {
+                    "type": "number",
+                    "description": "Lost to the free troposphere by relaxation to the background."
+                  },
+                  "transport_mt_co2": {
+                    "type": "number",
+                    "description": "Carried in (+) or out (-) through the region boundary."
+                  },
+                  "background_shift_mt_co2": {
+                    "type": "number",
+                    "description": "Change of the excess because the background moved."
+                  },
+                  "excess_mt_co2": {
+                    "type": "number",
+                    "description": "CO2 above the background in the region boundary layer."
+                  },
+                  "initial_excess_mt_co2": {
+                    "type": "number",
+                    "description": "excess at the end of the spin-up: excess - initial = emitted - land - ocean - ventilation + transport + background_shift."
+                  }
+                }
+              },
+              "ocean": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "co2_flux_mol_m2_yr",
+                  "surface_pco2_uatm",
+                  "surface_ph",
+                  "surface_omega_aragonite",
+                  "bottom_omega_aragonite",
+                  "bottom_oxygen_umol_kg",
+                  "minimum_oxygen_umol_kg",
+                  "minimum_oxygen_depth_m",
+                  "habitable_fraction",
+                  "production_g_c_m2_day",
+                  "surface_nitrate_umol_kg",
+                  "column_class",
+                  "dead_zone_cells",
+                  "level_oxygen_umol_kg",
+                  "level_ph",
+                  "level_omega_aragonite",
+                  "level_class",
+                  "totals",
+                  "budget",
+                  "averaging_hours"
+                ],
+                "properties": {
+                  "co2_flux_mol_m2_yr": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Sea-air CO2 flux into the sea (negative: outgassing), mean since the previous frame."
+                  },
+                  "surface_pco2_uatm": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "pCO2 of the surface water."
+                  },
+                  "surface_ph": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "pH (total scale) of the surface level."
+                  },
+                  "surface_omega_aragonite": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Aragonite saturation state at the surface."
+                  },
+                  "bottom_omega_aragonite": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "... of the deepest level (seafloor on shelves)."
+                  },
+                  "bottom_oxygen_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "O2 of the deepest level."
+                  },
+                  "minimum_oxygen_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Lowest O2 in the column."
+                  },
+                  "minimum_oxygen_depth_m": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Depth of that minimum."
+                  },
+                  "habitable_fraction": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Share of the column volume that is habitable (class 0)."
+                  },
+                  "production_g_c_m2_day": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Net community production, mean since the previous frame."
+                  },
+                  "surface_nitrate_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Nitrate of the surface level."
+                  },
+                  "column_class": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Worst class in the column: 0 habitable, 1 stressed (corrosive or metabolic index below the threshold), 2 hypoxic, 3 anoxic; -1 on land."
+                  },
+                  "dead_zone_cells": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Cells whose bottom water is hypoxic or whose column is hypoxic over dead_zone_column_fraction."
+                  },
+                  "level_oxygen_umol_kg": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "O2 per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "level_ph": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "pH per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "level_omega_aragonite": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Aragonite saturation per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "level_class": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "description": "Habitat class per level. One array per level (surface first), one value per cell; 0 (class -1) below the seafloor and on land."
+                  },
+                  "totals": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "sea_area_km2",
+                      "dead_zone_area_km2",
+                      "anoxic_area_km2",
+                      "corrosive_area_km2",
+                      "volume_km3",
+                      "hypoxic_volume_km3",
+                      "habitable_volume_pct",
+                      "dead_zone_pct",
+                      "mean_surface_ph",
+                      "mean_surface_omega_aragonite",
+                      "uptake_mt_co2_yr",
+                      "production_mt_c_yr"
+                    ],
+                    "properties": {
+                      "sea_area_km2": {
+                        "type": "number"
+                      },
+                      "dead_zone_area_km2": {
+                        "type": "number"
+                      },
+                      "anoxic_area_km2": {
+                        "type": "number"
+                      },
+                      "corrosive_area_km2": {
+                        "type": "number"
+                      },
+                      "volume_km3": {
+                        "type": "number"
+                      },
+                      "hypoxic_volume_km3": {
+                        "type": "number"
+                      },
+                      "habitable_volume_pct": {
+                        "type": "number"
+                      },
+                      "dead_zone_pct": {
+                        "type": "number"
+                      },
+                      "mean_surface_ph": {
+                        "type": "number"
+                      },
+                      "mean_surface_omega_aragonite": {
+                        "type": "number"
+                      },
+                      "uptake_mt_co2_yr": {
+                        "type": "number"
+                      },
+                      "production_mt_c_yr": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "budget": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "carbon_inventory_mol",
+                      "carbon_change_mol",
+                      "air_sea_carbon_mol",
+                      "river_carbon_mol",
+                      "export_carbon_mol",
+                      "ventilation_carbon_mol",
+                      "boundary_carbon_mol",
+                      "transport_carbon_mol",
+                      "nitrogen_change_mol",
+                      "river_nitrogen_mol",
+                      "export_nitrogen_mol",
+                      "ventilation_nitrogen_mol",
+                      "boundary_nitrogen_mol",
+                      "denitrified_nitrogen_mol",
+                      "transport_nitrogen_mol",
+                      "oxygen_change_mol",
+                      "air_sea_oxygen_mol",
+                      "river_oxygen_mol",
+                      "ventilation_oxygen_mol",
+                      "boundary_oxygen_mol",
+                      "transport_oxygen_mol",
+                      "sulfidic_oxygen_demand_mol"
+                    ],
+                    "properties": {
+                      "carbon_inventory_mol": {
+                        "type": "number"
+                      },
+                      "carbon_change_mol": {
+                        "type": "number"
+                      },
+                      "air_sea_carbon_mol": {
+                        "type": "number"
+                      },
+                      "river_carbon_mol": {
+                        "type": "number"
+                      },
+                      "export_carbon_mol": {
+                        "type": "number"
+                      },
+                      "ventilation_carbon_mol": {
+                        "type": "number"
+                      },
+                      "boundary_carbon_mol": {
+                        "type": "number"
+                      },
+                      "transport_carbon_mol": {
+                        "type": "number"
+                      },
+                      "nitrogen_change_mol": {
+                        "type": "number"
+                      },
+                      "river_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "export_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "ventilation_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "boundary_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "denitrified_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "transport_nitrogen_mol": {
+                        "type": "number"
+                      },
+                      "oxygen_change_mol": {
+                        "type": "number"
+                      },
+                      "air_sea_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "river_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "ventilation_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "boundary_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "transport_oxygen_mol": {
+                        "type": "number"
+                      },
+                      "sulfidic_oxygen_demand_mol": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Cumulative mol since the end of the spin-up. carbon_change = air_sea + river - export + ventilation + boundary + transport; nitrogen_change = river - export + ventilation + boundary - denitrified + transport; transport is the numerical residual (about zero)."
+                  },
+                  "averaging_hours": {
+                    "type": "number",
+                    "description": "Interval of the flux and production means."
+                  }
+                }
+              }
+            }
           }
+        }
+      }
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "rain",
+          "coastal_runoff",
+          "air_sea",
+          "thermal_layers",
+          "sea_ice",
+          "ice_sheet",
+          "warming",
+          "hosing",
+          "biogeochemistry",
+          "atmosphere_co2"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "Extensions active in the run; absent for the 1.5-layer slab with prescribed net precipitation. sea_ice, ice_sheet, warming and hosing are the polar processes: with any of them the frames carry glacial, cumulative ice_water/glacial and the surface oxygen. biogeochemistry and atmosphere_co2 (always together) add the carbon block to the frames and the top level."
+    },
+    "initial_heat_content_j": {
+      "type": "number",
+      "description": "rho_0 c_p sum h (T - 273.15) A after the spin-up."
+    },
+    "thermal_layers": {
+      "type": "object",
+      "required": [
+        "count",
+        "fractions"
+      ],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 40
+        },
+        "fractions": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        },
+        "coordinate": {
+          "type": "string"
+        }
+      }
+    },
+    "coastal": {
+      "type": "object",
+      "required": [
+        "band_m",
+        "runoff_coefficient",
+        "runoff_time_scale_s",
+        "receiver",
+        "initial_storage_m3"
+      ],
+      "properties": {
+        "band_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "runoff_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "runoff_time_scale_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "receiver": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "description": "Sea cell receiving the coastal runoff of each land cell (-1: sea, or land beyond the band)."
+        },
+        "initial_storage_m3": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "ice_sheet": {
+      "type": "object",
+      "required": [
+        "domain",
+        "bed_elevation_m",
+        "initial_volume_m3",
+        "initial_sea_level_equivalent_m",
+        "source"
+      ],
+      "properties": {
+        "domain": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "description": "Land cells of the ice-sheet region."
+        },
+        "bed_elevation_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Bed: terrain on land, min(0, terrain) at sea."
+        },
+        "initial_volume_m3": {
+          "type": "number"
+        },
+        "initial_sea_level_equivalent_m": {
+          "type": "number"
+        },
+        "source": {
+          "type": "object",
+          "description": "Region, dome, precipitation, coupling description."
+        }
+      }
+    },
+    "carbon": {
+      "type": "object",
+      "required": [
+        "levels_m",
+        "seafloor_depth_m",
+        "emission_mol_m2_s",
+        "method",
+        "sources",
+        "habitat",
+        "open_boundary",
+        "river_chemistry",
+        "initial_inventory_mol"
+      ],
+      "description": "Configuration echo of the carbon coupling (levels, profiles, biology, transport, habitat thresholds, background scenario, sources, open boundary, river chemistry) with the seafloor and emission maps.",
+      "properties": {
+        "levels_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Level bottoms (m)."
+        },
+        "seafloor_depth_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Per cell (0 on land)."
+        },
+        "emission_mol_m2_s": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Emission map of the sources."
+        },
+        "method": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "east_m",
+              "north_m",
+              "radius_m",
+              "mt_co2_per_year",
+              "peak_cell"
+            ]
+          }
+        },
+        "habitat": {
+          "type": "object",
+          "required": [
+            "hypoxia_umol_kg",
+            "anoxia_umol_kg",
+            "corrosive_omega",
+            "dead_zone_column_fraction",
+            "metabolic"
+          ]
+        },
+        "open_boundary": {
+          "type": "object",
+          "required": [
+            "cells",
+            "relaxation_days",
+            "source"
+          ]
+        },
+        "river_chemistry": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "river",
+              "nitrate_umol_kg"
+            ]
+          }
+        },
+        "initial_inventory_mol": {
+          "type": "object"
         }
       }
     }

@@ -10,7 +10,10 @@ The default command performs, in order:
 
 1. CMake configuration with BUILD_TESTING enabled and Release mode.
 2. C++ build.
-3. CTest, including kernel tests, gridding/composer integration, scenario validation, baseline/variant/outlet fixture regeneration, timestep sensitivity and basin checks.
+3. CTest, including kernel tests, gridding/composer integration, scenario validation, baseline/variant/outlet fixture regeneration, timestep sensitivity and basin checks. The ocean and polar fixture checks regenerate multi-year runs; the two ocean-carbon fixture checks take about a minute each. `weather.viewer_polar_ocean` alone takes about 5 minutes; it carries the CTest label `slow`, so `ctest --test-dir build -LE slow` skips it in quick local loops. The fixture checks compare the committed files with the regeneration:
+   - On the machine that wrote them they match exactly.
+   - Other compilers and C libraries differ in the last bits of exp, pow or sin, so the checks accept numbers within 10⁻⁶ relative or one digit of their printed precision (`tools/build_ocean_example.py` explains the rules).
+   - The ten-year polar ocean run turns those bits into different weather at the sea-ice edge, so its fields are compared by their relative RMS difference (`--field-tolerance 0.1`; the ocean fields differ by under 1 %).
 4. Python composer and verification-runner tests.
 5. Locked viewer installation with npm ci.
 6. Viewer data, comparison and CSV tests.

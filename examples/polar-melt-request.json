@@ -1,0 +1,56 @@
+{
+  "schema_version": "terraflux.polar.melt-run/v1",
+  "time": {"start_year": 1850, "end_year": 2300, "timestep_days": 10, "output_every_years": 10},
+  "scenarios": [
+    {"name": "low (about SSP1-2.6)", "global_warming_k": [[1850, 0.0], [1900, 0.1], [1950, 0.3], [1980, 0.5], [2000, 0.8], [2020, 1.2], [2050, 1.7], [2100, 1.8], [2200, 1.6], [2300, 1.5]]},
+    {"name": "intermediate (about SSP2-4.5)", "global_warming_k": [[1850, 0.0], [1900, 0.1], [1950, 0.3], [1980, 0.5], [2000, 0.8], [2020, 1.2], [2050, 2.0], [2100, 2.7], [2200, 3.3], [2300, 3.5]]},
+    {"name": "high (about SSP5-8.5)", "global_warming_k": [[1850, 0.0], [1900, 0.1], [1950, 0.3], [1980, 0.5], [2000, 0.8], [2020, 1.2], [2050, 2.4], [2100, 4.4], [2200, 7.0], [2300, 8.5]]}
+  ],
+  "control": true,
+  "map_scenario": "high (about SSP5-8.5)",
+  "greenland": {
+    "grid": {"nx": 26, "ny": 56, "spacing_m": 50000, "anchor_latitude_deg": 60.0, "anchor_longitude_deg": -42.0},
+    "land": {"center_east_m": 650000, "center_north_m": 1400000, "radius_east_m": 500000, "radius_north_m": 1250000, "coast_bed_m": 50, "centre_bed_m": 300, "sea_bed_m": -500},
+    "initial_dome": {"radius_east_m": 470000, "radius_north_m": 1200000, "center_thickness_m": 3000},
+    "climate": {
+      "south_sea_level_temperature_k": 273.65,
+      "temperature_gradient_k_per_km": -0.008,
+      "seasonal_amplitude_k": 11.0,
+      "warming_amplification": 1.6,
+      "precipitation_m_we_yr": 0.6,
+      "precipitation_reference_k": 263.15,
+      "precipitation_per_k": 0.07,
+      "thermal_forcing_k": 2.5,
+      "thermal_forcing_per_k": 0.0,
+      "thermal_forcing_per_north_k": 0.5
+    },
+    "physics": {"rate_factor_pa3_s": 1.27e-23},
+    "spinup_years": 3000,
+    "step_every": 3
+  },
+  "arctic_sea_ice": {
+    "mean_temperature_k": 255.65,
+    "seasonal_amplitude_k": 17.0,
+    "warming_amplification": 3.0,
+    "ice_export_per_year": 0.12,
+    "arctic_ocean_area_m2": 7.0e12,
+    "deep_ocean_heat_flux_w_m2": 2.0,
+    "deep_heat_per_k": 0.3,
+    "heat_follows_overturning": true,
+    "freshwater_residence_years": 10.0,
+    "spinup_years": 100
+  },
+  "overturning": {
+    "present": {"overturning_sv": 17.0, "temperature_difference_k": 15.0, "salinity_difference_psu": 1.0, "north_temperature_k": 279.15, "north_salinity_psu": 35.0},
+    "box": {"north_volume_m3": 1.0e16, "south_volume_m3": 5.0e16, "temperature_relaxation_years": 5.0},
+    "north_amplification": 1.85,
+    "south_amplification": 1.0,
+    "hydrological_sv_per_k": 0.01,
+    "greenland_fraction": 1.0,
+    "collapse_fraction": 0.2
+  },
+  "ensemble": {
+    "salinity_difference_psu": [0.8, 1.0, 1.2],
+    "greenland_warming_amplification": [1.3, 1.6, 2.0]
+  }
+}

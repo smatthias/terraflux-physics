@@ -103,6 +103,22 @@ with tempfile.TemporaryDirectory() as temporary:
     assert rates[0] == 0 and rates[2] == 20.0 and rates[3] == 0, rates  # 20 mm/h between the second and third coupled frames
     assert abs(driven_out['frames'][2]['fields']['air_temperature']['values'][0] - 281.0) < 1e-9
 
+    # Precipitation outcomes: rate_mm_h is the intensity while it rains, so the catchment receives the cell-mean
+    # rate x duration_fraction (accumulation = rate x duration x interval), here 40 mm/h x 0.25 = 10 mm/h.
+    showers = copy.deepcopy(coupled)
+    showers['coupled_atmosphere'] = {'schema_version': 'terraflux.weather.coupled_atmosphere/v1', 'precipitation': {'frames': []}}
+    for k, elapsed in enumerate([0.0, 3600.0, 7200.0]):
+        showers['coupled_atmosphere']['precipitation']['frames'].append({'elapsed_seconds': elapsed, 'rate_mm_h': [40.0 if k == 1 else 0.0] * 12, 'duration_fraction': [0.25 if k == 1 else 0.0] * 12})
+    showers_path = directory / 'showers.json'
+    showers_path.write_text(json.dumps(showers))
+    driven['forcing']['rainfall'] = {'coupled_timeline_path': str(showers_path)}
+    result, output = run(driven, 'showers')
+    assert result.returncode == 0, result.stderr
+    showers_out = json.loads(output.read_text())
+    rates = [max(f['rainfall_rate_mm_h']) for f in showers_out['hydrology']['frames']]
+    assert rates[0] == 0 and abs(rates[2] - 10.0) < 1e-9 and rates[3] == 0, rates
+    assert 'rate_mm_h x duration_fraction' in ' '.join(showers_out['hydrology']['forcing_source']['coupled']['sources'])
+
     # Invalid requests produce no output.
     mutations = [
         ('schema', lambda d: d.update(schema_version='other')),
