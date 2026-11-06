@@ -1,0 +1,334 @@
+{
+  "schema_version": "terraflux.solar.wind-run/v1",
+  "dipole": {
+    "moment_a_m2": 7.7e+22,
+    "north_pole_latitude_deg": 80.8,
+    "north_pole_longitude_deg": -72.7,
+    "note": "Centred dipole, rounded from the IGRF for about 2025. The geomagnetic north pole is where the dipole axis meets the northern hemisphere (NW Greenland / Canadian Arctic)."
+  },
+  "storm": {
+    "start_utc": "2026-03-18T00:00:00Z",
+    "hours": 96,
+    "frame_every_hours": 2,
+    "seed": 11,
+    "note": "A synthetic severe storm near the March equinox: a flare with a solar proton event, then a fast coronal mass ejection whose magnetic cloud turns the interplanetary field southward. Not a reconstruction of a real event.",
+    "background": {
+      "speed_km_s": 420,
+      "density_cm3": 6,
+      "field_nt": 5,
+      "fluctuation_nt": 3,
+      "correlation_h": 2,
+      "f107": 150,
+      "f107_81": 145,
+      "phi_gv": 0.75
+    },
+    "cme": {
+      "arrival_h": 30,
+      "sheath_h": 6,
+      "cloud_h": 20,
+      "shock_speed_km_s": 950,
+      "cloud_speed_end_km_s": 650,
+      "sheath_density_cm3": 25,
+      "cloud_density_cm3": 8,
+      "sheath_field_nt": 25,
+      "cloud_field_nt": 30,
+      "cloud_bz_start_nt": -30,
+      "cloud_bz_end_nt": 12,
+      "forbush_phi_gv": 0.3,
+      "forbush_recovery_h": 48,
+      "after_decay_h": 24
+    },
+    "sep": {
+      "onset_h": 6,
+      "rise_h": 8,
+      "decay_h": 24,
+      "peak_pfu": 4000,
+      "efold_rigidity_gv": 0.12
+    }
+  },
+  "map": {
+    "cells_east": 90,
+    "cells_north": 45,
+    "land_mask": [
+      "..........................................................................................",
+      "..........................................................................................",
+      ".....................######..############.........##................#.....................",
+      "...............##.#.#.#.......##########....................##......#####.......#.........",
+      "..............#####.#...##.....########...................#...#...###########...##........",
+      "#...############..#.###...###...#####............######.##.####.##########################",
+      ".....#####################.##...###....##.......##.###.###################################",
+      "...#####..###########.....#...................####...###############################.#....",
+      "............###########...####.................##.#############################.....##....",
+      ".............##################...........#.#.###################################...#.....",
+      "..............##############..##............####################################..........",
+      "..............###############................##..###...########################.#.........",
+      "..............############.................##.....#.#########################.............",
+      "...............###########...................###......#####################....#..........",
+      "................#########..................######.#...#####################...............",
+      "................#####...#.................###############.#################...............",
+      ".................####....................#############.####...############................",
+      "...................##.#..................#############.####....####.####..................",
+      ".....................##..................##############.##.....##....###..................",
+      ".......................#...#.............###############........#......#..................",
+      ".........................#####............###############...................#.............",
+      "..........................######...............##########............##..#................",
+      ".........................########..............#########..............#.##................",
+      ".........................##########.............#######....................#...##.........",
+      ".........................###########............#######..................#.....###........",
+      "..........................##########............#######.......................#.#.........",
+      "..........................#########.............#######.#...................###.#.........",
+      "...........................########.............######..#..................#######........",
+      "...........................######................#####..#................##########.......",
+      "...........................######................####.....................#########.......",
+      "...........................#####..................##......................###.#####.......",
+      "...........................####.................................................###.....#.",
+      "...........................##.............................................................",
+      "...........................##..........................................................#..",
+      "...........................##.............................................................",
+      "..........................##..............................................................",
+      "..........................................................................................",
+      "..........................................................................................",
+      ".............................##...........................................................",
+      "............................#...........................######...#################........",
+      "...................#......###.............##############################################..",
+      "........####################..........################################################....",
+      "........##################......##....###############################################.....",
+      ".....####################################################################################.",
+      "##########################################################################################"
+    ],
+    "land_mask_source": "global-land-mask 1.0.0 (MIT; GLOBE 1 km elevation, NOAA), sampled at the cell centres by tools/make_land_mask.py"
+  },
+  "solar_cycle_path": "viewer/public/solar/engine-timeline.json",
+  "cycle": {
+    "first_year": 1996,
+    "last_year": 2040,
+    "note": "Monthly climatology driven by the solar-cycle example (synthetic record until 2026, then its central forecast)."
+  },
+  "dipole_scenarios": [
+    {
+      "name": "Holocene high (about 1000 BC)",
+      "moment_ratio": 1.4,
+      "note": "archaeomagnetic dipole moments of about 11e22 A m^2"
+    },
+    {
+      "name": "1840 (first absolute measurements, Gauss)",
+      "moment_ratio": 1.1,
+      "note": "the dipole has weakened by about 9 % since"
+    },
+    {
+      "name": "Today",
+      "moment_ratio": 1.0
+    },
+    {
+      "name": "2100 if the decline continues",
+      "moment_ratio": 0.95,
+      "note": "about -5 % per century"
+    },
+    {
+      "name": "Half of today",
+      "moment_ratio": 0.5
+    },
+    {
+      "name": "A quarter of today",
+      "moment_ratio": 0.25
+    },
+    {
+      "name": "Laschamp excursion (about 41,000 years ago)",
+      "moment_ratio": 0.1,
+      "note": "the dipole fell to roughly a tenth for about a thousand years"
+    }
+  ],
+  "storm_scenarios": [
+    {
+      "name": "Quiet",
+      "speed_km_s": 380,
+      "density_cm3": 5,
+      "by_nt": 3,
+      "bz_nt": 1,
+      "hours": 12
+    },
+    {
+      "name": "Moderate storm",
+      "speed_km_s": 500,
+      "density_cm3": 10,
+      "by_nt": 3,
+      "bz_nt": -8,
+      "hours": 6
+    },
+    {
+      "name": "Strong storm",
+      "speed_km_s": 650,
+      "density_cm3": 15,
+      "by_nt": 5,
+      "bz_nt": -15,
+      "hours": 8
+    },
+    {
+      "name": "Severe storm",
+      "speed_km_s": 850,
+      "density_cm3": 20,
+      "by_nt": 5,
+      "bz_nt": -25,
+      "hours": 10
+    },
+    {
+      "name": "Extreme storm",
+      "speed_km_s": 1100,
+      "density_cm3": 25,
+      "by_nt": 5,
+      "bz_nt": -35,
+      "hours": 8
+    },
+    {
+      "name": "Carrington-class (1859)",
+      "speed_km_s": 1800,
+      "density_cm3": 30,
+      "by_nt": 10,
+      "bz_nt": -60,
+      "hours": 10,
+      "note": "order-of-magnitude estimates for the 1859 event"
+    }
+  ],
+  "methane_scenarios": [
+    {
+      "name": "Pre-industrial",
+      "methane_ppmv": 0.72
+    },
+    {
+      "name": "Today",
+      "methane_ppmv": 1.93
+    },
+    {
+      "name": "High emissions, 2100 (about)",
+      "methane_ppmv": 3.5
+    }
+  ],
+  "sep_scenarios": [
+    {
+      "name": "Minor (S1)",
+      "peak_pfu": 10,
+      "efold_rigidity_gv": 0.08,
+      "duration_h": 24
+    },
+    {
+      "name": "Strong (S3)",
+      "peak_pfu": 1000,
+      "efold_rigidity_gv": 0.1,
+      "duration_h": 24
+    },
+    {
+      "name": "Severe (S4)",
+      "peak_pfu": 10000,
+      "efold_rigidity_gv": 0.12,
+      "duration_h": 24
+    },
+    {
+      "name": "About 30,000 pfu (the peak of late October 2003)",
+      "peak_pfu": 30000,
+      "efold_rigidity_gv": 0.12,
+      "duration_h": 30
+    },
+    {
+      "name": "Hard spectrum: a ground-level enhancement",
+      "peak_pfu": 5000,
+      "efold_rigidity_gv": 0.35,
+      "duration_h": 12,
+      "note": "protons above 1 GV reach the ground and raise the dose at flight altitude"
+    }
+  ],
+  "cities": [
+    {
+      "name": "Longyearbyen",
+      "latitude_deg": 78.22,
+      "longitude_deg": 15.65
+    },
+    {
+      "name": "Tromsø",
+      "latitude_deg": 69.65,
+      "longitude_deg": 18.96
+    },
+    {
+      "name": "Fairbanks",
+      "latitude_deg": 64.84,
+      "longitude_deg": -147.72
+    },
+    {
+      "name": "Reykjavík",
+      "latitude_deg": 64.15,
+      "longitude_deg": -21.94
+    },
+    {
+      "name": "Oslo",
+      "latitude_deg": 59.91,
+      "longitude_deg": 10.75
+    },
+    {
+      "name": "Edinburgh",
+      "latitude_deg": 55.95,
+      "longitude_deg": -3.19
+    },
+    {
+      "name": "Berlin",
+      "latitude_deg": 52.52,
+      "longitude_deg": 13.4
+    },
+    {
+      "name": "Munich",
+      "latitude_deg": 48.14,
+      "longitude_deg": 11.58
+    },
+    {
+      "name": "Ottawa",
+      "latitude_deg": 45.42,
+      "longitude_deg": -75.7
+    },
+    {
+      "name": "Rome",
+      "latitude_deg": 41.9,
+      "longitude_deg": 12.5
+    },
+    {
+      "name": "New York",
+      "latitude_deg": 40.71,
+      "longitude_deg": -74.01
+    },
+    {
+      "name": "Tokyo",
+      "latitude_deg": 35.68,
+      "longitude_deg": 139.69
+    },
+    {
+      "name": "Singapore",
+      "latitude_deg": 1.35,
+      "longitude_deg": 103.82
+    },
+    {
+      "name": "Sydney",
+      "latitude_deg": -33.87,
+      "longitude_deg": 151.21
+    },
+    {
+      "name": "Hobart",
+      "latitude_deg": -42.88,
+      "longitude_deg": 147.33
+    },
+    {
+      "name": "Christchurch",
+      "latitude_deg": -43.53,
+      "longitude_deg": 172.64
+    },
+    {
+      "name": "Ushuaia",
+      "latitude_deg": -54.8,
+      "longitude_deg": -68.3
+    },
+    {
+      "name": "McMurdo Station",
+      "latitude_deg": -77.85,
+      "longitude_deg": 166.67
+    }
+  ],
+  "comparisons": {
+    "note": "Rounded orders of magnitude: atmosphere 5.15e18 kg, O2 1.2e18 kg, oceans 1.4e21 kg, absorbed sunlight about 240 W/m^2 over the Earth; natural background radiation about 2.4 mSv/yr (world average); aircrew about 700 flight hours a year. The cloud sensitivities are illustrative bounds, not measurements."
+  }
+}

@@ -164,6 +164,19 @@ double cell_north_of(const TransportGrid2D& g, std::size_t i) {
     return g.origin_north_m + (static_cast<double>(i / g.nx) + 0.5) * g.spacing_north_m;
 }
 
+// The cells that can lie within `radius` of cell i: a box of rows and columns (one cell of margin), visited in
+// ascending index order, so that loops restricted to it see the candidates in the same order as a loop over the
+// whole grid (identical sums) while skipping the far cells, which the exact distance test would reject anyway.
+struct NeighbourBox {
+    std::size_t x0, x1, y0, y1;
+};
+NeighbourBox neighbour_box(const TransportGrid2D& g, std::size_t i, double radius) {
+    const long long cx = static_cast<long long>(i % g.nx), cy = static_cast<long long>(i / g.nx);
+    const long long rx = static_cast<long long>(std::ceil(radius / g.spacing_east_m)) + 1, ry = static_cast<long long>(std::ceil(radius / g.spacing_north_m)) + 1;
+    auto clamp_to = [](long long v, std::size_t n) { return static_cast<std::size_t>(std::max(0LL, std::min(v, static_cast<long long>(n) - 1))); };
+    return {clamp_to(cx - rx, g.nx), clamp_to(cx + rx, g.nx), clamp_to(cy - ry, g.ny), clamp_to(cy + ry, g.ny)};
+}
+
 // Highest rise of the terrain ahead of the air (downwind half-disc within
 // the influence radius); zero when the air faces no obstacle.
 double obstacle_ahead(const std::vector<double>& h, const TransportGrid2D& g, std::size_t i, double u, double v, double radius) {
@@ -171,13 +184,15 @@ double obstacle_ahead(const std::vector<double>& h, const TransportGrid2D& g, st
     if (speed <= 0.0) return 0.0;
     double rise = 0.0;
     const double e0 = cell_east_of(g, i), n0 = cell_north_of(g, i);
-    for (std::size_t j = 0; j < h.size(); ++j) {
-        if (j == i) continue;
-        const double de = cell_east_of(g, j) - e0, dn = cell_north_of(g, j) - n0;
-        const double d = std::hypot(de, dn);
-        if (d > radius || de * u + dn * v <= 0.0) continue;
-        rise = std::max(rise, h[j] - h[i]);
-    }
+    const NeighbourBox box = neighbour_box(g, i, radius);
+    for (std::size_t y = box.y0; y <= box.y1; ++y)
+        for (std::size_t j = y * g.nx + box.x0; j <= y * g.nx + box.x1; ++j) {
+            if (j == i) continue;
+            const double de = cell_east_of(g, j) - e0, dn = cell_north_of(g, j) - n0;
+            const double d = std::hypot(de, dn);
+            if (d > radius || de * u + dn * v <= 0.0) continue;
+            rise = std::max(rise, h[j] - h[i]);
+        }
     return rise;
 }
 
@@ -185,12 +200,14 @@ double valley_depth(const std::vector<double>& h, const TransportGrid2D& g, std:
     double sum = 0.0;
     std::size_t n = 0;
     const double e0 = cell_east_of(g, i), n0 = cell_north_of(g, i);
-    for (std::size_t j = 0; j < h.size(); ++j) {
-        if (std::hypot(cell_east_of(g, j) - e0, cell_north_of(g, j) - n0) <= radius) {
-            sum += h[j];
-            ++n;
+    const NeighbourBox box = neighbour_box(g, i, radius);
+    for (std::size_t y = box.y0; y <= box.y1; ++y)
+        for (std::size_t j = y * g.nx + box.x0; j <= y * g.nx + box.x1; ++j) {
+            if (std::hypot(cell_east_of(g, j) - e0, cell_north_of(g, j) - n0) <= radius) {
+                sum += h[j];
+                ++n;
+            }
         }
-    }
     return n ? std::max(0.0, sum / static_cast<double>(n) - h[i]) : 0.0;
 }
 
@@ -255,11 +272,13 @@ OrographyField diagnose_orography(const CoupledWindState& state, const CoupledWi
         double sum = 0.0;
         std::size_t n = 0;
         const double e0 = cell_east_of(g, i), n0 = cell_north_of(g, i);
-        for (std::size_t j = 0; j < count; ++j) {
-            if (j == i || std::hypot(cell_east_of(g, j) - e0, cell_north_of(g, j) - n0) > o.influence_radius_m) continue;
-            sum += state.air_temperature_k[j] + 0.0065 * (o.elevation_m[j] - o.elevation_m[i]);
-            ++n;
-        }
+        const NeighbourBox box = neighbour_box(g, i, o.influence_radius_m);
+        for (std::size_t y = box.y0; y <= box.y1; ++y)
+            for (std::size_t j = y * g.nx + box.x0; j <= y * g.nx + box.x1; ++j) {
+                if (j == i || std::hypot(cell_east_of(g, j) - e0, cell_north_of(g, j) - n0) > o.influence_radius_m) continue;
+                sum += state.air_temperature_k[j] + 0.0065 * (o.elevation_m[j] - o.elevation_m[i]);
+                ++n;
+            }
         const double reference = n ? sum / static_cast<double>(n) : state.air_temperature_k[i];
         const double anomaly = state.air_temperature_k[i] - reference;
         f.cold_pool_k[i] = std::max(0.0, -anomaly);

@@ -1,0 +1,1439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/solar-wind-v1.schema.json",
+  "title": "TerraFlux solar wind block v1 (the solar_wind member of a viewer timeline)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "request",
+    "dipole",
+    "static",
+    "storm",
+    "latitude_profile",
+    "responses",
+    "cycle",
+    "dipole_scenarios",
+    "storm_scenarios",
+    "methane_scenarios",
+    "sep_scenarios",
+    "cities",
+    "budgets",
+    "comparisons",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.solar.wind/v1"
+    },
+    "method": {
+      "type": "string"
+    },
+    "source_kind": {
+      "const": "engine_output"
+    },
+    "request": {
+      "type": "object"
+    },
+    "dipole": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "moment_a_m2": {
+          "type": "number"
+        },
+        "north_pole_latitude_deg": {
+          "type": "number"
+        },
+        "north_pole_longitude_deg": {
+          "type": "number"
+        },
+        "equatorial_field_ut": {
+          "type": "number"
+        },
+        "polar_field_ut": {
+          "type": "number"
+        },
+        "cutoff_equator_gv": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "moment_a_m2",
+        "north_pole_latitude_deg",
+        "north_pole_longitude_deg",
+        "equatorial_field_ut",
+        "polar_field_ut",
+        "cutoff_equator_gv"
+      ]
+    },
+    "static": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cell_degrees": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "magnetic_latitude_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "magnetic_longitude_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "cutoff_gv": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "land_mask": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "boolean"
+          }
+        },
+        "land_mask_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "cell_degrees",
+        "magnetic_latitude_deg",
+        "magnetic_longitude_deg",
+        "cutoff_gv",
+        "land_mask",
+        "land_mask_source"
+      ]
+    },
+    "storm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_utc": {
+          "type": "string"
+        },
+        "hours": {
+          "type": "integer"
+        },
+        "frame_every_hours": {
+          "type": "integer"
+        },
+        "cme": {
+          "type": "boolean"
+        },
+        "sep": {
+          "type": "boolean"
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "series": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hour": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "speed_km_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "density_cm3": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "by_nt": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "bz_nt": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "pressure_npa": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "newell_coupling": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "kp": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "dst_nt": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "standoff_re": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "reconnection_kv": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "cross_cap_potential_kv": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "open_flux_gwb": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "cap_boundary_mlat_deg": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "oval_equatorward_midnight_mlat_deg": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "hemispheric_power_gw": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "joule_heating_gw": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "exospheric_k": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "density_400km_ratio": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "hydrogen_escape_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "hydrogen_jeans_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "hydrogen_charge_exchange_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "hydrogen_polar_wind_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "oxygen_upflow_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "oxygen_escape_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "helium_escape_per_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "phi_gv": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "neutron_pole_change_pct": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "neutron_equator_change_pct": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "sep_flux_pfu": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "sep_ion_pairs_pole_cm2_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "dose_pole_usv_h": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "dose_50deg_usv_h": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "dose_equator_usv_h": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "cutoff_factor": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "sep_nox_north_mol_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "sep_nox_south_mol_s": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "ozone_upper_north_pct": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "ozone_upper_south_pct": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "hour",
+            "speed_km_s",
+            "density_cm3",
+            "by_nt",
+            "bz_nt",
+            "pressure_npa",
+            "newell_coupling",
+            "kp",
+            "dst_nt",
+            "standoff_re",
+            "reconnection_kv",
+            "cross_cap_potential_kv",
+            "open_flux_gwb",
+            "cap_boundary_mlat_deg",
+            "oval_equatorward_midnight_mlat_deg",
+            "hemispheric_power_gw",
+            "joule_heating_gw",
+            "exospheric_k",
+            "density_400km_ratio",
+            "hydrogen_escape_per_s",
+            "hydrogen_jeans_per_s",
+            "hydrogen_charge_exchange_per_s",
+            "hydrogen_polar_wind_per_s",
+            "oxygen_upflow_per_s",
+            "oxygen_escape_per_s",
+            "helium_escape_per_s",
+            "phi_gv",
+            "neutron_pole_change_pct",
+            "neutron_equator_change_pct",
+            "sep_flux_pfu",
+            "sep_ion_pairs_pole_cm2_s",
+            "dose_pole_usv_h",
+            "dose_50deg_usv_h",
+            "dose_equator_usv_h",
+            "cutoff_factor",
+            "sep_nox_north_mol_s",
+            "sep_nox_south_mol_s",
+            "ozone_upper_north_pct",
+            "ozone_upper_south_pct"
+          ]
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "hour": {
+                "type": "number"
+              },
+              "time_utc": {
+                "type": "string"
+              },
+              "elapsed_seconds": {
+                "type": "number"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "subsolar": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "latitude_deg": {
+                    "type": "number"
+                  },
+                  "longitude_deg": {
+                    "type": "number"
+                  },
+                  "magnetic_longitude_deg": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "latitude_deg",
+                  "longitude_deg",
+                  "magnetic_longitude_deg"
+                ]
+              },
+              "solar_wind": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "speed_km_s": {
+                    "type": "number"
+                  },
+                  "density_cm3": {
+                    "type": "number"
+                  },
+                  "by_nt": {
+                    "type": "number"
+                  },
+                  "bz_nt": {
+                    "type": "number"
+                  },
+                  "pressure_npa": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "speed_km_s",
+                  "density_cm3",
+                  "by_nt",
+                  "bz_nt",
+                  "pressure_npa"
+                ]
+              },
+              "kp": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9
+              },
+              "dst_nt": {
+                "type": "number"
+              },
+              "g_scale": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5
+              },
+              "magnetopause": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "standoff_re": {
+                    "type": "number"
+                  },
+                  "flaring": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "standoff_re",
+                  "flaring"
+                ]
+              },
+              "oval": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "cap_colatitude_deg": {
+                    "type": "number"
+                  },
+                  "midnight_offset_deg": {
+                    "type": "number"
+                  },
+                  "width_night_deg": {
+                    "type": "number"
+                  },
+                  "width_day_deg": {
+                    "type": "number"
+                  },
+                  "storm_shift_deg": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "cap_colatitude_deg",
+                  "midnight_offset_deg",
+                  "width_night_deg",
+                  "width_day_deg",
+                  "storm_shift_deg"
+                ]
+              },
+              "hemispheric_power_gw": {
+                "type": "number"
+              },
+              "joule_heating_gw": {
+                "type": "number"
+              },
+              "cross_cap_potential_kv": {
+                "type": "number"
+              },
+              "exospheric_k": {
+                "type": "number"
+              },
+              "oxygen_upflow_per_s": {
+                "type": "number"
+              },
+              "hydrogen_escape_per_s": {
+                "type": "number"
+              },
+              "phi_gv": {
+                "type": "number"
+              },
+              "sep_flux_pfu": {
+                "type": "number"
+              },
+              "cutoff_factor": {
+                "type": "number"
+              },
+              "aurora_mw_m2": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "oxygen_outflow_1e7_cm2_s": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "dose_by_cutoff_usv_h": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 61,
+                "maxItems": 61
+              },
+              "sep_by_cutoff_1e9_cm2_s": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 41,
+                "maxItems": 41
+              },
+              "region": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                }
+              }
+            },
+            "required": [
+              "hour",
+              "time_utc",
+              "elapsed_seconds",
+              "phase",
+              "subsolar",
+              "solar_wind",
+              "kp",
+              "dst_nt",
+              "g_scale",
+              "magnetopause",
+              "oval",
+              "hemispheric_power_gw",
+              "joule_heating_gw",
+              "cross_cap_potential_kv",
+              "exospheric_k",
+              "oxygen_upflow_per_s",
+              "hydrogen_escape_per_s",
+              "phi_gv",
+              "sep_flux_pfu",
+              "cutoff_factor",
+              "aurora_mw_m2",
+              "oxygen_outflow_1e7_cm2_s",
+              "dose_by_cutoff_usv_h",
+              "sep_by_cutoff_1e9_cm2_s",
+              "region"
+            ]
+          }
+        }
+      },
+      "required": [
+        "start_utc",
+        "hours",
+        "frame_every_hours",
+        "cme",
+        "sep",
+        "phases",
+        "series",
+        "frames"
+      ]
+    },
+    "latitude_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "magnetic_latitude_deg": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "cutoff_gv": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "dose_min_usv_h": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "dose_max_usv_h": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "dose_sep_peak_usv_h": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "neutron_min": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "neutron_max": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "pfotzer_min": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "pfotzer_max": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "sep_ion_pairs_peak_cm2_s": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      },
+      "required": [
+        "magnetic_latitude_deg",
+        "cutoff_gv",
+        "dose_min_usv_h",
+        "dose_max_usv_h",
+        "dose_sep_peak_usv_h",
+        "neutron_min",
+        "neutron_max",
+        "pfotzer_min",
+        "pfotzer_max",
+        "sep_ion_pairs_peak_cm2_s"
+      ]
+    },
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "yield_exponent": {
+            "type": "number"
+          },
+          "threshold_gv": {
+            "type": "number"
+          },
+          "sharpness": {
+            "type": "number"
+          },
+          "anchor": {
+            "type": "number"
+          },
+          "reference_phi_gv": {
+            "type": "number"
+          },
+          "pole_over_equator": {
+            "type": "number"
+          },
+          "pole_change_phi_04_to_10_pct": {
+            "type": "number"
+          },
+          "equator_change_phi_04_to_10_pct": {
+            "type": "number"
+          },
+          "pole_cycle_min": {
+            "type": "number"
+          },
+          "pole_cycle_max": {
+            "type": "number"
+          },
+          "equator_cycle_min": {
+            "type": "number"
+          },
+          "equator_cycle_max": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "unit",
+          "yield_exponent",
+          "threshold_gv",
+          "sharpness",
+          "anchor",
+          "reference_phi_gv",
+          "pole_over_equator",
+          "pole_change_phi_04_to_10_pct",
+          "equator_change_phi_04_to_10_pct",
+          "pole_cycle_min",
+          "pole_cycle_max",
+          "equator_cycle_min",
+          "equator_cycle_max"
+        ]
+      }
+    },
+    "cycle": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "first_year": {
+              "type": "integer"
+            },
+            "last_year": {
+              "type": "integer"
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              }
+            },
+            "forecast": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "data_origin": {
+              "type": "string"
+            },
+            "config": {
+              "type": "object"
+            },
+            "series": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sunspot_number": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "f107_sfu": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "speed_km_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "field_nt": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "kp_mean": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "cross_cap_potential_kv": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "cap_boundary_mlat_deg": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "oval_equatorward_midnight_mlat_deg": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "hemispheric_power_gw": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "joule_heating_gw": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "exospheric_k": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "hydrogen_escape_per_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "hydrogen_jeans_per_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "hydrogen_charge_exchange_per_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "hydrogen_polar_wind_per_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "oxygen_escape_per_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "helium_escape_per_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "mass_loss_kg_s": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "phi_gv": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "neutron_pole": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "neutron_equator": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "dose_pole_usv_h": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "dose_50deg_usv_h": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "dose_equator_usv_h": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "pfotzer_pole": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "pfotzer_equator": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "production_pct": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "global_ionisation_relative": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "gcr_energy_w_m2": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "sep_nox_mol_yr": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "epp_nox_mol_yr": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "ozone_upper_pct": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "sunspot_number",
+                "f107_sfu",
+                "speed_km_s",
+                "field_nt",
+                "kp_mean",
+                "cross_cap_potential_kv",
+                "cap_boundary_mlat_deg",
+                "oval_equatorward_midnight_mlat_deg",
+                "hemispheric_power_gw",
+                "joule_heating_gw",
+                "exospheric_k",
+                "hydrogen_escape_per_s",
+                "hydrogen_jeans_per_s",
+                "hydrogen_charge_exchange_per_s",
+                "hydrogen_polar_wind_per_s",
+                "oxygen_escape_per_s",
+                "helium_escape_per_s",
+                "mass_loss_kg_s",
+                "phi_gv",
+                "neutron_pole",
+                "neutron_equator",
+                "dose_pole_usv_h",
+                "dose_50deg_usv_h",
+                "dose_equator_usv_h",
+                "pfotzer_pole",
+                "pfotzer_equator",
+                "production_pct",
+                "global_ionisation_relative",
+                "gcr_energy_w_m2",
+                "sep_nox_mol_yr",
+                "epp_nox_mol_yr",
+                "ozone_upper_pct"
+              ]
+            }
+          },
+          "required": [
+            "path",
+            "first_year",
+            "last_year",
+            "months",
+            "forecast",
+            "data_origin",
+            "config",
+            "series"
+          ]
+        }
+      ]
+    },
+    "dipole_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "moment_ratio",
+          "standoff_re",
+          "cap_boundary_mlat_deg",
+          "cutoff_equator_gv",
+          "polar_window_share",
+          "global_ionisation_pct",
+          "production_pct",
+          "oxygen_escape_pct"
+        ]
+      }
+    },
+    "storm_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "kp",
+          "g_scale",
+          "dst_nt",
+          "standoff_re",
+          "aurora_overhead_mlat_deg",
+          "exospheric_k",
+          "density_400km_ratio",
+          "oxygen_escape_per_s"
+        ]
+      }
+    },
+    "methane_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "methane_ppmv",
+          "hydrogen_per_s",
+          "relative_to_today_pct"
+        ]
+      }
+    },
+    "sep_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "peak_pfu",
+          "efold_rigidity_gv",
+          "ion_pairs_pole_cm2_s",
+          "reach_mlat_deg",
+          "nox_per_hemisphere_mol",
+          "ozone_upper_pct",
+          "dose_pole_ratio"
+        ]
+      }
+    },
+    "cities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "latitude_deg",
+          "longitude_deg",
+          "magnetic_latitude_deg",
+          "cutoff_gv",
+          "dose_min_usv_h",
+          "dose_max_usv_h",
+          "aurora_at_storm_peak",
+          "electrojet_at_storm_peak"
+        ]
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "mean_escape",
+        "reservoirs",
+        "energy",
+        "storm",
+        "chemistry",
+        "clouds",
+        "aviation"
+      ]
+    },
+    "comparisons": {
+      "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

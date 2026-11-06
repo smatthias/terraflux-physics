@@ -19,6 +19,7 @@
 #include "terraflux/weather/ocean_circulation.hpp"
 #include "terraflux/weather/overturning_box.hpp"
 #include "terraflux/weather/sea_ice.hpp"
+#include "terraflux/weather/solar_forcing.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -190,6 +191,12 @@ struct Request {
     OverturningSetup overturning;
     std::vector<double> ensemble_salinity, ensemble_greenland_amplification;
     std::string map_scenario;
+    // Optional solar cycle from a terraflux-run-solar-cycle timeline: its surface-temperature response is added to
+    // every scenario's warming (the control included: the Sun varies in every world), and its TSI anomaly to the
+    // Arctic column's sunshine. The mean Sun outside its years.
+    std::optional<SolarForcingSeries> solar;
+    std::string solar_path;
+    bool solar_warming{true}, solar_shortwave{true};
     Json echo;
 };
 
@@ -224,6 +231,18 @@ Request parse_request(const Json& j) {
     }
     r.control = optional_bool(j, "control", r.control);
     r.map_scenario = optional_string(j, "map_scenario", r.scenarios.back().name);
+    if (j.contains("solar_cycle")) {
+        const Json& s = required(j, "solar_cycle");
+        if (!s.is_object()) throw std::invalid_argument("solar_cycle must be an object");
+        for (const auto& item : s.items())
+            if (item.key() != "timeline_path" && item.key() != "warming" && item.key() != "arctic_shortwave") throw std::invalid_argument("unknown field in solar_cycle: " + item.key());
+        r.solar_path = optional_string(s, "timeline_path", "");
+        if (r.solar_path.empty()) throw std::invalid_argument("solar_cycle needs a timeline_path");
+        r.solar_warming = optional_bool(s, "warming", true);
+        r.solar_shortwave = optional_bool(s, "arctic_shortwave", true);
+        if (!r.solar_warming && !r.solar_shortwave) throw std::invalid_argument("solar_cycle must apply the warming, the Arctic shortwave or both");
+        r.solar = load_solar_forcing(r.solar_path);
+    }
     if (std::none_of(r.scenarios.begin(), r.scenarios.end(), [&](const Scenario& s) { return s.name == r.map_scenario; })) throw std::invalid_argument("map_scenario must name a scenario");
 
     if (j.contains("greenland")) {
@@ -367,15 +386,15 @@ Request parse_request(const Json& j) {
 }
 
 // Daily-mean surface shortwave at a latitude on a day of the year (24 hourly samples of the sun).
-double daily_shortwave(double latitude_deg, double day_of_year, double vapour_pressure_pa, double cloud) {
+double daily_shortwave(double latitude_deg, double day_of_year, double vapour_pressure_pa, double cloud, double solar_constant_w_m2 = kSolarConstantW_m2) {
     double sum = 0.0;
-    for (int h = 0; h < 24; ++h) sum += surface_shortwave_w_m2(solar_cosine_zenith(latitude_deg, 0.0, day_of_year, h + 0.5), vapour_pressure_pa, cloud);
+    for (int h = 0; h < 24; ++h) sum += surface_shortwave_w_m2(solar_cosine_zenith(latitude_deg, 0.0, day_of_year, h + 0.5), vapour_pressure_pa, cloud, solar_constant_w_m2);
     return sum / 24.0;
 }
 
 double seasonal(double day_of_year, double amplitude) { return amplitude * std::cos(2.0 * kPi * (day_of_year - 196.0) / 365.25); }
 
-AirState arctic_air(const ArcticSetup& a, double warming, double day) {
+AirState arctic_air(const ArcticSetup& a, double warming, double day, double solar_constant_w_m2 = kSolarConstantW_m2) {
     AirState air;
     air.temperature_k = a.mean_temperature_k + a.warming_amplification * warming + seasonal(day, a.seasonal_amplitude_k);
     air.pressure_pa = 101325.0;
@@ -383,7 +402,7 @@ AirState arctic_air(const ArcticSetup& a, double warming, double day) {
     air.wind_speed_m_s = a.wind_speed_m_s;
     const double summer = 0.5 * (1.0 - std::cos(2.0 * kPi * (day - 15.0) / 365.25));   // 0 mid-January, 1 mid-July
     air.cloud_fraction = a.cloud_winter + (a.cloud_summer - a.cloud_winter) * summer;
-    air.shortwave_down_w_m2 = daily_shortwave(a.latitude_deg, day, vapour_pressure_pa(air.specific_humidity_kg_kg, air.pressure_pa), air.cloud_fraction);
+    air.shortwave_down_w_m2 = daily_shortwave(a.latitude_deg, day, vapour_pressure_pa(air.specific_humidity_kg_kg, air.pressure_pa), air.cloud_fraction, solar_constant_w_m2);
     return air;
 }
 
@@ -537,6 +556,9 @@ MemberResult run_member(const Request& r, const Scenario& sc, const Baseline& ba
     double arctic_store = base.arctic_flux_m3_s * residence;
     NormalSequence noise(static_cast<std::uint64_t>(r.overturning.seed));
     const double start_warming = sc.warming.at(r.start_year);
+    // The solar cycle's response is an anomaly about the mean Sun: added as it is, not relative to the start.
+    auto solar_warming = [&](double year) { return r.solar && r.solar_warming ? r.solar->warming_at(year) : 0.0; };
+    auto solar_constant = [&](double year) { return r.solar && r.solar_shortwave ? kSolarConstantW_m2 + r.solar->tsi_anomaly_at(year) : kSolarConstantW_m2; };
     const auto steps = static_cast<long long>(std::llround((r.end_year - r.start_year) * 365.25 / r.step_days));
     const std::size_t count = gl.enabled ? gl.config.grid.nx * gl.config.grid.ny : 0;
     // Annual accumulators.
@@ -550,7 +572,7 @@ MemberResult run_member(const Request& r, const Scenario& sc, const Baseline& ba
         const double t_years = (static_cast<double>(k) + 0.5) * r.step_days / 365.25;
         const double year = r.start_year + t_years;
         const double day = std::fmod(t_years, 1.0) * 365.25;
-        const double warming = sc.warming.at(year) - start_warming;
+        const double warming = sc.warming.at(year) - start_warming + solar_warming(year);
         // Greenland: every `substeps` model steps, over their combined interval (forced at its middle).
         double g_flux_anomaly = 0.0, thermal_forcing = 0.0;
         if (gl.enabled) {
@@ -559,7 +581,7 @@ MemberResult run_member(const Request& r, const Scenario& sc, const Baseline& ba
                 const long long n = std::min<long long>(static_cast<long long>(gl.substeps), steps - k);
                 const double span = dt * static_cast<double>(n);
                 const double mid_years = (static_cast<double>(k) + 0.5 * static_cast<double>(n)) * r.step_days / 365.25;
-                const double mid_warming = sc.warming.at(r.start_year + mid_years) - start_warming;
+                const double mid_warming = sc.warming.at(r.start_year + mid_years) - start_warming + solar_warming(r.start_year + mid_years);
                 const IceSheetForcing f = greenland_forcing(gl, ice, mid_warming, std::fmod(mid_years, 1.0) * 365.25, thermal_forcing);
                 ice = advance_ice_sheet(ice, f, gl.config, span);
                 for (std::size_t i = 0; i < count; ++i) air_sample[i] = gl.config.ocean[i] ? f.air_temperature_k[i] : ice.surface_air_temperature_k[i];
@@ -577,7 +599,7 @@ MemberResult run_member(const Request& r, const Scenario& sc, const Baseline& ba
             const double q_now = overturning_m3_s(ob, amoc.config);
             deep = r.arctic.config.deep_ocean_heat_flux_w_m2 * (r.arctic.heat_follows_overturning ? std::max(0.0, q_now / q0) : 1.0) + r.arctic.deep_heat_per_k * warming;
             col_config.deep_ocean_heat_flux_w_m2 = std::min(200.0, std::max(-50.0, deep));
-            col = advance_arctic_column(col, arctic_air(r.arctic, warming, day), col_config, dt);
+            col = advance_arctic_column(col, arctic_air(r.arctic, warming, day, solar_constant(year)), col_config, dt);
             const double decay = std::exp(-dt / residence);
             const double liquid = col.freshwater_m_s * col_config.arctic_ocean_area_m2;
             const double next_store = arctic_store * decay + liquid * residence * (1.0 - decay);
@@ -903,6 +925,15 @@ int main(int argc, char** argv) {
                                              "ecosystem indicators are physical stressors (temperature, oxygen solubility, sea ice, sea level), not an ecosystem model"})},
             }},
         };
+        // Only runs with a solar cycle carry the key (runs without one are unchanged).
+        if (r.solar) {
+            double largest = 0.0;
+            for (double v : r.solar->surface_k) largest = std::max(largest, std::abs(v));
+            output["polar"]["solar_cycle"] = {{"timeline_path", r.solar_path}, {"first_year", static_cast<int>(r.solar->years.front())}, {"last_year", static_cast<int>(r.solar->years.back())},
+                                              {"reference_tsi_w_m2", r.solar->reference_tsi_w_m2}, {"warming", r.solar_warming}, {"arctic_shortwave", r.solar_shortwave},
+                                              {"max_abs_warming_k", tidy(largest, 4)},
+                                              {"applied_to", "every scenario including the control, as an anomaly about the mean Sun (the mean Sun outside its years)"}};
+        }
         std::ofstream out(argv[2]);
         if (!out) throw std::runtime_error(std::string("cannot write output: ") + argv[2]);
         out << output.dump() << '\n';

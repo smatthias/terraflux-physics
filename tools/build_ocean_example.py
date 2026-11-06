@@ -1,5 +1,6 @@
 """Generate (or check) an engine viewer fixture with a built CLI (terraflux-run-ocean-circulation by default,
-or --cli terraflux-run-polar-melt / terraflux-run-coastal-flooding).
+or --cli terraflux-run-polar-melt / terraflux-run-coastal-flooding / terraflux-run-solar-cycle /
+terraflux-run-cosmic-dust / terraflux-run-solar-wind / terraflux-run-earth-forecast / terraflux-run-earth-climate).
 
 The fixture is the CLI timeline written compactly with sorted keys, the format of the committed
 viewer/public/ocean*/engine-timeline.json files. --check regenerates into a temporary directory and
@@ -144,7 +145,9 @@ def main():
     parser.add_argument('--build-dir', type=Path, default=ROOT / 'build')
     parser.add_argument('--request', type=Path, default=ROOT / 'examples/ocean-heat-rain-request.json')
     parser.add_argument('--output', type=Path, default=ROOT / 'viewer/public/ocean-heat/engine-timeline.json')
-    parser.add_argument('--cli', default='terraflux-run-ocean-circulation', choices=['terraflux-run-ocean-circulation', 'terraflux-run-polar-melt', 'terraflux-run-coastal-flooding'])
+    parser.add_argument('--cli', default='terraflux-run-ocean-circulation',
+                        choices=['terraflux-run-ocean-circulation', 'terraflux-run-polar-melt', 'terraflux-run-coastal-flooding', 'terraflux-run-solar-cycle',
+                                 'terraflux-run-cosmic-dust', 'terraflux-run-solar-wind', 'terraflux-run-earth-forecast', 'terraflux-run-earth-climate'])
     parser.add_argument('--check', action='store_true', help='check that the committed fixture matches regeneration')
     parser.add_argument('--rtol', type=float, default=1e-6, help='relative tolerance of single numbers in --check (default 1e-6)')
     parser.add_argument('--field-tolerance', type=float, default=1e-4,

@@ -1,0 +1,746 @@
+{
+  "schema_version": "terraflux.earth.forecast-run/v1",
+  "grid": {
+    "nx": 52,
+    "ny": 32,
+    "spacing_m": 210000,
+    "anchor_latitude_deg": 40,
+    "anchor_longitude_deg": -45,
+    "note": "The North Atlantic sector from the US Plains to central Europe and from the Caribbean to Iceland, in the local azimuthal-equidistant frame of 40 N, 45 W; 210 km cells."
+  },
+  "time": {
+    "start_utc": "2026-09-08T00:00:00Z",
+    "days": 10,
+    "timestep_seconds": 600,
+    "detail_hours": 72,
+    "detail_every_hours": 3,
+    "later_every_hours": 12,
+    "diagnose_detail_every_hours": 6
+  },
+  "ensemble": {
+    "members": 10,
+    "seed": 2026,
+    "truth_seed": 4242,
+    "threads": 4,
+    "spread": {
+      "position_km": 50,
+      "speed_m_s": 0.8,
+      "deepening_pa_per_day": 250,
+      "radius_fraction": 0.08,
+      "genesis_position_km": 250,
+      "genesis_timing_hours": 6,
+      "temperature_k": 0.6,
+      "hurricane_position_km": 40,
+      "hurricane_wind_m_s": 3
+    },
+    "note": "Ten members and a hidden truth member, all drawn from the same error distribution."
+  },
+  "atmosphere": {
+    "surface_friction_coefficient_s": 5e-05,
+    "diffusion_m2_s": 40000
+  },
+  "synoptic": {
+    "background_pressure_pa": 101200,
+    "steering": {
+      "jet_latitude_deg": 46,
+      "jet_speed_m_s": 14,
+      "jet_width_deg": 12,
+      "trade_latitude_deg": 15,
+      "trade_speed_m_s": 7,
+      "trade_width_deg": 8
+    },
+    "systems": [
+      {
+        "name": "Bermuda-Azores high",
+        "kind": "high",
+        "latitude_deg": 31,
+        "longitude_deg": -52,
+        "anomaly_hpa": 12,
+        "radius_km": 1800,
+        "steering_factor": 0.1,
+        "mature_hours": 999,
+        "filling_hpa_per_day": 0
+      },
+      {
+        "name": "Icelandic low",
+        "kind": "low",
+        "latitude_deg": 61,
+        "longitude_deg": -30,
+        "anomaly_hpa": -14,
+        "radius_km": 1200,
+        "steering_factor": 0.25,
+        "mature_hours": 999,
+        "filling_hpa_per_day": 0
+      },
+      {
+        "name": "Great Lakes low",
+        "kind": "low",
+        "latitude_deg": 46,
+        "longitude_deg": -88,
+        "anomaly_hpa": -10,
+        "radius_km": 900,
+        "deepening_hpa_per_day": 8,
+        "mature_hours": 60,
+        "filling_hpa_per_day": 4,
+        "steering_factor": 0.9,
+        "drift_north_m_s": 1.0
+      },
+      {
+        "name": "Canadian high",
+        "kind": "high",
+        "latitude_deg": 52,
+        "longitude_deg": -101,
+        "anomaly_hpa": 9,
+        "radius_km": 1200,
+        "steering_factor": 0.55,
+        "drift_north_m_s": -1.5,
+        "mature_hours": 96,
+        "filling_hpa_per_day": 2
+      },
+      {
+        "name": "Central European high",
+        "kind": "high",
+        "latitude_deg": 50,
+        "longitude_deg": 12,
+        "anomaly_hpa": 8,
+        "radius_km": 1300,
+        "steering_factor": 0.15,
+        "mature_hours": 72,
+        "filling_hpa_per_day": 1.5
+      },
+      {
+        "name": "Central Plains low",
+        "kind": "low",
+        "latitude_deg": 38,
+        "longitude_deg": -101,
+        "anomaly_hpa": -16,
+        "radius_km": 650,
+        "deepening_hpa_per_day": 10,
+        "mature_hours": 36,
+        "filling_hpa_per_day": 6,
+        "steering_factor": 0.8,
+        "drift_north_m_s": 2.0,
+        "start_hours": 12
+      }
+    ],
+    "genesis": [
+      {
+        "name": "US East Coast cyclone",
+        "latitude_deg": 38,
+        "longitude_deg": -70,
+        "first_hours": 60,
+        "every_hours": 60,
+        "last_hours": 200,
+        "anomaly_hpa": -8,
+        "radius_km": 800,
+        "deepening_hpa_per_day": 10,
+        "mature_hours": 36,
+        "filling_hpa_per_day": 6,
+        "steering_factor": 1.0,
+        "drift_north_m_s": 2.0
+      }
+    ],
+    "note": "A synthetic early-September situation, not a reconstruction: the subtropical high, the Icelandic low, a low over the Great Lakes that deepens over the Atlantic and reaches Europe, a lee cyclone forming within hours over the Central Plains at midday of the first day (severe thunderstorms in the moist, warm return flow from the Gulf), a cold high over Canada, a high over Europe, and new cyclones off the US East Coast every 2.5 days."
+  },
+  "synoptic_weather": {
+    "low_ascent_m_s": 0.08,
+    "high_subsidence_m_s": 0.015,
+    "warm_sector_bias": 0.6,
+    "warm_sector_direction_deg": 60,
+    "convergence_depth_m": 1500,
+    "cloud_rh": 0.6,
+    "full_cloud_rh": 0.95,
+    "rain_rh": 0.72,
+    "efficiency": 0.6,
+    "orographic_lift_factor": 0.5,
+    "note": "The ascent of the warm conveyor belt ahead of lows (strongest to the east-northeast) and the subsidence of highs, which the single layer cannot make itself: layered cloud and rain. Half of the upslope wind rises over the terrain (orographic cloud and rain on the windward slopes)."
+  },
+  "air_masses": {
+    "temperature": [
+      {
+        "name": "Gulf warmth",
+        "latitude_deg": 30,
+        "longitude_deg": -95,
+        "radius_km": 900,
+        "amplitude": 2.0
+      },
+      {
+        "name": "Cold air behind the front",
+        "latitude_deg": 52,
+        "longitude_deg": -98,
+        "radius_km": 900,
+        "amplitude": -5.0
+      },
+      {
+        "name": "Late-summer heat over Europe",
+        "latitude_deg": 47,
+        "longitude_deg": 6,
+        "radius_km": 900,
+        "amplitude": 3.0
+      },
+      {
+        "name": "Warm sector",
+        "latitude_deg": 34,
+        "longitude_deg": -96,
+        "radius_km": 600,
+        "amplitude": 3.0
+      }
+    ],
+    "humidity": [
+      {
+        "name": "Gulf moisture",
+        "latitude_deg": 31,
+        "longitude_deg": -94,
+        "radius_km": 800,
+        "amplitude": 2.5
+      },
+      {
+        "name": "Moist return flow",
+        "latitude_deg": 33,
+        "longitude_deg": -96,
+        "radius_km": 600,
+        "amplitude": 4.0
+      }
+    ]
+  },
+  "surface": {
+    "sst_profile": [
+      [
+        0,
+        302.5
+      ],
+      [
+        15,
+        302.2
+      ],
+      [
+        25,
+        301.8
+      ],
+      [
+        30,
+        300.5
+      ],
+      [
+        35,
+        298.0
+      ],
+      [
+        40,
+        293.5
+      ],
+      [
+        45,
+        289.5
+      ],
+      [
+        50,
+        286.5
+      ],
+      [
+        55,
+        283.5
+      ],
+      [
+        60,
+        281.0
+      ],
+      [
+        70,
+        277.0
+      ]
+    ],
+    "sst_anomalies": [
+      {
+        "name": "Gulf Stream",
+        "latitude_deg": 37,
+        "longitude_deg": -70,
+        "radius_km": 500,
+        "amplitude": 3.5
+      },
+      {
+        "name": "Gulf Stream extension",
+        "latitude_deg": 41,
+        "longitude_deg": -58,
+        "radius_km": 500,
+        "amplitude": 3.0
+      },
+      {
+        "name": "North Atlantic Drift",
+        "latitude_deg": 52,
+        "longitude_deg": -25,
+        "radius_km": 900,
+        "amplitude": 2.0
+      },
+      {
+        "name": "Labrador Current",
+        "latitude_deg": 47,
+        "longitude_deg": -50,
+        "radius_km": 450,
+        "amplitude": -4.0
+      },
+      {
+        "name": "Canary upwelling",
+        "latitude_deg": 25,
+        "longitude_deg": -18,
+        "radius_km": 500,
+        "amplitude": -2.0
+      },
+      {
+        "name": "Gulf of Mexico",
+        "latitude_deg": 25,
+        "longitude_deg": -90,
+        "radius_km": 600,
+        "amplitude": 0.8
+      }
+    ],
+    "land_profile": [
+      [
+        0,
+        300.0
+      ],
+      [
+        15,
+        300.5
+      ],
+      [
+        25,
+        300.5
+      ],
+      [
+        30,
+        299.5
+      ],
+      [
+        35,
+        297.5
+      ],
+      [
+        40,
+        294.5
+      ],
+      [
+        45,
+        291.5
+      ],
+      [
+        50,
+        288.5
+      ],
+      [
+        55,
+        285.5
+      ],
+      [
+        60,
+        283.0
+      ],
+      [
+        70,
+        276.0
+      ]
+    ],
+    "lapse_rate_k_per_km": 6.5,
+    "soil_moisture": 0.5,
+    "soil_anomalies": [
+      {
+        "name": "Great Plains (dry)",
+        "latitude_deg": 36,
+        "longitude_deg": -100,
+        "radius_km": 700,
+        "amplitude": -0.25
+      },
+      {
+        "name": "Southwest (dry)",
+        "latitude_deg": 32,
+        "longitude_deg": -108,
+        "radius_km": 600,
+        "amplitude": -0.3
+      },
+      {
+        "name": "Southeast (wet)",
+        "latitude_deg": 33,
+        "longitude_deg": -84,
+        "radius_km": 600,
+        "amplitude": 0.15
+      },
+      {
+        "name": "Iberia (dry)",
+        "latitude_deg": 40,
+        "longitude_deg": -4,
+        "radius_km": 500,
+        "amplitude": -0.25
+      },
+      {
+        "name": "Sahara",
+        "latitude_deg": 27,
+        "longitude_deg": -4,
+        "radius_km": 1000,
+        "amplitude": -0.45
+      },
+      {
+        "name": "Northern Europe (wet)",
+        "latitude_deg": 55,
+        "longitude_deg": 8,
+        "radius_km": 800,
+        "amplitude": 0.1
+      }
+    ],
+    "terrain": {
+      "ridges": [
+        {
+          "name": "Rocky Mountains",
+          "latitude_deg": 40,
+          "longitude_deg": -106,
+          "orientation_deg": 0,
+          "length_km": 2500,
+          "half_width_km": 250,
+          "height_m": 2300
+        },
+        {
+          "name": "Appalachians",
+          "latitude_deg": 37.5,
+          "longitude_deg": -80.5,
+          "orientation_deg": 35,
+          "length_km": 1400,
+          "half_width_km": 130,
+          "height_m": 900
+        },
+        {
+          "name": "Alps",
+          "latitude_deg": 46.3,
+          "longitude_deg": 9,
+          "orientation_deg": 70,
+          "length_km": 700,
+          "half_width_km": 90,
+          "height_m": 2200
+        },
+        {
+          "name": "Pyrenees",
+          "latitude_deg": 42.7,
+          "longitude_deg": 0.5,
+          "orientation_deg": 95,
+          "length_km": 420,
+          "half_width_km": 50,
+          "height_m": 1600
+        },
+        {
+          "name": "Iberian Meseta",
+          "latitude_deg": 40,
+          "longitude_deg": -4,
+          "orientation_deg": 0,
+          "length_km": 500,
+          "half_width_km": 250,
+          "height_m": 700
+        },
+        {
+          "name": "Atlas",
+          "latitude_deg": 32,
+          "longitude_deg": -4,
+          "orientation_deg": 60,
+          "length_km": 1000,
+          "half_width_km": 120,
+          "height_m": 1800
+        },
+        {
+          "name": "Scandinavian Mountains",
+          "latitude_deg": 63,
+          "longitude_deg": 12,
+          "orientation_deg": 25,
+          "length_km": 1200,
+          "half_width_km": 120,
+          "height_m": 1000
+        },
+        {
+          "name": "Greenland ice sheet",
+          "latitude_deg": 72,
+          "longitude_deg": -40,
+          "orientation_deg": 0,
+          "length_km": 2000,
+          "half_width_km": 450,
+          "height_m": 2500
+        }
+      ],
+      "note": "Idealised Gaussian ranges at roughly the right places and heights (hand-entered), not a digital elevation model."
+    },
+    "coupling": {
+      "ocean_temperature_time_h": 24,
+      "sea_air_offset_k": 0.5,
+      "ocean_moisture_time_h": 24,
+      "sea_relative_humidity": 0.8,
+      "land_heating_k_per_h": 1.6,
+      "dry_soil_warming_k": 4,
+      "cloud_shading": 0.6,
+      "wet_soil_heating_reduction": 0.5,
+      "evapotranspiration_g_kg_per_h": 0.25,
+      "land_climate_time_h": 72,
+      "soil_capacity_mm": 100,
+      "drainage_mm_per_day": 8,
+      "boundary_layer_depth_m": 1500
+    },
+    "note": "Sea-surface temperatures and land climate are rounded early-September values by latitude with the main currents as anomalies; soil moisture is a rough pattern.",
+    "land_mask": [
+      "###############..#..##..#####.........####.#######..",
+      "#############......###..####...##........#.#######..",
+      "#############.......#...###..............##########.",
+      "##############....#.....###..........#...###########",
+      "##############...##......##..........##..##########.",
+      "###############..####................#.############.",
+      "###############.#####................#.#.#####....##",
+      "######################..................#####.###...",
+      "######################...................###........",
+      "######################....................##........",
+      "###################......................###........",
+      "###################..##.................###...###.##",
+      "####################....................####.#######",
+      "################........................###.########",
+      "##############.............................#########",
+      "#############.............................##########",
+      "##...#######..............................##########",
+      "#.......##................................##########",
+      "#........#................................##########",
+      "#........#...............................###########",
+      "#........................................###########",
+      "##.##...................................############",
+      ".####...................................############",
+      "..##....................................############",
+      "..###...................................############",
+      "...###......##...........................###########",
+      "....##...................................###########",
+      "....#....................................###########",
+      ".....#...................................###########",
+      "......#...##...............................#######..",
+      "........#######.............................####....",
+      "........#########..................................."
+    ],
+    "land_mask_source": "global-land-mask 1.0.0 (MIT; GLOBE 1 km elevation, NOAA), majority of 3 x 3 points per cell by tools/make_land_mask.py"
+  },
+  "hurricanes": {
+    "seeds": [
+      {
+        "name": "Hurricane Ada (synthetic)",
+        "latitude_deg": 21.5,
+        "longitude_deg": -66.5,
+        "start_hours": 0,
+        "max_wind_m_s": 36,
+        "radius_max_wind_km": 40
+      }
+    ],
+    "note": "Tropical cyclones come only from the seeds (spontaneous genesis is off). On the 210 km grid their wind is a modified Rankine vortex (tropical-storm winds reach a few hundred km), with a rain shield and a coastal surge of at least a cell's width.",
+    "wind_decay_exponent": 0.6,
+    "rain_scale_km": 250,
+    "surge_reach_km": 300
+  },
+  "column": {
+    "layer_count": 16,
+    "layer_thickness_m": 800,
+    "environment_lapse_rate_k_m": 0.0065,
+    "tropopause_height_m": 12000,
+    "humidity_scale_height_m": 2500,
+    "parcel_step_m": 100,
+    "inversion_base_m": 1600,
+    "inversion_depth_m": 400,
+    "inversion_strength_k": 1.0,
+    "lapse_rate_above_inversion_k_m": 0.0082
+  },
+  "clouds": {
+    "frontal_gradient_threshold_k_m": 1e-05,
+    "note": "A frontal zone from 1 K per 100 km: the 210 km grid smooths the fronts."
+  },
+  "precipitation": {
+    "stratiform_efficiency": 0.7,
+    "convective_efficiency": 0.25,
+    "convective_updraft_fraction": 0.08,
+    "moist_depth_m": 3000,
+    "rain_floor_relative_humidity": 0.4,
+    "hail_full_freezing_level_m": 3000,
+    "hail_none_freezing_level_m": 4500,
+    "note": "Convective and frontal rain draws on the moisture of a 3 km deep layer down to 40 % relative humidity. Large hail reaches the ground in full where the freezing level lies below 3 km and not above 4.5 km: the column keeps a constant 6.5 K/km environment, so its tropical freezing level (about 4.4 km) sits lower than the observed 4.8-5 km."
+  },
+  "gusts": {
+    "gust_factor": 1.45,
+    "convective_gust_m_s": 8,
+    "terrain_reduction_per_km": 0.1,
+    "surface_factor_land": 0.6,
+    "surface_factor_sea": 0.8,
+    "note": "The 10 m wind is the wind of the coupled 1.5 km layer slowed by surface friction (0.6 over land, 0.8 over the sea; mountains reduce it further), plus the hurricane vortex. Gusts: 10 m wind x 1.45, plus 8 m/s of downdraft under thunderstorms."
+  },
+  "warnings": {
+    "min_probability": 0.3,
+    "tornado_min_probability": 0.15,
+    "gust_m_s": [
+      18,
+      25,
+      33
+    ],
+    "rain_24h_mm": [
+      30,
+      60,
+      100
+    ],
+    "runoff_72h_mm": [
+      40,
+      80,
+      150
+    ],
+    "hail_cm": [
+      2,
+      3,
+      5
+    ],
+    "tornado_stp": [
+      1,
+      3,
+      6
+    ],
+    "hurricane_wind_m_s": [
+      18,
+      33,
+      50
+    ],
+    "surge_m": [
+      1,
+      2,
+      3
+    ],
+    "note": "Levels yellow, orange, red; a level is issued where at least min_probability of the members exceed its threshold (tornadoes: tornado_min_probability; red needs red_min_probability). Gusts 18/25/33 m/s are about 65/90/120 km/h; thunderstorms: yellow any, orange hail of 3 cm, red hail of 5 cm. Floods: 40/80/150 mm of runoff in 72 hours (saturation excess from wet soils and slopes, a flood index rather than river levels).",
+    "red_min_probability": 0.5
+  },
+  "sensitivity": {
+    "runs": [
+      "no_ocean_coupling",
+      "uniform_soil",
+      "flat_terrain",
+      "no_sun"
+    ],
+    "days": 3,
+    "note": "The unperturbed control is rerun with one coupling switched off: what each link contributes to the forecast."
+  },
+  "cities": [
+    {
+      "name": "Miami",
+      "latitude_deg": 25.76,
+      "longitude_deg": -80.19
+    },
+    {
+      "name": "Tampa",
+      "latitude_deg": 27.95,
+      "longitude_deg": -82.46
+    },
+    {
+      "name": "New Orleans",
+      "latitude_deg": 29.95,
+      "longitude_deg": -90.07
+    },
+    {
+      "name": "Houston",
+      "latitude_deg": 29.76,
+      "longitude_deg": -95.37
+    },
+    {
+      "name": "Havana",
+      "latitude_deg": 23.11,
+      "longitude_deg": -82.37
+    },
+    {
+      "name": "San Juan",
+      "latitude_deg": 18.47,
+      "longitude_deg": -66.1
+    },
+    {
+      "name": "Atlanta",
+      "latitude_deg": 33.75,
+      "longitude_deg": -84.39
+    },
+    {
+      "name": "Oklahoma City",
+      "latitude_deg": 35.47,
+      "longitude_deg": -97.52
+    },
+    {
+      "name": "Chicago",
+      "latitude_deg": 41.88,
+      "longitude_deg": -87.63
+    },
+    {
+      "name": "Washington",
+      "latitude_deg": 38.9,
+      "longitude_deg": -77.04
+    },
+    {
+      "name": "New York",
+      "latitude_deg": 40.71,
+      "longitude_deg": -74.0
+    },
+    {
+      "name": "Boston",
+      "latitude_deg": 42.36,
+      "longitude_deg": -71.06
+    },
+    {
+      "name": "Toronto",
+      "latitude_deg": 43.65,
+      "longitude_deg": -79.38
+    },
+    {
+      "name": "Halifax",
+      "latitude_deg": 44.65,
+      "longitude_deg": -63.57
+    },
+    {
+      "name": "St. John's",
+      "latitude_deg": 47.56,
+      "longitude_deg": -52.71
+    },
+    {
+      "name": "Bermuda",
+      "latitude_deg": 32.3,
+      "longitude_deg": -64.78
+    },
+    {
+      "name": "Ponta Delgada (Azores)",
+      "latitude_deg": 37.74,
+      "longitude_deg": -25.67
+    },
+    {
+      "name": "Reykjavík",
+      "latitude_deg": 64.15,
+      "longitude_deg": -21.94
+    },
+    {
+      "name": "Dublin",
+      "latitude_deg": 53.35,
+      "longitude_deg": -6.26
+    },
+    {
+      "name": "London",
+      "latitude_deg": 51.51,
+      "longitude_deg": -0.13
+    },
+    {
+      "name": "Paris",
+      "latitude_deg": 48.86,
+      "longitude_deg": 2.35
+    },
+    {
+      "name": "Amsterdam",
+      "latitude_deg": 52.37,
+      "longitude_deg": 4.9
+    },
+    {
+      "name": "Berlin",
+      "latitude_deg": 52.52,
+      "longitude_deg": 13.4
+    },
+    {
+      "name": "Madrid",
+      "latitude_deg": 40.42,
+      "longitude_deg": -3.7
+    },
+    {
+      "name": "Lisbon",
+      "latitude_deg": 38.72,
+      "longitude_deg": -9.14
+    }
+  ]
+}

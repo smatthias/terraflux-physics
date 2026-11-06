@@ -1024,7 +1024,25 @@
                   "properties": {
                     "kind": {
                       "const": "astronomical"
+                    },
+                    "solar_constant_w_m2": {
+                      "type": "number",
+                      "minimum": 1300,
+                      "maximum": 1400,
+                      "default": 1361,
+                      "description": "Top-of-atmosphere irradiance of the astronomical shortwave."
+                    },
+                    "solar_cycle_path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A terraflux-run-solar-cycle timeline (or a terraflux.solar.forcing/v1 file), relative to the working directory: its annual TSI is applied as an anomaly, 1361 W/m2 + TSI(t) - its mean TSI, at each step's date (the mean Sun outside its years). Excludes solar_constant_w_m2."
                     }
+                  },
+                  "not": {
+                    "required": [
+                      "solar_constant_w_m2",
+                      "solar_cycle_path"
+                    ]
                   }
                 },
                 {

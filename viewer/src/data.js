@@ -3,6 +3,9 @@ import { validateHydrology } from './hydrology.js'
 import { validateOcean } from './ocean.js'
 import { validatePolar } from './polar.js'
 import { validateCoast } from './coastal.js'
+import { validateSolar } from './solar.js'
+import { validateCosmicDust } from './cosmicDust.js'
+import { validateSolarWind } from './solarWind.js'
 const finite = n => typeof n === 'number' && Number.isFinite(n)
 const check = (ok, message) => { if (!ok) throw new Error(message) }
 export function validate(input) {
@@ -167,6 +170,18 @@ export function validateSequence(input) {
   if(input.coast !== undefined){
     check(input.terrain !== undefined, 'Coastal flooding requires the terrain grid.')
     validateCoast(input.coast, frames, frames[0].terrain)
+  }
+  if(input.cosmic_dust !== undefined){
+    check(input.terrain === undefined, 'A cosmic dust timeline carries a global map, not a terrain grid.')
+    validateCosmicDust(input.cosmic_dust, frames)
+  }
+  if(input.solar_wind !== undefined){
+    check(input.terrain === undefined, 'A solar wind timeline carries a global map, not a terrain grid.')
+    validateSolarWind(input.solar_wind, frames)
+  }
+  if(input.solar !== undefined){
+    check(input.terrain === undefined, 'A solar timeline carries the disk, not a terrain grid.')
+    validateSolar(input.solar, frames)
   }
   if(input.terrain_derivatives !== undefined){
     const d=input.terrain_derivatives, count=first.grid.nx*first.grid.ny

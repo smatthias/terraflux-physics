@@ -6,8 +6,8 @@ export const LAYER_GROUPS = [
   {
     id: 'air', title: 'Weather & air', tooltip: 'Temperature, wind, pressure and moisture of the air near the ground.',
     layers: [
-      { key: 'temperature', title: 'Air temperature', subtitle: 'Dry transport · °C', tooltip: 'Air temperature near the ground, carried by the wind and smoothed by diffusion. With a terrain grid it can be corrected by the lapse rate (colder up high).', needs: d => !d.coast },
-      { key: 'wind', title: 'Wind speed', subtitle: 'Prescribed field · m/s', tooltip: 'Wind speed near the ground. In coupled runs it follows from the pressure pattern, the Coriolis force and surface friction; arrows show the direction.', needs: () => true },
+      { key: 'temperature', title: 'Air temperature', subtitle: 'Dry transport · °C', tooltip: 'Air temperature near the ground, carried by the wind and smoothed by diffusion. With a terrain grid it can be corrected by the lapse rate (colder up high).', needs: d => !d.coast && !d.solar && !d.dust && !d.solarWind },
+      { key: 'wind', title: 'Wind speed', subtitle: 'Prescribed field · m/s', tooltip: 'Wind speed near the ground. In coupled runs it follows from the pressure pattern, the Coriolis force and surface friction; arrows show the direction.', needs: d => !d.solar && !d.dust && !d.solarWind },
       { key: 'pressure', title: 'Sea-level pressure', subtitle: 'Synthetic regional field · hPa', tooltip: 'Air pressure reduced to sea level. Lows (blue) bring wind and weather, highs (red) calm and dry conditions.', needs: d => !!(d.atmosphere || d.coupled) },
       { key: 'humidity', title: 'Relative humidity', subtitle: 'Synthetic regional field · %', tooltip: 'How close the air is to saturation. At 100 % water vapour condenses into cloud.', needs: d => !!(d.atmosphere || d.coupled) },
       { key: 'density', title: 'Air density', subtitle: 'Coupled moist layer · kg/m³', tooltip: 'Mass of a cubic metre of air, from pressure, temperature and humidity. Warm, moist air is lighter and accelerates faster under the same pressure gradient.', needs: has('coupled') },
@@ -109,6 +109,22 @@ export const LAYER_GROUPS = [
     ],
   },
   {
+    id: 'sun', title: 'Sun & space weather', tooltip: 'The solar disk of the sunspot cycle (spots, faculae and flaring regions on an illustrative day), the solar wind at the polar caps (aurora, escaping ions, cosmic radiation) and the cosmic dust entering the Earth.',
+    layers: [
+      { key: 'sunbrightness', title: 'Photosphere brightness', subtitle: 'Solar disk · K', tooltip: 'Brightness temperature of the visible solar surface: limb darkening toward the edge, dark sunspots, slightly brighter faculae. One illustrative day of the month.', needs: has('solar') },
+      { key: 'suncontrast', title: 'Contrast to the quiet Sun', subtitle: 'Spots − / faculae + · %', tooltip: 'Intensity against the same cell of a spotless Sun: sunspots remove light, faculae add a little. Integrated over the disk the faculae usually win, so the Sun is brighter at maximum.', needs: has('solar') },
+      { key: 'windaurora', title: 'Aurora (particle energy)', subtitle: 'Storm hour · mW/m²', tooltip: 'Energy carried into the upper atmosphere by electrons and ions raining down along the auroral oval, the ring around each magnetic pole where the field lines reach into the magnetotail. It spreads towards the equator in storms.', needs: has('solarWind') },
+      { key: 'windoutflow', title: 'Escaping oxygen ions', subtitle: 'O⁺ upflow · 10⁷ ions/cm²/s', tooltip: 'Oxygen ions lifted out of the ionosphere along open and stretched field lines: the cleft ion fountain at the cusp (noon) and the night-side oval. Part of it leaves the Earth for good. Oxygen cannot escape any other way.', needs: has('solarWind') },
+      { key: 'winddose', title: 'Cosmic radiation at 12 km', subtitle: 'Flight altitude · µSv/h', tooltip: 'Effective dose rate from galactic cosmic rays (and solar protons) at cruising altitude. The field shields the equator (cutoff about 14 GV); over the poles almost nothing is held back.', needs: has('solarWind') },
+      { key: 'windsep', title: 'Solar-proton ionisation', subtitle: 'Column · 10⁹ ion pairs/cm²/s', tooltip: 'Ion pairs made by solar energetic protons in the whole atmospheric column. They only reach the polar caps (polar cap absorption), where they make NOx that destroys ozone.', needs: has('solarWind') },
+      { key: 'windcutoff', title: 'Cutoff rigidity', subtitle: 'Magnetic shielding · GV', tooltip: 'The lowest rigidity (momentum per charge) a charged particle needs to reach the atmosphere here from straight above: high at the magnetic equator, near zero at the poles; lowered by the ring current in storms.', needs: has('solarWind') },
+      { key: 'windthermo', title: 'Thermosphere temperature', subtitle: 'Exosphere · K', tooltip: 'Temperature of the upper thermosphere (Jacchia): set by the Sun\'s EUV with a day-night cycle, and raised in storms by Joule heating and particles, most at high latitudes. A hotter thermosphere expands: more drag on satellites, more hydrogen escape.', needs: has('solarWind') },
+      { key: 'windregion', title: 'Open and closed field', subtitle: 'Polar cap · oval · cusp', tooltip: 'Where the field lines are open to the solar wind (polar cap), where they reach the magnetotail (auroral oval), the cusp near noon where the solar wind enters, and the closed, shielded field at lower latitudes.', needs: has('solarWind') },
+      { key: 'dustinflux', title: 'Cosmic dust influx', subtitle: 'This hour · µg/m²/day', tooltip: 'Mass of interplanetary dust and small meteoroids entering the atmosphere per square metre, as a daily rate at this hour: the side of the Earth facing its direction of motion (local morning) sweeps up more.', needs: has('dust') },
+      { key: 'dustdaily', title: 'Cosmic dust, daily mean', subtitle: 'Over the day · µg/m²/day', tooltip: 'The influx averaged over the day: its variation with latitude follows the position of the apex of the Earth\'s way in the sky, which changes with the seasons.', needs: has('dust') },
+    ],
+  },
+  {
     id: 'carbon', title: 'Carbon & ocean life', tooltip: 'CO₂ in the air and the sea: the ocean\'s uptake, acidification, oxygen, and the dead zones where sea life cannot live.',
     layers: [
       { key: 'co2air', title: 'CO₂ in the air', subtitle: 'Boundary layer · ppm', tooltip: 'CO₂ of the air near the ground over land and sea: the scenario background, raised by cities and industry, carried by the wind, drawn down by plants in daylight and by the sea.', needs: has('carbon') },
@@ -161,6 +177,10 @@ export function layerSubtitle(layer, data) {
 
 // The example datasets, grouped the same way, each with a tooltip.
 export const EXAMPLE_GROUPS = [
+  { id: 'earth', title: 'Coupled Earth', examples: [
+    { action: 'openEarthForecast', label: '🌍 Open the coupled 10-day forecast', tooltip: 'Ocean, land, mountains, the Sun and a hurricane coupled to the weather: a 10-member ensemble forecast with 3/5/7/10-day products, a 3-day wind forecast and severe-weather warnings (Coupled Earth workspace).' },
+    { action: 'openEarthClimate', label: '🌡 Open climate drivers & CO₂ impact', tooltip: 'Which drivers change the climate most (CO₂, methane, aerosols, the Sun, volcanoes, space), what the warming does, and where CO₂ comes from, goes and hits hardest (Coupled Earth workspace).' },
+  ] },
   { id: 'weather', title: 'Weather', examples: [
     { action: 'loadEngineExample', label: '→ Load engine example', tooltip: 'Temperature transport, radar rainfall and surface water on a small synthetic grid: wet weather, then drying.' },
     { action: 'loadCoupledExample', label: '⇶ Load coupled wind example', tooltip: 'Wind from pressure systems with Coriolis and friction, coupled to temperature, humidity and air density.' },
@@ -184,6 +204,11 @@ export const EXAMPLE_GROUPS = [
   { id: 'carbon', title: 'Carbon & ocean life', examples: [
     { action: 'loadCarbonExample', label: '🫧 Load ocean carbon & dead zones (today)', tooltip: 'A Gulf-like sea under today\'s 427 ppm: city and refinery CO₂ plumes, the sea taking up CO₂, a delta river whose nitrate feeds a summer dead zone.' },
     { action: 'loadCarbon2100Example', label: '🌡 Load ocean carbon & dead zones (2100)', tooltip: 'The same sea in 2100 under high emissions (about 1,010 ppm, 3 K warmer): more acid, less shell-friendly, larger dead zones.' },
+  ] },
+  { id: 'space', title: 'Sun & space weather', examples: [
+    { action: 'loadSolarExample', label: '☀ Load solar cycle & space weather example', tooltip: 'The 11-year sunspot cycle since 1850 with its minima and maxima, a tested forecast to 2050, and what the cycle does to UV, ozone, flares and the climate.' },
+    { action: 'loadWindExample', label: '🧲 Load solar wind & polar caps example', tooltip: 'A severe geomagnetic storm at the March equinox: the solar wind, the polar caps and the aurora, the ions escaping to space, cosmic radiation and solar protons over the poles, and what it means globally.' },
+    { action: 'loadDustExample', label: '☄ Load cosmic dust & extraterrestrial water example', tooltip: 'The 30-100 t of dust and small meteoroids entering the Earth every day: what burns up, what reaches the ground, where the extraterrestrial water goes, and whether it matters.' },
   ] },
   { id: 'coast', title: 'Sea level & coasts', examples: [
     { action: 'loadCoastExample', label: '🏝 Load sea-level rise & coasts example', tooltip: 'The sea-level rise of the polar-melt scenarios on a coast with a delta, an estuary city, barrier islands, cliffs and low islands: land lost, storm floods, defences, rivers.' },

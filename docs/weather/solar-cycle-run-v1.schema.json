@@ -1,0 +1,1170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/solar-cycle-run-v1.schema.json",
+  "title": "TerraFlux solar cycle run request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record",
+    "forecast",
+    "uv_sites",
+    "disk"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.solar.cycle-run/v1"
+    },
+    "record": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "cycle_table"
+            },
+            "data_origin": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Where the table comes from; copied into the output."
+            },
+            "first_cycle_number": {
+              "type": "integer",
+              "minimum": -100,
+              "maximum": 1000,
+              "description": "Number of the cycle that starts at the first minimum detected in the synthesised record; must be in the table."
+            },
+            "start_year": {
+              "type": "number",
+              "minimum": 1600,
+              "description": "First month of the synthesised record; it should lie in the decline of the table's first cycle."
+            },
+            "calibrate_widths": {
+              "type": "boolean",
+              "default": false,
+              "description": "Scale each cycle's width until its maximum falls on maximum_year (off: single smooth curves cannot represent double peaks)."
+            },
+            "first_lead_years": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0.3,
+              "description": "Onset of the first table cycle before its minimum (it has no predecessor to calibrate against)."
+            },
+            "noise": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "factor": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10,
+                  "default": 2.5,
+                  "description": "f in R_m = R + f sqrt(R + 1) e_m"
+                },
+                "autocorrelation": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.999,
+                  "default": 0.6,
+                  "description": "Lag-1 correlation of e_m"
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "cycles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "minimum": -100,
+                    "maximum": 1000,
+                    "description": "Consecutive cycle numbers."
+                  },
+                  "minimum_year": {
+                    "type": "number",
+                    "description": "Decimal year of the minimum of the 13-month smoothed sunspot number that starts the cycle."
+                  },
+                  "maximum_year": {
+                    "type": "number",
+                    "description": "Decimal year of the maximum (used only with calibrate_widths, otherwise reported for comparison)."
+                  },
+                  "maximum": {
+                    "type": "number",
+                    "minimum": 5,
+                    "maximum": 600,
+                    "description": "Maximum of the 13-month smoothed sunspot number (v2)."
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "minimum_year",
+                  "maximum"
+                ]
+              },
+              "minItems": 5,
+              "maxItems": 60
+            }
+          },
+          "required": [
+            "kind",
+            "start_year",
+            "cycles",
+            "first_cycle_number"
+          ],
+          "description": "A table of cycles turned into overlapping Hathaway curves (calibrated to the table's minima and maxima) and a monthly record with correlated noise."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "monthly"
+            },
+            "data_origin": {
+              "type": "string",
+              "minLength": 1
+            },
+            "first_cycle_number": {
+              "type": "integer",
+              "minimum": -100,
+              "maximum": 1000
+            },
+            "first_year": {
+              "type": "integer",
+              "minimum": 1600,
+              "maximum": 3000
+            },
+            "first_month": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "default": 1
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "minItems": 480,
+              "maxItems": 7200,
+              "description": "Monthly mean sunspot numbers (v2) without gaps; tools/silso_to_request.py converts the SILSO file."
+            }
+          },
+          "required": [
+            "kind",
+            "first_year",
+            "values",
+            "first_cycle_number"
+          ]
+        }
+      ]
+    },
+    "forecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issue_year": {
+          "type": "number",
+          "description": "The forecast uses the record before this date (the record ends here)."
+        },
+        "horizon_year": {
+          "type": "number",
+          "description": "2-40 years after the issue year."
+        },
+        "members": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 2000,
+          "default": 200
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "backtest_phases_years": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "minItems": 1,
+          "maxItems": 20,
+          "description": "Years after each past minimum at which the backtest issues forecasts (increasing)."
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "half_window_months": {
+              "type": "integer",
+              "minimum": 6,
+              "maximum": 60,
+              "default": 30
+            },
+            "confirm_months": {
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 60,
+              "default": 12
+            },
+            "minimum_history_cycles": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 30,
+              "default": 3
+            },
+            "fit_lead_in_years": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3,
+              "default": 1.0
+            },
+            "shape_fit_phase_years": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 12,
+              "default": 5.5
+            },
+            "onset_search_years": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 4,
+              "default": 2.0
+            }
+          }
+        }
+      },
+      "required": [
+        "issue_year",
+        "horizon_year"
+      ]
+    },
+    "irradiance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "f107_base_sfu": {
+          "type": "number",
+          "minimum": 30,
+          "maximum": 120,
+          "default": 65
+        },
+        "f107_per_sunspot": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 3,
+          "default": 0.62
+        },
+        "f107_per_sunspot_squared": {
+          "type": "number",
+          "minimum": -0.01,
+          "maximum": 0.01,
+          "default": 0
+        },
+        "mgii_quiet": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 0.2,
+          "default": 0.15
+        },
+        "mgii_per_sfu": {
+          "type": "number",
+          "minimum": 1e-07,
+          "maximum": 0.001,
+          "default": 0.00011
+        },
+        "reference_sunspot_number": {
+          "type": "number",
+          "minimum": 50,
+          "maximum": 400,
+          "default": 180
+        },
+        "tsi_quiet_w_m2": {
+          "type": "number",
+          "minimum": 1350,
+          "maximum": 1370,
+          "default": 1360.6
+        },
+        "facular_brightening_w_m2": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 2.1
+        },
+        "spot_darkening_w_m2_per_sunspot": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.05,
+          "default": 0.0055
+        },
+        "uv_bands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "from_nm": {
+                "type": "number",
+                "minimum": 10,
+                "maximum": 1000
+              },
+              "to_nm": {
+                "type": "number",
+                "minimum": 10,
+                "maximum": 1000
+              },
+              "quiet_w_m2": {
+                "type": "number",
+                "minimum": 1e-06,
+                "maximum": 1000
+              },
+              "variability": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 5,
+                "description": "Relative change from the quiet Sun to the reference maximum."
+              }
+            },
+            "required": [
+              "key",
+              "from_nm",
+              "to_nm",
+              "quiet_w_m2",
+              "variability"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 12,
+          "description": "Default: Lyman-alpha, 200-242 nm, UV-C, UV-B, UV-A (keys uv_c, uv_b and uv_a tile 100-400 nm for the UV share of the TSI change)."
+        }
+      }
+    },
+    "atmosphere": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ozone_change_at_reference": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.2,
+          "default": 0.02
+        },
+        "stratosphere_warming_at_reference_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 1.0
+        },
+        "erythemal_variability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.2,
+          "default": 0.01
+        },
+        "radiation_amplification_factor": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2.5,
+          "default": 1.23
+        }
+      }
+    },
+    "uv_sites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "latitude_deg": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "ozone_du": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 600,
+            "description": "Annual-mean total ozone."
+          },
+          "ozone_seasonal_amplitude_du": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200,
+            "default": 0
+          },
+          "ozone_peak_day": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 366,
+            "default": 90
+          }
+        },
+        "required": [
+          "name",
+          "latitude_deg",
+          "ozone_du"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "flares": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x_rate_per_year": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 15
+        },
+        "reference_sunspot_number": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 400,
+          "default": 100
+        },
+        "rate_exponent": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 3,
+          "default": 1.3
+        },
+        "size_index": {
+          "type": "number",
+          "minimum": 1.2,
+          "maximum": 3,
+          "default": 2.2
+        },
+        "max_peak_flux_w_m2": {
+          "type": "number",
+          "minimum": 0.003,
+          "maximum": 1,
+          "default": 0.004,
+          "description": "Upper cut-off of the flare size distribution (W/m2; 4e-3 = X40, about the largest flares known)."
+        },
+        "energy_x1_j": {
+          "type": "number",
+          "minimum": 1e+20,
+          "maximum": 1e+28,
+          "default": 1e+25
+        },
+        "energy_exponent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0.8
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "climate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "albedo": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.9,
+          "default": 0.29
+        },
+        "upper_heat_capacity": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1000,
+          "default": 7.3,
+          "description": "W yr m-2 K-1"
+        },
+        "deep_heat_capacity": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 106
+        },
+        "feedback_w_m2_k": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 10,
+          "default": 1.13
+        },
+        "exchange_w_m2_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.74
+        }
+      }
+    },
+    "disk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first_year": {
+          "type": "number"
+        },
+        "last_year": {
+          "type": "number"
+        },
+        "every_months": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 6
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cells": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 256,
+          "default": 56
+        },
+        "extent_radii": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 2,
+          "default": 1.08
+        },
+        "subsamples": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 6
+        },
+        "effective_temperature_k": {
+          "type": "number",
+          "minimum": 3000,
+          "maximum": 10000,
+          "default": 5772
+        },
+        "limb_darkening": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6
+        },
+        "groups_per_sunspot": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.058823529411764705
+        },
+        "group_area_median_uhem": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5000,
+          "default": 100
+        },
+        "group_area_log_sd": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 1.0
+        },
+        "umbra_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.2
+        },
+        "umbra_contrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.25
+        },
+        "penumbra_contrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.78
+        },
+        "facular_area_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 23
+        },
+        "facular_contrast_centre": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.005
+        },
+        "facular_contrast_limb": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.12
+        },
+        "onset_latitude_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60,
+          "default": 28
+        },
+        "drift_efold_months": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 90
+        },
+        "zone_width_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.25
+        },
+        "zone_min_width_deg": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 20,
+          "default": 3
+        },
+        "max_longitude_deg": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 90,
+          "default": 85
+        },
+        "area_per_sunspot_uhem": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 100,
+          "default": 10
+        }
+      },
+      "required": [
+        "first_year",
+        "last_year"
+      ],
+      "description": "Frames of the rendered disk between first_year and last_year (within the record and the forecast), at most 240."
+    },
+    "butterfly": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_year": {
+          "type": "number"
+        },
+        "step_months": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24,
+          "default": 3
+        },
+        "latitude_step_deg": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 10,
+          "default": 2.5
+        },
+        "max_latitude_deg": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 90,
+          "default": 45
+        }
+      }
+    },
+    "long_term": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_year": {
+          "type": "integer",
+          "minimum": -10000,
+          "maximum": 1800,
+          "default": 1000
+        },
+        "horizon_year": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2500,
+          "default": 2100
+        },
+        "normal_amplitude": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 400,
+          "default": 120
+        },
+        "transition_years": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 12
+        },
+        "historical_cycles": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "period_years": {
+              "type": "number",
+              "minimum": 8,
+              "maximum": 15,
+              "default": 11
+            },
+            "period_sd_years": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3,
+              "default": 1
+            },
+            "amplitude_log_sd": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1.5,
+              "default": 0.25
+            },
+            "lead_years": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0.3
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "epochs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "grand_minimum",
+                  "grand_maximum",
+                  "minimum",
+                  "maximum"
+                ]
+              },
+              "start_year": {
+                "type": "number",
+                "minimum": -12000,
+                "maximum": 3000
+              },
+              "end_year": {
+                "type": "number",
+                "minimum": -12000,
+                "maximum": 3000
+              },
+              "cycle_amplitude": {
+                "type": "number",
+                "maximum": 400,
+                "default": 0,
+                "description": "Typical smoothed cycle maximum (v2) inside the epoch; <= 0 annotates without shaping the envelope (e.g. epochs covered by the cycle table)."
+              },
+              "evidence": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "kind",
+              "start_year",
+              "end_year"
+            ]
+          },
+          "maxItems": 40,
+          "description": "Epochs that set an amplitude must not overlap."
+        },
+        "episodes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "window_years": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 101,
+              "default": 11
+            },
+            "min_years": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 20
+            },
+            "grand_minimum_mean": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 500,
+              "default": 25
+            },
+            "grand_maximum_mean": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 500,
+              "default": 83
+            }
+          }
+        },
+        "secular_background": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timescale_years": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 15
+            },
+            "reference_start_year": {
+              "type": "integer",
+              "minimum": 1600,
+              "maximum": 2500,
+              "default": 1976
+            },
+            "reference_end_year": {
+              "type": "integer",
+              "minimum": 1600,
+              "maximum": 2500,
+              "default": 2019
+            },
+            "low": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0
+            },
+            "central": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0.7
+            },
+            "high": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3.5
+            }
+          },
+          "description": "Extra facular index k (M - M_ref) / SN_ref of the slow background; 0 <= low <= central <= high."
+        },
+        "cosmic_rays": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "phi_min_mv": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000,
+              "default": 150
+            },
+            "phi_per_sunspot_mv": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 50,
+              "default": 4
+            },
+            "background_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.5
+            },
+            "production_offset_mv": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3000,
+              "default": 300
+            },
+            "production_exponent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3,
+              "default": 0.53
+            }
+          }
+        },
+        "volcanic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rise_years": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5,
+              "default": 0.75
+            },
+            "note": {
+              "type": "string"
+            },
+            "eruptions": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "peak_forcing_w_m2": {
+                    "type": "number",
+                    "minimum": -30,
+                    "maximum": 0
+                  }
+                },
+                "required": [
+                  "year",
+                  "peak_forcing_w_m2"
+                ]
+              }
+            }
+          },
+          "required": [
+            "eruptions"
+          ]
+        },
+        "co2_ppm": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "description": "[year, ppm], increasing years; linear between, held beyond."
+        },
+        "regional_winter": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "global_amplification": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 2
+            },
+            "top_down_k_per_uv_pct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.1
+            }
+          }
+        },
+        "future": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "grand_minimum": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "first_cycle": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 1000,
+                  "default": 26
+                },
+                "cycles": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30,
+                  "default": 6
+                },
+                "amplitude": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "default": 8
+                }
+              }
+            }
+          },
+          "required": [
+            "grand_minimum"
+          ]
+        },
+        "dynamo": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "weak_alpha": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 1.5,
+              "default": 1.033
+            },
+            "babcock_leighton_noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3,
+              "default": 0.73
+            },
+            "emergence_threshold": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 2,
+              "default": 0.5
+            },
+            "emergence_width": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 1,
+              "default": 0.1
+            },
+            "quenching_field": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 5,
+              "default": 1.5
+            },
+            "floor_noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.5,
+              "default": 0.01
+            },
+            "amplitude_scale": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 600,
+              "default": 121
+            },
+            "cycle_mean_fraction": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 1,
+              "default": 0.45
+            },
+            "episode_cycles": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 2
+            },
+            "statistics_cycles": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 2000000,
+              "default": 100000
+            },
+            "realizations": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1000000,
+              "default": 20000
+            },
+            "cycles_ahead": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 50,
+              "default": 10
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "targets": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "grand_minima_per_11400_years": {
+                  "type": "number"
+                },
+                "grand_minimum_fraction": {
+                  "type": "number"
+                },
+                "grand_minimum_mean_years": {
+                  "type": "number"
+                },
+                "grand_maxima_per_11400_years": {
+                  "type": "number"
+                },
+                "grand_maximum_fraction": {
+                  "type": "number"
+                },
+                "grand_maximum_mean_years": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "case_study": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "epoch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "from_year": {
+              "type": "integer",
+              "minimum": -10000,
+              "maximum": 2500
+            },
+            "to_year": {
+              "type": "integer",
+              "minimum": -10000,
+              "maximum": 2500
+            }
+          },
+          "required": [
+            "epoch"
+          ]
+        }
+      },
+      "required": [
+        "epochs",
+        "co2_ppm"
+      ],
+      "description": "Grand minima and maxima: the historical envelope before the cycle table, the slow background, cosmic rays, comparison forcings, a future grand minimum and the dynamo map."
+    }
+  }
+}

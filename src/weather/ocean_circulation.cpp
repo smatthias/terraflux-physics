@@ -17,7 +17,6 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kStefanBoltzmann = 5.670374419e-8;  // W m-2 K-4
-constexpr double kSolarConstant = 1361.0;            // W m-2
 constexpr double kZeroCelsius = 273.15;
 
 bool layered(const OceanConfig& c) { return c.thermal.count >= 2; }
@@ -115,10 +114,10 @@ double solar_cosine_zenith(double latitude_deg, double longitude_deg, double day
     return std::sin(phi) * std::sin(declination) + std::cos(phi) * std::cos(declination) * std::cos(hour_angle);
 }
 
-double surface_shortwave_w_m2(double cos_zenith, double vapour_pressure_pa, double cloud_fraction) {
+double surface_shortwave_w_m2(double cos_zenith, double vapour_pressure_pa, double cloud_fraction, double solar_constant_w_m2) {
     if (!(cos_zenith > 0.0)) return 0.0;
     const double e_hpa = std::max(0.0, vapour_pressure_pa) / 100.0;
-    const double clear = kSolarConstant * cos_zenith * cos_zenith / ((cos_zenith + 2.7) * e_hpa * 1.0e-3 + 1.085 * cos_zenith + 0.10);
+    const double clear = solar_constant_w_m2 * cos_zenith * cos_zenith / ((cos_zenith + 2.7) * e_hpa * 1.0e-3 + 1.085 * cos_zenith + 0.10);
     return clear * std::min(1.0, std::max(0.0, 1.0 - 0.62 * cloud_fraction));
 }
 

@@ -450,6 +450,29 @@
         }
       },
       "description": "Members = every combination (at most 40)."
+    },
+    "solar_cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timeline_path"
+      ],
+      "description": "Optional solar cycle from a terraflux-run-solar-cycle timeline (its forcing_export): the surface-temperature response is added to every scenario's warming (the control included) and the TSI anomaly to the Arctic column's shortwave; the mean Sun outside its years.",
+      "properties": {
+        "timeline_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative to the working directory, e.g. viewer/public/solar/engine-timeline.json."
+        },
+        "warming": {
+          "type": "boolean",
+          "default": true
+        },
+        "arctic_shortwave": {
+          "type": "boolean",
+          "default": true
+        }
+      }
     }
   }
 }

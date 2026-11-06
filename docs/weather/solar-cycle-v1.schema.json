@@ -1,0 +1,1346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraflux.example/schemas/solar-cycle-v1.schema.json",
+  "title": "TerraFlux solar cycle block v1 (timeline.solar)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "source_kind",
+    "record_kind",
+    "data_origin",
+    "record",
+    "cycles",
+    "statistics",
+    "backtest",
+    "forecast",
+    "irradiance",
+    "atmosphere",
+    "flares",
+    "climate",
+    "butterfly",
+    "disk",
+    "forcing_export",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "terraflux.solar.cycle/v1"
+    },
+    "method": {
+      "const": "hathaway_cycles_onset_prior_fit_ar1_ensemble_proxy_irradiance"
+    },
+    "source_kind": {
+      "enum": [
+        "engine_output",
+        "synthetic"
+      ]
+    },
+    "record_kind": {
+      "enum": [
+        "cycle_table",
+        "monthly"
+      ]
+    },
+    "data_origin": {
+      "type": "string"
+    },
+    "request": {
+      "type": "object"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first_month": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}$"
+        },
+        "first_year": {
+          "type": "number"
+        },
+        "months": {
+          "type": "integer",
+          "minimum": 480
+        },
+        "sunspot_number": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "smoothed": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "model": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "f107_sfu": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "tsi_w_m2": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "facular_index": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "uv_change_pct": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "ozone_change_pct": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "stratosphere_k": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "uv_index_change_pct": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "flares": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "m1_expected": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "x1_expected": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "m1_count": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "x1_count": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "largest_w_m2": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "m1_expected",
+            "x1_expected",
+            "m1_count",
+            "x1_count",
+            "largest_w_m2"
+          ]
+        },
+        "forcing_w_m2": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "surface_k": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "deep_k": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": [
+        "first_month",
+        "first_year",
+        "months",
+        "sunspot_number",
+        "smoothed",
+        "model",
+        "f107_sfu",
+        "tsi_w_m2",
+        "facular_index",
+        "uv_change_pct",
+        "ozone_change_pct",
+        "stratosphere_k",
+        "uv_index_change_pct",
+        "flares",
+        "forcing_w_m2",
+        "surface_k",
+        "deep_k"
+      ],
+      "description": "Monthly series from first_month, one entry per month (the middle of the month); smoothed is null in the first and last six months."
+    },
+    "cycles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "number",
+          "minimum_year",
+          "minimum",
+          "complete",
+          "maximum_year",
+          "maximum",
+          "end_year",
+          "length_years",
+          "rise_years",
+          "decline_years"
+        ]
+      },
+      "description": "Cycles detected in the smoothed record (minimum to minimum), with the fitted curve (fit) and, for a table record, the table's entry (table)."
+    },
+    "statistics": {
+      "type": "object",
+      "required": [
+        "complete_cycles",
+        "mean_period_years",
+        "sd_period_years",
+        "mean_amplitude",
+        "sd_amplitude",
+        "amplitude_autocorrelation",
+        "mean_lead_years",
+        "sd_lead_years"
+      ]
+    },
+    "backtest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phases_years": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "summary": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "error_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "phases_years": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "amplitude_error_fraction": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "peak_timing_error_years": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "phases_years",
+            "amplitude_error_fraction",
+            "peak_timing_error_years"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "phases_years",
+        "entries",
+        "summary",
+        "error_model"
+      ]
+    },
+    "forecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issue_year": {
+          "type": "number"
+        },
+        "issue_month": {
+          "type": "string"
+        },
+        "first_month": {
+          "type": "string"
+        },
+        "first_year": {
+          "type": "number"
+        },
+        "months": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "horizon_year": {
+          "type": "number"
+        },
+        "members": {
+          "type": "integer"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "sunspot": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "p25": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "p75": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "central": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p25",
+            "p50",
+            "p75",
+            "p95",
+            "central"
+          ]
+        },
+        "f107_sfu": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p50",
+            "p95"
+          ]
+        },
+        "tsi_w_m2": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p50",
+            "p95"
+          ]
+        },
+        "uv_change_pct": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "p5": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "p50": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "p95": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "p5",
+              "p50",
+              "p95"
+            ]
+          }
+        },
+        "ozone_change_pct": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p50",
+            "p95"
+          ]
+        },
+        "stratosphere_k": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p50",
+            "p95"
+          ]
+        },
+        "uv_index_change_pct": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p50",
+            "p95"
+          ]
+        },
+        "flares": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "m1_expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p5": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "p50": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "p95": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "p5",
+                "p50",
+                "p95"
+              ]
+            },
+            "x1_expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p5": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "p50": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "p95": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "p5",
+                "p50",
+                "p95"
+              ]
+            },
+            "x1_probability": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p5": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "p50": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "p95": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "p5",
+                "p50",
+                "p95"
+              ]
+            }
+          },
+          "required": [
+            "m1_expected",
+            "x1_expected",
+            "x1_probability"
+          ]
+        },
+        "surface_k": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "p5": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p50": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "p95": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "p5",
+            "p50",
+            "p95"
+          ]
+        },
+        "turning_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "minimum",
+                  "maximum"
+                ]
+              },
+              "cycle": {
+                "type": "integer"
+              },
+              "year_median": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "year_p5": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "year_p95": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "value_median": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "value_p5": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "value_p95": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "central_year": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "central_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "beyond_horizon": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "cycle",
+              "year_median",
+              "year_p5",
+              "year_p95",
+              "value_median",
+              "value_p5",
+              "value_p95",
+              "beyond_horizon"
+            ]
+          }
+        },
+        "current_cycle": {
+          "type": "object"
+        },
+        "central_cycles": {
+          "type": "array"
+        },
+        "annual": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "issue_year",
+        "first_month",
+        "months",
+        "sunspot",
+        "tsi_w_m2",
+        "uv_change_pct",
+        "flares",
+        "surface_k",
+        "turning_points",
+        "current_cycle",
+        "annual"
+      ],
+      "description": "From the issue month: ensemble percentiles (the monotone quantities follow the sunspot percentiles; surface_k is the percentile of the members' energy balance)."
+    },
+    "irradiance": {
+      "type": "object",
+      "required": [
+        "proxies",
+        "bands",
+        "reference",
+        "reference_tsi_w_m2"
+      ]
+    },
+    "atmosphere": {
+      "type": "object",
+      "required": [
+        "ozone_change_at_reference",
+        "stratosphere_warming_at_reference_k",
+        "uv_index_change_at_reference_pct",
+        "sites"
+      ]
+    },
+    "flares": {
+      "type": "object",
+      "required": [
+        "config",
+        "r_scale",
+        "rates",
+        "energy",
+        "record_largest",
+        "record_annual"
+      ]
+    },
+    "climate": {
+      "type": "object",
+      "required": [
+        "config",
+        "equilibrium_k_per_w_m2",
+        "forcing_at_reference_w_m2",
+        "cycles"
+      ]
+    },
+    "butterfly": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "years": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "latitudes_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "density_uhem_per_deg": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "issue_year": {
+          "type": "number"
+        },
+        "drift": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "years",
+        "latitudes_deg",
+        "density_uhem_per_deg",
+        "issue_year"
+      ]
+    },
+    "disk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "type": "integer"
+        },
+        "extent_radii": {
+          "type": "number"
+        },
+        "solar_radius_m": {
+          "type": "number"
+        },
+        "effective_temperature_k": {
+          "type": "number"
+        },
+        "limb_darkening": {
+          "type": "number"
+        },
+        "every_months": {
+          "type": "integer"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "quiet_brightness_k": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "month": {
+                "type": "string"
+              },
+              "year": {
+                "type": "number"
+              },
+              "elapsed_seconds": {
+                "type": "number"
+              },
+              "source": {
+                "enum": [
+                  "record",
+                  "forecast"
+                ]
+              },
+              "sunspot_number": {
+                "type": "number"
+              },
+              "smoothed": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "latitude_deg": {
+                      "type": "number"
+                    },
+                    "longitude_deg": {
+                      "type": "number"
+                    },
+                    "area_uhem": {
+                      "type": "number"
+                    },
+                    "cycle": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "latitude_deg",
+                    "longitude_deg",
+                    "area_uhem",
+                    "cycle"
+                  ]
+                }
+              },
+              "flares": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "peak_flux_w_m2": {
+                      "type": "number"
+                    },
+                    "class": {
+                      "type": "string"
+                    },
+                    "r_scale": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    "region": {
+                      "type": "integer",
+                      "minimum": -1
+                    }
+                  },
+                  "required": [
+                    "peak_flux_w_m2",
+                    "class",
+                    "r_scale",
+                    "region"
+                  ]
+                }
+              },
+              "spot_ppm": {
+                "type": "number"
+              },
+              "facular_ppm": {
+                "type": "number"
+              },
+              "net_ppm": {
+                "type": "number"
+              },
+              "brightness_k": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "month",
+              "year",
+              "elapsed_seconds",
+              "source",
+              "sunspot_number",
+              "regions",
+              "flares",
+              "spot_ppm",
+              "facular_ppm",
+              "net_ppm",
+              "brightness_k"
+            ]
+          }
+        }
+      },
+      "required": [
+        "cells",
+        "extent_radii",
+        "solar_radius_m",
+        "quiet_brightness_k",
+        "frames"
+      ],
+      "description": "One entry per timeline frame; brightness_k is null off the disk."
+    },
+    "forcing_export": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "terraflux.solar.forcing/v1"
+        },
+        "years": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "tsi_w_m2": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "surface_k": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "source": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "record",
+              "forecast",
+              "mixed"
+            ]
+          }
+        },
+        "reference_tsi_w_m2": {
+          "type": "number"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "years",
+        "tsi_w_m2",
+        "surface_k",
+        "source",
+        "reference_tsi_w_m2"
+      ],
+      "description": "Annual TSI and solar-cycle surface-temperature anomaly that polar-melt and ocean requests can read (solar_cycle sections)."
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "long_term": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_year": {
+          "type": "integer"
+        },
+        "horizon_year": {
+          "type": "integer"
+        },
+        "preindustrial_end_year": {
+          "type": "integer"
+        },
+        "issue_year": {
+          "type": "number"
+        },
+        "series": {
+          "type": "object",
+          "required": [
+            "sunspot",
+            "decadal_sunspot",
+            "sunspot_grand_minimum_scenario",
+            "source",
+            "envelope",
+            "background_sunspot",
+            "tsi_w_m2",
+            "uv_200_242_pct",
+            "ozone_pct",
+            "cosmogenic_production",
+            "co2_ppm",
+            "forcing_w_m2",
+            "temperature_k"
+          ],
+          "description": "Annual values from start_year to horizon_year; forcings and temperatures are anomalies about their pre-industrial means (start_year-1849)."
+        },
+        "epochs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "kind",
+              "start_year",
+              "end_year",
+              "mean_sunspot",
+              "tsi_vs_preindustrial_w_m2",
+              "tsi_vs_reference_w_m2",
+              "cosmogenic_production_pct",
+              "temperature_k"
+            ]
+          }
+        },
+        "episodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "start_year",
+              "end_year",
+              "years",
+              "mean_sunspot",
+              "epoch"
+            ]
+          }
+        },
+        "cycles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "number",
+              "onset_year",
+              "peak_year",
+              "amplitude",
+              "source"
+            ]
+          }
+        },
+        "episode_definition": {
+          "type": "object"
+        },
+        "envelope": {
+          "type": "object"
+        },
+        "secular_background": {
+          "type": "object"
+        },
+        "cosmic_rays": {
+          "type": "object"
+        },
+        "volcanic": {
+          "type": "object"
+        },
+        "co2": {
+          "type": "object"
+        },
+        "regional_winter": {
+          "type": "object"
+        },
+        "future": {
+          "type": "object",
+          "required": [
+            "grand_minimum",
+            "rows",
+            "largest_global_difference_k"
+          ]
+        },
+        "dynamo": {
+          "type": "object",
+          "required": [
+            "config",
+            "statistics",
+            "targets",
+            "example",
+            "holocene",
+            "outlook"
+          ]
+        },
+        "case_study": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "start_year",
+        "horizon_year",
+        "series",
+        "epochs",
+        "episodes",
+        "cycles",
+        "dynamo",
+        "future",
+        "limitations"
+      ],
+      "description": "Present when the request had a long_term section."
+    }
+  }
+}

@@ -1,0 +1,564 @@
+{
+  "schema_version": "terraflux.solar.cycle-run/v1",
+  "record": {
+    "kind": "cycle_table",
+    "data_origin": "Approximate SILSO sunspot number v2 cycle table, cycles 1-25 (dates of the minima and maxima of the 13-month smoothed series and the maximum values, rounded; cycle 25's maximum provisional), entered by hand and not verified against the SILSO files: check before quantitative use. The monthly values are synthesised from it with noise; they are not observations.",
+    "first_cycle_number": 10,
+    "start_year": 1850.0,
+    "calibrate_widths": false,
+    "noise": {
+      "factor": 2.5,
+      "autocorrelation": 0.6,
+      "seed": 11
+    },
+    "cycles": [
+      {
+        "number": 1,
+        "minimum_year": 1755.2,
+        "maximum_year": 1761.5,
+        "maximum": 144.1
+      },
+      {
+        "number": 2,
+        "minimum_year": 1766.5,
+        "maximum_year": 1769.7,
+        "maximum": 193.0
+      },
+      {
+        "number": 3,
+        "minimum_year": 1775.5,
+        "maximum_year": 1778.4,
+        "maximum": 264.3
+      },
+      {
+        "number": 4,
+        "minimum_year": 1784.7,
+        "maximum_year": 1788.1,
+        "maximum": 235.3
+      },
+      {
+        "number": 5,
+        "minimum_year": 1798.3,
+        "maximum_year": 1805.2,
+        "maximum": 82.0
+      },
+      {
+        "number": 6,
+        "minimum_year": 1810.6,
+        "maximum_year": 1816.4,
+        "maximum": 81.2
+      },
+      {
+        "number": 7,
+        "minimum_year": 1823.3,
+        "maximum_year": 1829.9,
+        "maximum": 119.2
+      },
+      {
+        "number": 8,
+        "minimum_year": 1833.9,
+        "maximum_year": 1837.2,
+        "maximum": 244.9
+      },
+      {
+        "number": 9,
+        "minimum_year": 1843.5,
+        "maximum_year": 1848.1,
+        "maximum": 219.9
+      },
+      {
+        "number": 10,
+        "minimum_year": 1855.9,
+        "maximum_year": 1860.1,
+        "maximum": 186.2
+      },
+      {
+        "number": 11,
+        "minimum_year": 1867.2,
+        "maximum_year": 1870.6,
+        "maximum": 234.0
+      },
+      {
+        "number": 12,
+        "minimum_year": 1878.9,
+        "maximum_year": 1883.9,
+        "maximum": 124.4
+      },
+      {
+        "number": 13,
+        "minimum_year": 1890.2,
+        "maximum_year": 1894.1,
+        "maximum": 146.5
+      },
+      {
+        "number": 14,
+        "minimum_year": 1902.0,
+        "maximum_year": 1906.2,
+        "maximum": 107.1
+      },
+      {
+        "number": 15,
+        "minimum_year": 1913.6,
+        "maximum_year": 1917.6,
+        "maximum": 175.7
+      },
+      {
+        "number": 16,
+        "minimum_year": 1923.6,
+        "maximum_year": 1928.4,
+        "maximum": 130.2
+      },
+      {
+        "number": 17,
+        "minimum_year": 1933.8,
+        "maximum_year": 1937.4,
+        "maximum": 198.6
+      },
+      {
+        "number": 18,
+        "minimum_year": 1944.2,
+        "maximum_year": 1947.4,
+        "maximum": 218.7
+      },
+      {
+        "number": 19,
+        "minimum_year": 1954.3,
+        "maximum_year": 1958.2,
+        "maximum": 285.0
+      },
+      {
+        "number": 20,
+        "minimum_year": 1964.8,
+        "maximum_year": 1968.9,
+        "maximum": 156.6
+      },
+      {
+        "number": 21,
+        "minimum_year": 1976.2,
+        "maximum_year": 1979.9,
+        "maximum": 232.9
+      },
+      {
+        "number": 22,
+        "minimum_year": 1986.8,
+        "maximum_year": 1989.6,
+        "maximum": 212.5
+      },
+      {
+        "number": 23,
+        "minimum_year": 1996.4,
+        "maximum_year": 2001.9,
+        "maximum": 180.3
+      },
+      {
+        "number": 24,
+        "minimum_year": 2008.9,
+        "maximum_year": 2014.3,
+        "maximum": 116.4
+      },
+      {
+        "number": 25,
+        "minimum_year": 2019.9,
+        "maximum_year": 2024.8,
+        "maximum": 160.9,
+        "note": "maximum provisional"
+      }
+    ]
+  },
+  "forecast": {
+    "issue_year": 2026.8,
+    "horizon_year": 2050.0,
+    "members": 200,
+    "seed": 25,
+    "backtest_phases_years": [
+      0,
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "irradiance": {
+    "f107_base_sfu": 65.0,
+    "f107_per_sunspot": 0.62,
+    "mgii_quiet": 0.15,
+    "mgii_per_sfu": 0.00011,
+    "reference_sunspot_number": 180.0,
+    "tsi_quiet_w_m2": 1360.6,
+    "facular_brightening_w_m2": 2.1,
+    "spot_darkening_w_m2_per_sunspot": 0.0055
+  },
+  "atmosphere": {
+    "ozone_change_at_reference": 0.02,
+    "stratosphere_warming_at_reference_k": 1.0,
+    "erythemal_variability": 0.01,
+    "radiation_amplification_factor": 1.23
+  },
+  "uv_sites": [
+    {
+      "name": "Equator (1° N)",
+      "latitude_deg": 1.3,
+      "ozone_du": 265,
+      "ozone_seasonal_amplitude_du": 10,
+      "ozone_peak_day": 250
+    },
+    {
+      "name": "Mid-latitudes (45° N)",
+      "latitude_deg": 45.0,
+      "ozone_du": 335,
+      "ozone_seasonal_amplitude_du": 35,
+      "ozone_peak_day": 90
+    },
+    {
+      "name": "Northern Europe (60° N)",
+      "latitude_deg": 60.0,
+      "ozone_du": 350,
+      "ozone_seasonal_amplitude_du": 50,
+      "ozone_peak_day": 95
+    },
+    {
+      "name": "Southern mid-latitudes (40° S)",
+      "latitude_deg": -40.0,
+      "ozone_du": 300,
+      "ozone_seasonal_amplitude_du": 20,
+      "ozone_peak_day": 270
+    }
+  ],
+  "flares": {
+    "x_rate_per_year": 15.0,
+    "reference_sunspot_number": 100.0,
+    "rate_exponent": 1.3,
+    "size_index": 2.2,
+    "max_peak_flux_w_m2": 0.004,
+    "energy_x1_j": 1e+25,
+    "energy_exponent": 0.8,
+    "seed": 5
+  },
+  "climate": {
+    "albedo": 0.29,
+    "upper_heat_capacity": 7.3,
+    "deep_heat_capacity": 106.0,
+    "feedback_w_m2_k": 1.13,
+    "exchange_w_m2_k": 0.74
+  },
+  "disk": {
+    "first_year": 2008.5,
+    "last_year": 2045.5,
+    "every_months": 6,
+    "seed": 3,
+    "cells": 56
+  },
+  "butterfly": {
+    "start_year": 1900.0,
+    "step_months": 3,
+    "latitude_step_deg": 2.5,
+    "max_latitude_deg": 45.0
+  },
+  "long_term": {
+    "start_year": 1000,
+    "horizon_year": 2100,
+    "normal_amplitude": 120,
+    "transition_years": 12,
+    "historical_cycles": {
+      "period_years": 11.0,
+      "period_sd_years": 1.0,
+      "amplitude_log_sd": 0.25,
+      "seed": 7
+    },
+    "epochs": [
+      {
+        "name": "Oort Minimum",
+        "kind": "grand_minimum",
+        "start_year": 1010,
+        "end_year": 1050,
+        "cycle_amplitude": 20,
+        "evidence": "14C and 10Be in tree rings and ice (e.g. Usoskin et al. 2007)"
+      },
+      {
+        "name": "Medieval Maximum",
+        "kind": "grand_maximum",
+        "start_year": 1100,
+        "end_year": 1250,
+        "cycle_amplitude": 190,
+        "evidence": "14C (Eddy 1976); naked-eye sunspots and aurorae in East Asian chronicles"
+      },
+      {
+        "name": "Wolf Minimum",
+        "kind": "grand_minimum",
+        "start_year": 1280,
+        "end_year": 1350,
+        "cycle_amplitude": 15,
+        "evidence": "14C and 10Be"
+      },
+      {
+        "name": "Spörer Minimum",
+        "kind": "grand_minimum",
+        "start_year": 1450,
+        "end_year": 1550,
+        "cycle_amplitude": 12,
+        "evidence": "14C and 10Be (Eddy 1976 named it after G. Spörer); the isotope records suggest an earlier start around 1400"
+      },
+      {
+        "name": "Maunder Minimum",
+        "kind": "grand_minimum",
+        "start_year": 1645,
+        "end_year": 1715,
+        "cycle_amplitude": 8,
+        "evidence": "telescopic observations (very few spots, mostly in the southern hemisphere), rare aurorae, high 14C and 10Be (Eddy 1976; Usoskin et al. 2015)"
+      },
+      {
+        "name": "Dalton Minimum",
+        "kind": "minimum",
+        "start_year": 1790,
+        "end_year": 1830,
+        "cycle_amplitude": 0,
+        "evidence": "telescopic: weak SILSO cycles 5 and 6 (not a grand minimum by the decadal definition)"
+      },
+      {
+        "name": "Gleissberg minimum around 1900",
+        "kind": "minimum",
+        "start_year": 1880,
+        "end_year": 1915,
+        "cycle_amplitude": 0,
+        "evidence": "telescopic: SILSO cycles 12-14"
+      },
+      {
+        "name": "Modern Maximum",
+        "kind": "grand_maximum",
+        "start_year": 1940,
+        "end_year": 2009,
+        "cycle_amplitude": 0,
+        "evidence": "telescopic: SILSO cycles 18-23"
+      }
+    ],
+    "episodes": {
+      "window_years": 11,
+      "min_years": 20,
+      "grand_minimum_mean": 25,
+      "grand_maximum_mean": 83
+    },
+    "secular_background": {
+      "timescale_years": 15,
+      "reference_start_year": 1976,
+      "reference_end_year": 2019,
+      "low": 0.0,
+      "central": 0.7,
+      "high": 3.5
+    },
+    "cosmic_rays": {
+      "phi_min_mv": 150,
+      "phi_per_sunspot_mv": 4.0,
+      "background_weight": 0.5,
+      "production_offset_mv": 300,
+      "production_exponent": 0.53
+    },
+    "volcanic": {
+      "rise_years": 0.75,
+      "note": "Rounded, illustrative peak forcings of some of the largest eruptions (orders of magnitude after ice-core reconstructions); replace with eVolv2k or the CMIP6/PMIP4 volcanic forcing for quantitative work.",
+      "eruptions": [
+        {
+          "name": "Samalas (Rinjani)",
+          "year": 1257.5,
+          "peak_forcing_w_m2": -8
+        },
+        {
+          "name": "Kuwae (date debated)",
+          "year": 1458.0,
+          "peak_forcing_w_m2": -5
+        },
+        {
+          "name": "Huaynaputina",
+          "year": 1600.1,
+          "peak_forcing_w_m2": -3
+        },
+        {
+          "name": "Parker",
+          "year": 1641.0,
+          "peak_forcing_w_m2": -2.5
+        },
+        {
+          "name": "unidentified 1695",
+          "year": 1695.0,
+          "peak_forcing_w_m2": -2
+        },
+        {
+          "name": "Laki",
+          "year": 1783.5,
+          "peak_forcing_w_m2": -1.5
+        },
+        {
+          "name": "unidentified 1809",
+          "year": 1809.0,
+          "peak_forcing_w_m2": -3
+        },
+        {
+          "name": "Tambora",
+          "year": 1815.3,
+          "peak_forcing_w_m2": -6
+        },
+        {
+          "name": "Cosigüina",
+          "year": 1835.1,
+          "peak_forcing_w_m2": -2
+        },
+        {
+          "name": "Krakatau",
+          "year": 1883.6,
+          "peak_forcing_w_m2": -2.5
+        },
+        {
+          "name": "Santa María",
+          "year": 1902.8,
+          "peak_forcing_w_m2": -1
+        },
+        {
+          "name": "Novarupta",
+          "year": 1912.4,
+          "peak_forcing_w_m2": -0.8
+        },
+        {
+          "name": "Agung",
+          "year": 1963.2,
+          "peak_forcing_w_m2": -1.5
+        },
+        {
+          "name": "El Chichón",
+          "year": 1982.3,
+          "peak_forcing_w_m2": -1.5
+        },
+        {
+          "name": "Pinatubo",
+          "year": 1991.5,
+          "peak_forcing_w_m2": -3
+        }
+      ]
+    },
+    "co2_ppm": [
+      [
+        1000,
+        279
+      ],
+      [
+        1200,
+        281
+      ],
+      [
+        1400,
+        280
+      ],
+      [
+        1550,
+        281
+      ],
+      [
+        1610,
+        272
+      ],
+      [
+        1700,
+        277
+      ],
+      [
+        1750,
+        277
+      ],
+      [
+        1800,
+        282
+      ],
+      [
+        1850,
+        285
+      ],
+      [
+        1900,
+        296
+      ],
+      [
+        1950,
+        311
+      ],
+      [
+        1970,
+        325
+      ],
+      [
+        1990,
+        354
+      ],
+      [
+        2000,
+        369
+      ],
+      [
+        2010,
+        389
+      ],
+      [
+        2020,
+        413
+      ],
+      [
+        2025,
+        427
+      ],
+      [
+        2050,
+        505
+      ],
+      [
+        2075,
+        560
+      ],
+      [
+        2100,
+        600
+      ]
+    ],
+    "regional_winter": {
+      "name": "Northern and central Europe, winter (illustrative)",
+      "global_amplification": 2.0,
+      "top_down_k_per_uv_pct": 0.1
+    },
+    "future": {
+      "grand_minimum": {
+        "first_cycle": 26,
+        "cycles": 6,
+        "amplitude": 8
+      }
+    },
+    "dynamo": {
+      "weak_alpha": 1.033,
+      "babcock_leighton_noise": 0.73,
+      "emergence_threshold": 0.5,
+      "emergence_width": 0.1,
+      "quenching_field": 1.5,
+      "floor_noise": 0.01,
+      "amplitude_scale": 121,
+      "cycle_mean_fraction": 0.45,
+      "episode_cycles": 2,
+      "statistics_cycles": 100000,
+      "realizations": 20000,
+      "cycles_ahead": 10,
+      "seed": 13,
+      "targets": {
+        "source": "Holocene statistics from 14C (Usoskin, Solanki & Kovaltsov 2007, rounded)",
+        "grand_minima_per_11400_years": 27,
+        "grand_minimum_fraction": 0.17,
+        "grand_minimum_mean_years": 70,
+        "grand_maxima_per_11400_years": 19,
+        "grand_maximum_fraction": 0.09,
+        "grand_maximum_mean_years": 53
+      }
+    },
+    "case_study": {
+      "epoch": "Maunder Minimum",
+      "from_year": 1600,
+      "to_year": 1760
+    }
+  }
+}
