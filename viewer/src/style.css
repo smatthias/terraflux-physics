@@ -324,6 +324,9 @@ main.stage-return>article{animation:hud-return .5s var(--hud-ease) backwards}
 .mac-window{position:absolute;z-index:9;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;color:#eef3f6;font-family:var(--mac-font);-webkit-font-smoothing:antialiased;
  background:rgba(30,36,44,.5);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);border:1px solid rgba(255,255,255,.16);
  box-shadow:0 0 0 .5px rgba(0,0,0,.55),0 24px 64px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);animation:mac-open .34s cubic-bezier(.2,.9,.25,1.08) backwards;transition:width .3s cubic-bezier(.2,.9,.25,1)}
+.mac-window{transform-origin:0 0}
+.mac-window.dragging,.mac-window.dragging *{cursor:grabbing !important;user-select:none}
+.mac-body{cursor:grab}
 .mac-titlebar{position:relative;flex:none;display:flex;align-items:center;height:34px;padding:0 12px;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-bottom:1px solid rgba(255,255,255,.08)}
 .mac-titlebar:active{cursor:grabbing}
 .mac-window.minimised .mac-titlebar{border-bottom:0}
@@ -334,7 +337,7 @@ main.stage-return>article{animation:hud-return .5s var(--hud-ease) backwards}
 .mac-light.close{background:#ff5f57}.mac-light.min{background:#febc2e}.mac-light.zoom{background:#28c840}
 .mac-light:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:1px}
 .mac-title{position:absolute;left:78px;right:78px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:rgba(255,255,255,.86);pointer-events:none}
-.mac-body{overflow-y:auto;padding:14px 18px 14px;font-size:12.5px;line-height:1.55;cursor:default;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+.mac-body{overflow-y:auto;padding:14px 18px 14px;font-size:12.5px;line-height:1.55;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
 .mac-hero{display:flex;align-items:baseline;gap:7px}
 .mac-value{font-size:36px;font-weight:600;line-height:1.1;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
 .mac-unit{font-size:15px;color:rgba(255,255,255,.6);opacity:0;transition:opacity .3s}
@@ -381,7 +384,7 @@ main.stage-return>article{animation:hud-return .5s var(--hud-ease) backwards}
 .g-compass .g-wind line{stroke:#7fe0ff;stroke-width:2.2;stroke-linecap:round}
 .g-compass .g-wind path,.g-compass .g-wind circle{fill:#7fe0ff}
 .g-compass.on .g-wind{animation:wind-swing .9s cubic-bezier(.2,.9,.25,1.2) backwards}
-@keyframes mac-open{from{opacity:0;transform:scale(.9) translateY(8px)}}
+@keyframes mac-open{from{opacity:0}}
 @keyframes tip-in{from{opacity:0}}
 @keyframes bar-grow{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:none}}
 @keyframes arrow-in{from{opacity:0}to{opacity:1}}
@@ -392,3 +395,14 @@ main.stage-return>article{animation:hud-return .5s var(--hud-ease) backwards}
 @keyframes tether-pulse{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(3.2)}}
 @media(prefers-reduced-motion:reduce){.mac-window,.mac-window *,.hover-tip,.mac-tether *{animation:none !important;transition:none !important}.g-near rect{opacity:1}.g-spark .g-line{stroke-dashoffset:0}.g-near .g-arrow{opacity:1}}
 @media(max-width:700px){.hover-tip{display:none}}
+
+/* ---- Terrain ---------------------------------------------------------------------------------------------------- */
+.relief-note{position:absolute;top:66px;left:23px;padding:3px 7px;border:1px solid rgba(177,217,164,.25);border-radius:3px;background:rgba(9,21,29,.55);font-size:8.5px;letter-spacing:1px;color:#b1d9a4;pointer-events:auto;cursor:help}
+main.immersive .relief-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);font-family:var(--hud-mono);transition:left .42s var(--hud-ease)}
+@media(max-width:700px){.relief-note{left:15px;top:60px}}
+
+/* Draggable, wobbly overlays in the scene (legends and keys): grab to move, double-click to put back. */
+.wobbly{pointer-events:auto !important;cursor:grab;touch-action:none;user-select:none;will-change:transform}
+.wobbly.wobbly-dragging{cursor:grabbing;z-index:6}
+.legend.wobbly{padding:6px 8px;margin:-6px -8px;border-radius:6px}
+.legend.wobbly:hover,.cloud-key.wobbly:hover{box-shadow:0 0 0 1px rgba(127,224,255,.25)}

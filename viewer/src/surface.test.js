@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
-import { surfaceSubdivisions, latticeAxis, sampleCubic, sampleLinear, cellAtUv, planeSurface, globeSurface, surfaceSkirt, surfaceMaterial } from './surface.js'
+import { surfaceSubdivisions, latticeAxis, centreHeights, noise2, ridged, cavityOcclusion, sampleCubic, sampleLinear, cellAtUv, planeSurface, globeSurface, surfaceSkirt, surfaceMaterial, skirtMaterial } from './surface.js'
 
 const field = (nx, ny, f) => Float32Array.from({ length: nx * ny }, (_, i) => f(i % nx, Math.floor(i / nx)))
 const colours = n => Float32Array.from({ length: n * 3 }, (_, k) => (k % 3) / 2)
@@ -137,4 +137,45 @@ test('the app draws the field as a surface, lights points on hover and explains 
   // Hovering must not rebuild the scene: the rebuild watch lists neither the hover nor the selection itself.
   const rebuild = app.match(/watch\(\[data,layer[^\]]*\],draw/)[0]
   assert.ok(!rebuild.includes('hoverCell') && !/[,[]selected[,\]]/.test(rebuild), rebuild)
+})
+
+test('fine relief: deterministic noise, crags only where asked, overlays read the final height', () => {
+  assert.equal(noise2(1.3, 2.7, 5), noise2(1.3, 2.7, 5), 'deterministic')
+  assert.notEqual(noise2(1.3, 2.7, 5), noise2(1.3, 2.7, 6), 'seeded')
+  for (let k = 0; k < 200; k++) { const r = ridged(k * 0.37, k * 0.11); assert.ok(r >= 0 && r <= 1) }
+  const nx = 6, ny = 5, heights = new Float32Array(nx * ny).fill(1), colors = new Float32Array(nx * ny * 3)
+  const amplitude = Float32Array.from({ length: nx * ny }, (_, i) => (i % nx >= 3 ? 0.5 : 0))
+  for (const s of [1, 2, 4]) {
+    const g = planeSurface({ nx, ny, dx: 1, dz: 1, heights, colors, values: null, s, detail: { amplitude, seed: 3 } })
+    const centre = centreHeights(g, nx, ny)
+    assert.ok(Math.abs(centre[0] - 1) < 1e-6, `s=${s}: no relief where the amplitude is zero`)
+    const pos = g.attributes.position
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const cx = x + 0.5 - nx / 2, cz = -(y + 0.5 - ny / 2)
+      const k = Array.from({ length: pos.count }, (_, j) => j).find(j => Math.abs(pos.getX(j) - cx) < 1e-6 && Math.abs(pos.getZ(j) - cz) < 1e-6)
+      assert.ok(Math.abs(pos.getY(k) - centre[y * nx + x]) < 1e-6, `s=${s}: centre height of ${x},${y} is the vertex there`)
+    }
+    if (s === 4) assert.ok(Array.from({ length: pos.count }, (_, j) => pos.getY(j)).some(h => Math.abs(h - 1) > 0.05), 'crags where the amplitude is set')
+  }
+  const ao = cavityOcclusion(Float32Array.from([1, 1, 1, 1, 0, 1, 1, 1, 1]), 3, 3, 1, 1)
+  assert.ok(ao[4] < ao[0] && ao[4] >= 0.35 - 1e-6, 'the pit is occluded, within bounds (float32)')
+})
+
+test('terrain attributes reach the geometry and the terrain shader compiles its hooks', () => {
+  const nx = 3, ny = 2, ones = new Float32Array(6).fill(1)
+  const g = planeSurface({ nx, ny, dx: 1, dz: 1, heights: ones, colors: new Float32Array(18), values: null, s: 2, extras: { aElev: ones, aIce: ones, aSnow: ones, aWater: ones }, occlusion: 0.1 })
+  for (const a of ['aElev', 'aIce', 'aSnow', 'aWater', 'aAO']) assert.ok(g.attributes[a], a)
+  const skirt = surfaceSkirt(g, 0, { iceDepth: 0.5 })
+  assert.ok(skirt.attributes.aTop && skirt.attributes.aIceDepth.array.every(v => v === 0.5) && skirt.attributes.aWater)
+  const m = surfaceMaterial({ nx, ny, terrain: { dataMix: 0.3, snowline: 2500, treeline: 1600, strata: 80 } })
+  assert.equal(m.userData.uniforms.uDataMix.value, 0.3); assert.equal(m.defines.TF_TERRAIN, ''); assert.equal(m.defines.STANDARD, '', 'the standard define is kept')
+  const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader }
+  m.onBeforeCompile(shader)
+  for (const hook of ['vElev = aElev', 'vTerrainNormal = normalize']) assert.ok(shader.vertexShader.includes(hook), hook)
+  for (const hook of ['float rockAmount', 'roughnessFactor = mix(roughnessFactor, 0.18', 'footprint(dh)']) assert.ok(shader.fragmentShader.includes(hook), hook)
+  const side = skirtMaterial({ terrain: true }), sideShader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader }
+  side.onBeforeCompile(sideShader)
+  assert.ok(sideShader.fragmentShader.includes('float band = fract(vSidePos.y * uSkirtStrata'))
+  assert.equal(skirtMaterial().defines.TF_TERRAIN, undefined, 'without terrain the sides stay plain')
+  assert.equal(skirtMaterial({ terrain: true }).defines.STANDARD, '')
 })

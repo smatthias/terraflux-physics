@@ -1,11 +1,12 @@
 <script setup>
 // The inspector: a translucent window in the style of a macOS window that opens at a clicked data point and explains
-// it in sentences. The sentences type themselves out; values are gaps that fill in as the typing reaches them, and the
+// it in sentences. It springs open from its point and wobbles like jelly while it is dragged (wobbly.js). The sentences type themselves out; values are gaps that fill in as the typing reaches them, and the
 // graphics of a section draw themselves once its text is typed. A tether line keeps pointing at the data point while the
 // camera moves. Drag the title bar to move the window; the traffic lights close, minimise and enlarge it.
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { typePlan, typedParts, lineStart, lineEnd, typingRate } from './typewriter.js'
 import { compass8, formatNumber } from './explain.js'
+import { createWobble, popFrom, matrixCss } from './wobbly.js'
 
 const props = defineProps({
   content: { type: Object, required: true },
@@ -54,19 +55,49 @@ function place() {
   if (x + w > b.right - 8) x = a.x - 40 - w
   pos.value = { x: clamp(x, b.left + 8, Math.max(b.left + 8, b.right - w - 8)), y: clamp(a.y - Math.min(140, h / 2), b.top + 8, Math.max(b.top + 8, b.bottom - h - 8)) }
 }
-let drag = null
+// Dragging: anywhere on the window except its controls and scrollbar; it becomes a drag after 4 px, so a click still
+// clicks. The wobble is applied straight to the element's transform every frame, without re-rendering the window.
+const wobble = createWobble(), wobbly = !reduced
+let drag = null, wobbleFrame = 0, wobbleLast = 0
+function wobbleTick(now) {
+  wobble.step(wobbleLast ? (now - wobbleLast) / 1000 : 0); wobbleLast = now
+  if (!drag?.moving && wobble.resting()) { wobble.settle(); if (win.value) win.value.style.transform = ''; wobbleFrame = 0; wobbleLast = 0; return }
+  if (win.value) win.value.style.transform = matrixCss(wobble.matrix())
+  wobbleFrame = requestAnimationFrame(wobbleTick)
+}
+const wobbleRun = () => { if (wobbly && !wobbleFrame) wobbleFrame = requestAnimationFrame(wobbleTick) }
 function startDrag(e) {
-  if (e.button !== 0 || e.target.closest('.mac-lights')) return
-  drag = { x: e.clientX - pos.value.x, y: e.clientY - pos.value.y }
-  e.currentTarget.setPointerCapture(e.pointerId)
+  if (e.button !== 0 || e.target.closest('button, a, input, select, .mac-lights')) return
+  const body = e.target.closest('.mac-body')
+  if (body && e.clientX > body.getBoundingClientRect().left + body.clientWidth) return   // the scrollbar
+  drag = { x: e.clientX, y: e.clientY, offset: [e.clientX - pos.value.x, e.clientY - pos.value.y], moving: false }
+  // Follow the gesture on the document: a quick first move may leave the window before the drag has begun, and a
+  // pointer capture taken up front would steal the click that shows all the text at once.
+  window.addEventListener('pointermove', moveDrag); window.addEventListener('pointerup', endDrag); window.addEventListener('pointercancel', endDrag)
 }
 function moveDrag(e) {
   if (!drag) return
-  const b = props.bounds
-  pos.value = { x: clamp(e.clientX - drag.x, b.left - width.value + 80, b.right - 80), y: clamp(e.clientY - drag.y, b.top, b.bottom - 40) }
-  dragged.value = true
+  if (!drag.moving) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return
+    drag.moving = true; win.value?.classList.add('dragging')
+    wobble.resize(win.value.offsetWidth, win.value.offsetHeight); wobble.grab(drag.x - win.value.getBoundingClientRect().left, drag.y - win.value.getBoundingClientRect().top)
+  }
+  const b = props.bounds, before = pos.value
+  pos.value = { x: clamp(e.clientX - drag.offset[0], b.left - width.value + 80, b.right - 80), y: clamp(e.clientY - drag.offset[1], b.top, b.bottom - 40) }
+  wobble.move(pos.value.x - before.x, pos.value.y - before.y)
+  dragged.value = true; wobbleRun()
 }
-function endDrag() { drag = null }
+function endDrag() {
+  window.removeEventListener('pointermove', moveDrag); window.removeEventListener('pointerup', endDrag); window.removeEventListener('pointercancel', endDrag)
+  if (drag?.moving) { wobble.release(); win.value?.classList.remove('dragging'); wobbleRun() }
+  drag = null
+}
+// Spring open from the data point.
+function popOpen() {
+  if (!wobbly || !win.value || !props.anchor) return
+  const w = win.value.offsetWidth, h = win.value.offsetHeight
+  wobble.resize(w, h); wobble.kick(popFrom(w, h, props.anchor.x - pos.value.x, props.anchor.y - pos.value.y, 0.12)); wobbleRun()
+}
 const maxHeight = computed(() => Math.max(160, props.bounds.bottom - props.bounds.top - 16))
 
 // The tether from the data point to the nearest point of the window's edge.
@@ -85,10 +116,10 @@ onMounted(() => {
   // width transition, and re-applying the inline width restarts that transition so it would never get anywhere.
   observer = new ResizeObserver(() => { if (win.value && Math.abs(win.value.offsetHeight - size.value.h) > 0.5) size.value = { w: size.value.w, h: win.value.offsetHeight } })
   if (win.value) { observer.observe(win.value); size.value = { w: win.value.offsetWidth, h: win.value.offsetHeight } }
-  place(); retype()
+  place(); retype(); nextTick(popOpen)
 })
-onBeforeUnmount(() => { cancelAnimationFrame(raf); observer?.disconnect() })
-watch(() => props.typeKey, () => { dragged.value = dragged.value && !!drag; minimised.value = false; nextTick(place); retype() })
+onBeforeUnmount(() => { cancelAnimationFrame(raf); cancelAnimationFrame(wobbleFrame); observer?.disconnect(); endDrag() })
+watch(() => props.typeKey, () => { dragged.value = dragged.value && !!drag; minimised.value = false; nextTick(() => { place(); popOpen() }); retype() })
 watch(expanded, () => nextTick(place))
 
 // ---- Graphics ----------------------------------------------------------------------------------------------------------
@@ -127,9 +158,9 @@ const delay = k => `${(Math.abs((k % 5) - 2) + Math.abs(Math.floor(k / 5) - 2)) 
     <circle v-if="anchor?.visible" class="mac-tether-dot" :cx="anchor.x" :cy="anchor.y" r="5"/>
     <circle v-if="anchor?.visible" class="mac-tether-pulse" :cx="anchor.x" :cy="anchor.y" r="5"/>
   </svg>
-  <div ref="win" class="mac-window" :class="{ minimised, expanded, typing }" role="dialog" :aria-label="`${content.title}: ${content.value} ${content.unit}`"
-       :style="{ left: `${pos.x}px`, top: `${pos.y}px`, width: `${width}px`, maxHeight: `${maxHeight}px`, transformOrigin: anchor && anchor.x < pos.x ? '0 40%' : '100% 40%' }">
-    <div class="mac-titlebar" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag" @dblclick="e => { if (!e.target.closest('.mac-lights')) minimised = !minimised }">
+  <div ref="win" class="mac-window" :class="{ minimised, expanded, typing }" @pointerdown="startDrag" role="dialog" :aria-label="`${content.title}: ${content.value} ${content.unit}`"
+       :style="{ left: `${pos.x}px`, top: `${pos.y}px`, width: `${width}px`, maxHeight: `${maxHeight}px` }">
+    <div class="mac-titlebar" @dblclick="e => { if (!e.target.closest('.mac-lights')) minimised = !minimised }">
       <div class="mac-lights">
         <button class="mac-light close" aria-label="Close" title="Close (Esc)" @click="emit('close')"><svg viewBox="0 0 10 10"><path d="M3 3l4 4M7 3l-4 4"/></svg></button>
         <button class="mac-light min" :aria-label="minimised ? 'Expand' : 'Minimise'" :title="minimised ? 'Expand' : 'Minimise'" @click="minimised = !minimised"><svg viewBox="0 0 10 10"><path d="M2.5 5h5"/></svg></button>
