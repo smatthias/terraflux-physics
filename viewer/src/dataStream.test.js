@@ -8,7 +8,7 @@ const layer = key => LAYERS.find(l => l.key === key)
 const snap = (over = {}) => ({ source: 'Synthetic demonstration', frames: 1, nx: 32, ny: 24, variant: 'baseline', view: 'field', viewLabel: 'Field explorer', layer: 'temperature', layerTitle: 'Air temperature', unit: '°C', frame: 0, frameLabel: '+60 min', overlays: ['wind vectors'], selected: null, selectedLabel: '', selectedValue: null, ...over })
 
 test('every viewer view has a stream label', () => {
-  for (const v of ['field', 'map', 'water', 'hazards', 'ocean', 'polar', 'coast', 'carbon', 'solar', 'dust', 'solarwind']) assert.ok(VIEW_LABELS[v], v)
+  for (const v of ['field', 'map', 'severe', 'water', 'hazards', 'ocean', 'polar', 'coast', 'carbon', 'solar', 'dust', 'solarwind']) assert.ok(VIEW_LABELS[v], v)
 })
 
 test('channels list the frame blocks and mark the ones the layer cannot do without', () => {

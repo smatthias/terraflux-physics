@@ -411,3 +411,8 @@ main.immersive .relief-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-
 main.immersive .wave-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);font-family:var(--hud-mono);transition:left .42s var(--hud-ease)}
 main.immersive .wave-note.second{top:calc(var(--hud-top) + 78px)}
 @media(max-width:700px){.wave-note{left:15px;top:60px}.wave-note.second{top:84px}}
+
+/* ---- Storm watch report ------------------------------------------------------------------------------------------ */
+.storm-report .bulletin{margin:10px 0;padding:10px 14px;border-left:3px solid #52707e;background:rgba(9,21,29,.6);font-size:12px;line-height:1.7;color:#cfe0e8}
+.storm-report .bulletin.alert{border-left-color:#ff3b30;background:rgba(60,18,20,.55);color:#ffe1dd}
+.storm-report .bulletin b{letter-spacing:1px;color:#fff}

@@ -97,6 +97,7 @@ export const CLOUD_VERTEX = `
 attribute vec4 aCloud;   // x: base y, y: depth, z: shade at the base, w: opacity
 attribute vec3 aTint;
 attribute vec2 aMisc;    // x: flat base + 2 * storm (0..3), y: seed
+attribute vec3 aSpin;    // rotation about a vertical axis: centre x, z (mesh coordinates) and angular speed (rad/s, + counter-clockwise from above)
 uniform float uTime;
 varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vSphereW; varying vec4 vCloud; varying vec3 vTint; varying vec2 vMisc;
 float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -114,9 +115,14 @@ void main(){
   vec3 t1 = normalize(cross(q, abs(q.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(q, t1);
   vec3 nl = normalize(cross(lumpy(normalize(q + t1 * 0.09)) - p, lumpy(normalize(q + t2 * 0.09)) - p));
   if (dot(nl, q) < 0.0) nl = -nl;
-  vec4 world = modelMatrix * instanceMatrix * vec4(p, 1.0);
+  // Spin (supercell updrafts, hurricane eyewalls): turn the puff about its storm's vertical axis.
+  float sa = aSpin.z * uTime, cs = cos(sa), sn = sin(sa);
+  mat3 spin = mat3(cs, 0.0, -sn, 0.0, 1.0, 0.0, sn, 0.0, cs);
+  vec4 local = instanceMatrix * vec4(p, 1.0);
+  local.xz = vec2(aSpin.x, aSpin.y) + (spin * vec3(local.x - aSpin.x, 0.0, local.z - aSpin.y)).xz;
+  vec4 world = modelMatrix * local;
   vWorld = world.xyz;
-  mat3 m = mat3(modelMatrix) * mat3(instanceMatrix);
+  mat3 m = mat3(modelMatrix) * spin * mat3(instanceMatrix);
   vNormalW = normalize(m * nl); vSphereW = normalize(m * q);
   vCloud = aCloud; vTint = aTint; vMisc = aMisc;
   gl_Position = projectionMatrix * viewMatrix * world;
@@ -151,7 +157,7 @@ void main(){
 export function cloudMesh(puffs, { sun = new THREE.Vector3(-30, 19, 10), opacity = 1 } = {}) {
   // Finer puffs while there are not too many of them (a hurricane of storm towers has thousands).
   const n = puffs.length, geometry = new THREE.IcosahedronGeometry(1, n < 2500 ? 3 : 2)
-  const aCloud = new Float32Array(n * 4), aTint = new Float32Array(n * 3), aMisc = new Float32Array(n * 2)
+  const aCloud = new Float32Array(n * 4), aTint = new Float32Array(n * 3), aMisc = new Float32Array(n * 2), aSpin = new Float32Array(n * 3)
   const uniforms = { uTime: { value: 0 }, uSun: { value: sun.clone().normalize() }, uFlash: { value: 1 }, uOpacity: { value: opacity } }
   const material = new THREE.ShaderMaterial({ vertexShader: CLOUD_VERTEX, fragmentShader: CLOUD_FRAGMENT, uniforms, transparent: true, depthWrite: false })
   const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, n))
@@ -161,11 +167,13 @@ export function cloudMesh(puffs, { sun = new THREE.Vector3(-30, 19, 10), opacity
     mesh.setMatrixAt(i, m)
     aCloud.set([p.base, p.depth, p.shade, p.opacity], i * 4); aTint.set(p.tint, i * 3)
     aMisc.set([(p.flat ? 1 : 0) + (p.storm ? 2 : 0), p.seed ?? i * 0.137], i * 2)
+    if (p.spin) aSpin.set([p.spin.x, p.spin.z, p.spin.omega], i * 3)
   })
   mesh.count = n
   geometry.setAttribute('aCloud', new THREE.InstancedBufferAttribute(aCloud, 4))
   geometry.setAttribute('aTint', new THREE.InstancedBufferAttribute(aTint, 3))
   geometry.setAttribute('aMisc', new THREE.InstancedBufferAttribute(aMisc, 2))
+  geometry.setAttribute('aSpin', new THREE.InstancedBufferAttribute(aSpin, 3))
   mesh.frustumCulled = false; mesh.renderOrder = 2
   mesh.userData.uniforms = uniforms
   return mesh

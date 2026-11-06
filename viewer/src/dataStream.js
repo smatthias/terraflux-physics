@@ -3,7 +3,7 @@
 // rebuild that says what changed. Pure functions; the component and the app only wire them up.
 
 export const VIEW_LABELS = {
-  field: 'Field explorer', map: 'Weather map', water: 'Catchment', hazards: 'Hazards', ocean: 'Ocean streams', polar: 'Polar melt',
+  field: 'Field explorer', map: 'Weather map', severe: 'Storm watch', water: 'Catchment', hazards: 'Hazards', ocean: 'Ocean streams', polar: 'Polar melt',
   coast: 'Sea level & coasts', carbon: 'Carbon & ocean life', solar: 'Sun & solar cycle', dust: 'Cosmic dust', solarwind: 'Solar wind & poles',
 }
 

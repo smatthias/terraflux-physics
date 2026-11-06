@@ -5,6 +5,7 @@ import { CLOUD_VERTEX, CLOUD_FRAGMENT, SHAFT_VERTEX, SHAFT_FRAGMENT } from './cl
 import { surfaceMaterial, skirtMaterial } from './surface.js'
 import { arrowField } from './flowArrows.js'
 import { WATER_VERTEX, WATER_FRAGMENT } from './waterSurface.js'
+import { STORM_SHADERS, watchCurtain } from './stormScene.js'
 
 // Node cannot compile GLSL, so this catches the mistake that slipped through once: a variable named after a word that
 // GLSL ES 3.0 reserves (flat, smooth, ...) breaks the shader in the browser.
@@ -36,7 +37,7 @@ test('the reserved-name check finds names after commas inside calls', () => {
 })
 
 test('no custom shader declares a GLSL-reserved name', () => {
-  const sources = { water: WATER_VERTEX + WATER_FRAGMENT, clouds: CLOUD_VERTEX + CLOUD_FRAGMENT, rain: SHAFT_VERTEX + SHAFT_FRAGMENT, surface: patched(surfaceMaterial({ nx: 2, ny: 2 })), terrain: patched(surfaceMaterial({ nx: 2, ny: 2, terrain: {} })),
+  const sources = { storms: Object.values(STORM_SHADERS).join('\n') + watchCurtain([[0, 0, 1, 0]], () => 0).material.fragmentShader, water: WATER_VERTEX + WATER_FRAGMENT, clouds: CLOUD_VERTEX + CLOUD_FRAGMENT, rain: SHAFT_VERTEX + SHAFT_FRAGMENT, surface: patched(surfaceMaterial({ nx: 2, ny: 2 })), terrain: patched(surfaceMaterial({ nx: 2, ny: 2, terrain: {} })),
     sides: patched(skirtMaterial({ terrain: true })), arrows: patched(arrowField([{ dir: new THREE.Vector3(1, 0, 0), origin: new THREE.Vector3(), length: 1, color: 1 }]).material) }
   for (const [name, src] of Object.entries(sources)) {
     const names = declared(src)

@@ -185,6 +185,7 @@ export const EXAMPLE_GROUPS = [
     { action: 'loadEngineExample', label: '→ Load engine example', tooltip: 'Temperature transport, radar rainfall and surface water on a small synthetic grid: wet weather, then drying.' },
     { action: 'loadCoupledExample', label: '⇶ Load coupled wind example', tooltip: 'Wind from pressure systems with Coriolis and friction, coupled to temperature, humidity and air density.' },
     { action: 'loadCloudExample', label: '⛅ Load cloud formation example', tooltip: 'Fronts, frontal and convective clouds, afternoon thunderstorms and what they rain.' },
+    { action: 'loadSupercellExample', label: '🌪 Load supercell & tornado outbreak example', tooltip: 'The engine\'s tornado-outbreak run, hourly: a capping inversion breaks, supercells rotate in strong helicity and tornado watches come and go (Storm watch view).' },
     { action: 'loadHurricaneExample', label: '🌀 Load hurricane landfall example', tooltip: 'Two tropical cyclones merge, intensify over warm water, make landfall with a storm surge and decay inland.' },
     { action: 'loadAlpsExample', label: '⛰ Load Alps foehn example', tooltip: 'Southerly flow over an Alpine ridge: rain on the windward side, foehn in the lee, cold pools in the valleys.' },
     { action: 'useCloudMock', label: '⛈ Cloud formation mock (synthetic)', tooltip: 'A hand-built mock in the cloud-formation format; not engine output.' },
