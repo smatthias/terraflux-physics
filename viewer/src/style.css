@@ -301,3 +301,94 @@ main.stage-return>article{animation:hud-return .5s var(--hud-ease) backwards}
  main.immersive>.control-panel,main.immersive .data-stream,main.immersive .viewport,main.immersive .scene-head,main.immersive .timeline{animation:none !important;transition:none !important}
 }
 @media(hover:none){.fullscreen-toggle kbd,.hud-keys-hint{display:none}}
+
+/* ---- Data points that explain themselves ----------------------------------------------------------------------------
+   Hover: a small translucent tip with the value and its meaning. Click: an inspector window in the style of macOS
+   (rounded, half transparent, traffic lights) whose sentences type themselves out; values fill their gaps. */
+:root{--mac-font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue','DM Sans',system-ui,sans-serif}
+.legend span small{margin-top:3px;font-size:8.5px;letter-spacing:.3px;color:#7f98a4}
+.legend span:last-child small{text-align:right}
+.hover-tip{position:absolute;z-index:7;display:grid;grid-template-columns:auto auto;justify-content:start;align-items:baseline;column-gap:5px;padding:7px 12px 8px;transform:translate(18px,18px);border-radius:10px;pointer-events:none;white-space:nowrap;
+ font-family:var(--mac-font);color:#fff;background:rgba(30,36,44,.6);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);border:1px solid rgba(255,255,255,.14);box-shadow:0 0 0 .5px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.4);animation:tip-in .18s ease-out}
+.hover-tip.flip{transform:translate(calc(-100% - 18px),18px)}
+.hover-tip b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.hover-tip em{font-style:normal;font-size:11px;color:rgba(255,255,255,.6)}
+.hover-tip span{grid-column:1/-1;font-size:11.5px;color:#ffd98a}
+.hover-tip small{grid-column:1/-1;margin-top:2px;font-size:9.5px;color:rgba(255,255,255,.45)}
+
+.mac-tether{position:absolute;inset:0;z-index:8;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mac-tether path{fill:none;stroke:rgba(255,255,255,.55);stroke-width:1.2;stroke-dasharray:3 4}
+.mac-tether-dot{fill:#ffd166;stroke:#1a1206;stroke-width:1.5}
+.mac-tether-pulse{fill:none;stroke:#ffd166;stroke-width:1.5;opacity:0;animation:tether-pulse 1.8s ease-out 3;transform-box:fill-box;transform-origin:center}
+
+.mac-window{position:absolute;z-index:9;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;color:#eef3f6;font-family:var(--mac-font);-webkit-font-smoothing:antialiased;
+ background:rgba(30,36,44,.5);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);border:1px solid rgba(255,255,255,.16);
+ box-shadow:0 0 0 .5px rgba(0,0,0,.55),0 24px 64px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);animation:mac-open .34s cubic-bezier(.2,.9,.25,1.08) backwards;transition:width .3s cubic-bezier(.2,.9,.25,1)}
+.mac-titlebar{position:relative;flex:none;display:flex;align-items:center;height:34px;padding:0 12px;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-bottom:1px solid rgba(255,255,255,.08)}
+.mac-titlebar:active{cursor:grabbing}
+.mac-window.minimised .mac-titlebar{border-bottom:0}
+.mac-lights{position:relative;z-index:1;display:flex;gap:8px}
+.mac-light{display:grid;place-items:center;width:12px;height:12px;padding:0;border-radius:50%;border:.5px solid rgba(0,0,0,.28)}
+.mac-light svg{width:8px;height:8px;fill:none;stroke:rgba(0,0,0,.62);stroke-width:1.5;stroke-linecap:round;opacity:0;transition:opacity .12s}
+.mac-lights:hover .mac-light svg,.mac-light:focus-visible svg{opacity:1}
+.mac-light.close{background:#ff5f57}.mac-light.min{background:#febc2e}.mac-light.zoom{background:#28c840}
+.mac-light:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:1px}
+.mac-title{position:absolute;left:78px;right:78px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:rgba(255,255,255,.86);pointer-events:none}
+.mac-body{overflow-y:auto;padding:14px 18px 14px;font-size:12.5px;line-height:1.55;cursor:default;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+.mac-hero{display:flex;align-items:baseline;gap:7px}
+.mac-value{font-size:36px;font-weight:600;line-height:1.1;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.mac-unit{font-size:15px;color:rgba(255,255,255,.6);opacity:0;transition:opacity .3s}
+.mac-unit.on{opacity:1}
+.mac-verdict{margin:5px 0 12px;font-size:14px;line-height:1.45;color:#fff}
+.mac-window .tv{font-weight:600;color:#fff;font-variant-numeric:tabular-nums}
+.mac-window .tone-class{color:#ffd98a}
+.mac-window .ghost{color:transparent}
+.mac-window .ghost.gap{border-radius:4px;background:linear-gradient(90deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.07) 100%);background-size:200% 100%;animation:gap-shimmer 1.1s linear infinite}
+.mac-window .caret{display:inline-block;width:2px;height:1.05em;margin:0 1px -2px;border-radius:1px;background:#7fe0ff;box-shadow:0 0 6px #7fe0ff;animation:caret-blink .8s steps(1) infinite}
+.mac-section{padding:10px 0 4px;border-top:1px solid rgba(255,255,255,.08)}
+.mac-section h4{margin:0 0 5px;font-size:10.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:rgba(255,255,255,.45);opacity:0;transform:translateY(3px);transition:opacity .25s,transform .25s}
+.mac-section h4.on{opacity:1;transform:none}
+.mac-section p{margin:0 0 4px;color:rgba(236,243,247,.86)}
+.mac-section-body{display:flex;flex-direction:column;gap:8px}
+.sec-around .mac-section-body,.sec-also .mac-section-body{flex-direction:row;align-items:flex-start}
+.mac-text{flex:1;min-width:0}
+.mac-skip{margin:8px 0 0;font-size:10px;text-align:center;color:rgba(255,255,255,.35)}
+.mac-graphic{display:block;flex:none;opacity:0;transition:opacity .35s}
+.mac-graphic.on{opacity:1}
+.mac-graphic .g-small{font-size:8.5px;fill:rgba(255,255,255,.5)}
+.mac-graphic .g-label{font-size:9.5px;fill:rgba(255,255,255,.78);font-variant-numeric:tabular-nums}
+.g-dist,.g-spark,.g-cats{width:100%;height:auto}
+.g-cats rect{opacity:0;transform-box:fill-box;transform-origin:left center}
+.g-cats.on rect{animation:bar-grow .45s ease-out forwards}
+.g-cats rect.current{stroke:#ffd166;stroke-width:2}
+.g-dist .g-mean{stroke:rgba(255,255,255,.7);stroke-width:1.2;stroke-dasharray:2 2}
+.g-dist .g-marker{transition:transform 1s cubic-bezier(.2,.9,.2,1)}
+.g-dist .g-marker circle{fill:rgba(255,255,255,.18);stroke:#fff;stroke-width:2}
+.g-dist .g-marker .g-core{fill:#fff;stroke:none}
+.g-near{width:112px;height:112px}
+.g-near rect{opacity:0;transform-box:fill-box;transform-origin:center}
+.g-near.on rect{animation:cell-pop .4s cubic-bezier(.2,.9,.25,1.2) forwards}
+.g-near rect.centre{stroke:#ffd166;stroke-width:2}
+.g-near .g-arrow line,.g-near .g-arrow path{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 2px rgba(0,0,0,.8))}
+.g-near .g-arrow{opacity:0}
+.g-near.on .g-arrow{animation:arrow-in .4s .5s forwards}
+.g-spark .g-line{fill:none;stroke:#7fe0ff;stroke-width:1.8;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
+.g-spark.on .g-line{stroke-dashoffset:0;transition:stroke-dashoffset 1.1s ease}
+.g-spark .g-now{stroke:rgba(255,209,102,.6);stroke-dasharray:2 2}
+.g-spark .g-dot{fill:#ffd166;stroke:#1a1206;stroke-width:1.5}
+.g-compass{width:90px;height:90px}
+.g-compass .g-ring{fill:rgba(255,255,255,.04);stroke:rgba(255,255,255,.25)}
+.g-compass .g-wind line{stroke:#7fe0ff;stroke-width:2.2;stroke-linecap:round}
+.g-compass .g-wind path,.g-compass .g-wind circle{fill:#7fe0ff}
+.g-compass.on .g-wind{animation:wind-swing .9s cubic-bezier(.2,.9,.25,1.2) backwards}
+@keyframes mac-open{from{opacity:0;transform:scale(.9) translateY(8px)}}
+@keyframes tip-in{from{opacity:0}}
+@keyframes bar-grow{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:none}}
+@keyframes arrow-in{from{opacity:0}to{opacity:1}}
+@keyframes gap-shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
+@keyframes caret-blink{50%{opacity:0}}
+@keyframes cell-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+@keyframes wind-swing{from{opacity:0}}
+@keyframes tether-pulse{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(3.2)}}
+@media(prefers-reduced-motion:reduce){.mac-window,.mac-window *,.hover-tip,.mac-tether *{animation:none !important;transition:none !important}.g-near rect{opacity:1}.g-spark .g-line{stroke-dashoffset:0}.g-near .g-arrow{opacity:1}}
+@media(max-width:700px){.hover-tip{display:none}}
