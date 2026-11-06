@@ -80,3 +80,339 @@ details.example-group>summary>span{flex:1}
 .chart-box{position:relative}.chart-box .ylab{position:absolute;left:4px;font-size:9px;color:#7c96a4;transform:translateY(-110%)}
 .earth .axis span:last-child:not(:first-child){transform:translateX(-100%)}.slider-label{display:block;font-size:11px;color:#9db0b8;margin-top:12px}.slider-label input{display:block}
 @media(max-width:700px){header{flex-wrap:wrap;height:auto;padding:14px 0;gap:12px}header .status{display:none}header .mode-switch{order:3;width:100%}header .mode-switch button{flex:1}}
+
+/* ---- Scene actions and the fullscreen stage ------------------------------------------------------------------------
+   F (or the Fullscreen button) turns <main> into a fullscreen stage: the WebGL scene fills the screen, the control panel
+   floats over its left side and the data stream over its right side. The insets come from hudLayout() in immersive.js
+   as custom properties (--hud-top/left/right/bottom), so the CSS and the camera offset always agree. */
+:root{--hud-accent:#7fe0ff;--hud-green:#58e0a0;--hud-mono:'JetBrains Mono','IBM Plex Mono','DejaVu Sans Mono',ui-monospace,SFMono-Regular,Menlo,monospace;--hud-ease:cubic-bezier(.2,.8,.2,1)}
+/* Scene head: the title and the actions on the first row, the views as a row of tabs below (no more squeezed labels). */
+.scene-head{gap:12px 16px;height:auto;min-height:87px;flex-wrap:wrap}
+.scene-head>div:first-child{flex:1 1 260px;min-width:0}
+.scene-actions{display:flex;gap:8px;align-items:center;flex:none}
+.view-switch{order:3;flex:1 1 100%;flex-wrap:wrap;gap:6px}
+.view-switch button{white-space:nowrap}
+.icon{width:11px;height:11px;margin-right:6px;vertical-align:-1px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+kbd{font-family:var(--hud-mono);font-size:9px;line-height:1;border:1px solid currentColor;border-radius:3px;padding:2px 4px;margin-left:5px;opacity:.7;font-weight:500}
+.fullscreen-toggle{border-color:#4f7f8c;color:#c9eef8;white-space:nowrap}
+.fullscreen-toggle:hover{border-color:var(--hud-accent);box-shadow:0 0 0 1px rgba(127,224,255,.2),0 0 14px rgba(127,224,255,.18)}
+html.tf-immersive,html.tf-immersive body{overflow:hidden}
+
+main.immersive{position:fixed;inset:0;z-index:40;display:block;margin:0;padding:0;max-width:none;background:#050d13;overflow:hidden;color-scheme:dark}
+main.immersive:fullscreen{background:#050d13}
+main:focus{outline:none}
+/* align/justify-self: the page's article is align-self:start (grid), and current browsers apply box alignment to
+   absolutely positioned boxes too, which would shrink it to its (all absolute, so empty) content. */
+main.immersive>article{position:absolute;inset:0;align-self:stretch;justify-self:stretch;border:0;border-radius:0;background:#09151d;overflow:hidden}
+main.immersive>article>:not(.scene-head):not(.viewport):not(.timeline){display:none}
+main.immersive .viewport{position:absolute;inset:0;height:auto;animation:hud-stage-in .55s ease-out backwards}
+main.immersive .viewport::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 58%,rgba(2,8,12,.6) 100%),repeating-linear-gradient(0deg,rgba(127,224,255,.022) 0 1px,transparent 1px 3px)}
+
+/* Glass panels with bracket corners; the corners are backgrounds, so they stay put while the panel scrolls. */
+.hud-panel{--c:rgba(127,224,255,.55);border:1px solid rgba(127,224,255,.13);border-radius:4px;box-shadow:0 18px 50px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.03);backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
+ background:linear-gradient(var(--c),var(--c)) top left/14px 1px no-repeat,linear-gradient(var(--c),var(--c)) top left/1px 14px no-repeat,linear-gradient(var(--c),var(--c)) top right/14px 1px no-repeat,linear-gradient(var(--c),var(--c)) top right/1px 14px no-repeat,
+ linear-gradient(var(--c),var(--c)) bottom left/14px 1px no-repeat,linear-gradient(var(--c),var(--c)) bottom left/1px 14px no-repeat,linear-gradient(var(--c),var(--c)) bottom right/14px 1px no-repeat,linear-gradient(var(--c),var(--c)) bottom right/1px 14px no-repeat,
+ linear-gradient(180deg,rgba(12,29,39,.84),rgba(6,17,24,.8))}
+.hud-panel::-webkit-scrollbar{width:6px}
+.hud-panel::-webkit-scrollbar-thumb{background:rgba(127,224,255,.18);border-radius:3px}
+.hud-panel{scrollbar-width:thin;scrollbar-color:rgba(127,224,255,.22) transparent}
+.hud-panel-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;margin:0 -16px 2px;padding:13px 16px 11px;background:linear-gradient(180deg,rgba(9,23,31,.97),rgba(9,23,31,.9));border-bottom:1px solid rgba(127,224,255,.12)}
+.stream-title{display:flex;align-items:center;gap:9px;white-space:nowrap;font:600 10px/1 var(--hud-mono);letter-spacing:2.6px;color:#e2f7ff}
+.stream-status{margin-left:auto;font:500 9px/1 var(--hud-mono);letter-spacing:1.4px;color:#78a6b6;white-space:nowrap}
+.hud-icon{flex:none;display:grid;place-items:center;width:24px;height:24px;padding:0;border:1px solid rgba(127,224,255,.25);border-radius:3px;background:transparent;color:#a9dff0;font:600 11px/1 var(--hud-mono)}
+.hud-icon:hover{border-color:var(--hud-accent);color:#fff;background:rgba(127,224,255,.08)}
+
+/* Top bar: the scene head of the page, restyled. Views without data are hidden here to keep the bar short. */
+main.immersive .scene-head{position:absolute;z-index:4;top:var(--hud-gap);left:var(--hud-gap);right:var(--hud-gap);height:var(--hud-bar);padding:0 12px 0 18px;border:1px solid rgba(127,224,255,.1);border-radius:4px;background:linear-gradient(90deg,rgba(7,18,26,.82),rgba(7,18,26,.55) 50%,rgba(7,18,26,.82));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.25);animation:hud-in-top .45s var(--hud-ease) backwards}
+main.immersive .scene-head>div:first-child{flex:0 1 auto;min-width:0;max-width:32%}
+main.immersive .scene-head .eyebrow{font-family:var(--hud-mono);color:var(--hud-accent);letter-spacing:2.4px;opacity:.8}
+main.immersive .scene-head h2{font-size:15px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main.immersive .scene-head{flex-wrap:nowrap;min-height:0}
+main.immersive .view-switch{order:0;flex:1 1 auto;flex-wrap:nowrap;min-width:0;justify-content:center;overflow-x:auto;scrollbar-width:none;padding:2px}
+main.immersive .view-switch::-webkit-scrollbar{display:none}
+main.immersive .view-switch button:disabled{display:none}
+main.immersive .view-switch button,main.immersive .scene-actions button{white-space:nowrap;padding:7px 11px;background:rgba(9,21,29,.6)}
+main.immersive .view-switch button.selected,main.immersive .scene-actions button.selected{color:#dff6ff;border-color:rgba(127,224,255,.6);background:rgba(127,224,255,.1);box-shadow:inset 0 -2px 0 var(--hud-accent)}
+main.immersive .fullscreen-toggle{border-color:rgba(255,138,128,.45);color:#ffd7d3}
+main.immersive .fullscreen-toggle:hover{border-color:#ff8a80;box-shadow:0 0 14px rgba(255,138,128,.2)}
+
+/* Left: the control panel. It is the page's own aside, so every control keeps its state between the two modes. */
+main.immersive>.control-panel{position:absolute;z-index:5;display:block;top:var(--hud-top);bottom:var(--hud-gap);left:var(--hud-gap);width:var(--hud-panel-left);padding:0 16px 14px;overflow-y:auto;overscroll-behavior:contain;
+ transition:transform .42s var(--hud-ease),opacity .3s ease,visibility 0s linear 0s;animation:hud-in-left .5s var(--hud-ease) backwards}
+main.immersive>.control-panel>.eyebrow,main.immersive>.control-panel>h1,main.immersive>.control-panel>.intro{display:none}
+main.immersive>.control-panel section{padding:15px 0;border-top-color:rgba(127,224,255,.1)}
+main.immersive>.control-panel .hud-panel-head+section{border-top:0}
+main.immersive>.control-panel .layer{padding:10px 11px;margin:4px 0}
+main.immersive>.control-panel .layer.active{background:rgba(127,224,255,.09);border-color:rgba(127,224,255,.45);color:#e2f7ff;box-shadow:inset 2px 0 0 var(--hud-accent)}
+main.immersive>.control-panel .layer:hover:not(:disabled):not(.active){background:rgba(127,224,255,.04)}
+main.immersive>.control-panel .example-button{background:rgba(28,48,47,.55)}
+main.immersive .hud-collapsed{opacity:0;visibility:hidden;pointer-events:none;transition:transform .42s var(--hud-ease),opacity .3s ease,visibility 0s linear .42s}
+main.immersive>.control-panel.hud-collapsed{transform:translateX(calc(-100% - var(--hud-gap) - 8px))}
+
+/* Right: the data stream. */
+.data-stream{container-type:inline-size;position:absolute;z-index:5;top:var(--hud-top);bottom:var(--hud-gap);right:var(--hud-gap);width:var(--hud-panel-right);display:flex;flex-direction:column;padding:0 16px 12px;overflow-y:auto;overscroll-behavior:contain;font-family:var(--hud-mono);color:#cfe9f3;
+ transition:transform .42s var(--hud-ease),opacity .3s ease,visibility 0s linear 0s;animation:hud-in-right .5s .06s var(--hud-ease) backwards}
+main.immersive .data-stream.hud-collapsed{transform:translateX(calc(100% + var(--hud-gap) + 8px))}
+.data-stream .stream-block{flex:none;border-top:1px solid rgba(127,224,255,.09);padding:10px 0}
+.data-stream .hud-panel-head+.stream-block{border-top:0}
+.stream-label{display:flex;justify-content:space-between;gap:8px;font-size:8.5px;letter-spacing:1.8px;color:#5f8b9b;margin-bottom:9px}
+.stream-label span{color:#9fd3e3;letter-spacing:1.2px;text-align:right}
+.live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--hud-green);box-shadow:0 0 8px var(--hud-green)}
+.live.idle{animation:live-breathe 2.4s ease-in-out infinite}
+.live.pulse{animation:live-pulse .5s ease-out}
+.stream-target strong{display:block;font:500 16px/1.25 'DM Sans',system-ui,sans-serif;color:#eef9ff}
+.stream-target small{font-size:10px;color:#7fa0ad;margin-top:4px}
+.stream-kv{display:grid;grid-template-columns:56px minmax(0,1fr);gap:4px 10px;margin:9px 0 0;font-size:10.5px}
+.stream-kv dt{color:#5a8393;letter-spacing:1.3px;font-size:8.5px;padding-top:2px}
+.stream-kv dd{margin:0;color:#d4ecf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stream-kv em{font-style:normal;color:#7fa0ad;margin-left:6px}
+.stream-progress{height:2px;margin-top:11px;background:rgba(127,224,255,.1)}
+.stream-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--hud-green),var(--hud-accent));box-shadow:0 0 8px rgba(127,224,255,.6);transition:width .3s ease}
+.stream-stats{display:flex;justify-content:space-between;gap:8px}
+.stream-stats span{display:flex;align-items:baseline;gap:6px;min-width:0}
+.stream-stats small{display:inline;font-size:7.5px;letter-spacing:1.3px;color:#5a8393}
+.stream-stats b{font-size:13px;font-weight:500;color:#eef9ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stream-telemetry{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.stream-telemetry small{font-size:7px;letter-spacing:1.1px;color:#5a8393;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stream-telemetry{gap:4px 8px}
+.stream-telemetry div{min-width:0;padding:0 0 0 7px;border-left:1px solid rgba(127,224,255,.16)}
+.stream-telemetry b{display:block;margin-top:3px;font-size:11.5px;font-weight:500;color:#eef9ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stream-hist{display:block;width:100%;height:40px;margin-top:8px}
+.stream-hist .mean-line{stroke:#fff;stroke-width:1;stroke-dasharray:2 2;vector-effect:non-scaling-stroke;opacity:.8}
+.stream-scale{display:flex;justify-content:space-between;margin-top:3px;font-size:9px;color:#6f97a6}
+.stream-scale span:nth-child(2){font-size:7.5px;letter-spacing:1.5px;color:#4d7584;align-self:center}
+.stream-coverage{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-top:7px;font-size:8px;letter-spacing:1.2px;color:#5a8393}
+.stream-coverage i{display:block;height:3px;background:rgba(127,224,255,.1)}
+.stream-coverage b{display:block;height:100%;background:var(--hud-accent);box-shadow:0 0 6px rgba(127,224,255,.5)}
+.stream-coverage span:last-child{color:#9fd3e3;letter-spacing:0}
+.stream-scan{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;align-items:stretch}
+.stream-map{position:relative;align-self:start;width:92px;max-height:120px;overflow:hidden;cursor:crosshair;border:1px solid rgba(127,224,255,.18);background:#06121a}
+.stream-map canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.stream-map .sweep{position:absolute;left:0;right:0;min-height:1px;background:rgba(127,224,255,.45);box-shadow:0 0 10px 2px rgba(127,224,255,.5);pointer-events:none}
+.stream-map .sweep.locked{background:rgba(255,209,102,.4);box-shadow:0 0 10px 2px rgba(255,209,102,.45)}
+.stream-map .probe{position:absolute;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border:1px solid #ffd166;box-shadow:0 0 6px #ffd166;pointer-events:none}
+.stream-scope{display:block;width:100%;height:100%;min-height:46px;background:rgba(2,10,15,.65);border:1px solid rgba(127,224,255,.1)}
+.stream-scope .grid-line{stroke:rgba(127,224,255,.08);stroke-width:1;vector-effect:non-scaling-stroke}
+.stream-scope .trace{fill:none;stroke:var(--hud-accent);stroke-width:1.3;vector-effect:non-scaling-stroke;stroke-linejoin:round;filter:drop-shadow(0 0 2px rgba(127,224,255,.8))}
+.stream-scope .probe-line{stroke:#ffd166;stroke-width:1;stroke-dasharray:2 2;vector-effect:non-scaling-stroke}
+.stream-probe{margin:9px 0 0;font-size:10px;color:#9fd3e3}
+.stream-probe b{color:#ffd166;font-weight:600}
+.stream-chips{display:flex;flex-wrap:wrap;gap:5px}
+.stream-chips.overlays{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(127,224,255,.08)}
+.chip{font-size:9.5px;line-height:1.3;padding:3px 7px;border:1px solid rgba(127,224,255,.14);border-radius:2px;color:#6f97a6;cursor:default}
+.chip.base{color:#bcd6e0;border-color:rgba(188,214,224,.3)}
+.chip.active{color:#04212b;background:var(--hud-accent);border-color:var(--hud-accent);box-shadow:0 0 10px rgba(127,224,255,.45);font-weight:600}
+.chip.overlay{color:#c8e8bd;border-color:rgba(177,217,164,.28)}
+.stream-log-block{flex:1 1 auto !important;min-height:160px;display:flex;flex-direction:column}
+.stream-log{flex:1 1 auto;min-height:0;margin:0;padding:0;list-style:none;overflow-y:auto;font-size:10px;line-height:1.45;-webkit-mask-image:linear-gradient(180deg,#000 78%,transparent);mask-image:linear-gradient(180deg,#000 78%,transparent)}
+.stream-log li{display:grid;grid-template-columns:auto 50px minmax(0,1fr);gap:2px 7px;padding:4px 2px;border-bottom:1px dashed rgba(127,224,255,.06);animation:stream-in .55s ease-out}
+.stream-log time{font-size:9px;color:#4b7080;padding-top:1px}
+.stream-log b{font-weight:600;color:var(--hud-accent);letter-spacing:.6px}
+.stream-log span{color:#cfe9f3;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.stream-log em{grid-column:3;font-style:normal;font-size:9px;color:var(--hud-green)}
+.stream-log .tag-frame b{color:#9fd3e3}
+.stream-log .tag-data b,.stream-log .tag-fetch b,.stream-log .tag-probe b{color:#ffd166}
+.stream-log .tag-view b,.stream-log .tag-layer b,.stream-log .tag-init b{color:#b1d9a4}
+.stream-log .tag-overlay b{color:#c9a6ff}
+.stream-log .tag-render b{color:#6f97a6}
+.stream-log .tag-error b,.stream-log .tag-error span{color:#ff8a80}
+
+/* Bottom: the timeline as a HUD bar between the panels. */
+main.immersive .timeline{position:absolute;z-index:4;left:calc(var(--hud-left) + var(--hud-gap));right:calc(var(--hud-right) + var(--hud-gap));bottom:var(--hud-gap);height:var(--hud-timeline);display:flex;flex-direction:column;justify-content:center;padding:8px 18px;border:1px solid rgba(127,224,255,.13);border-radius:4px;background:rgba(7,18,26,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+ transition:left .42s var(--hud-ease),right .42s var(--hud-ease);animation:hud-in-bottom .45s .08s var(--hud-ease) backwards}
+main.immersive .timeline p{display:none}
+main.immersive .timeline input{margin:9px 0 0;accent-color:var(--hud-accent)}
+main.immersive .playback span{font-family:var(--hud-mono);font-size:10px;color:#9fd3e3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+main.immersive .playback button{background:rgba(127,224,255,.07);border-color:rgba(127,224,255,.35);color:#dff6ff}
+
+/* Overlays of the scene move into the free area between the panels and follow them when a panel opens or closes. */
+main.immersive .scene-note,main.immersive .gestures,main.immersive .legend,main.immersive .cloud-key,main.immersive .aspect-key,main.immersive .hud-keys-hint,main.immersive .hud-frame,main.immersive .hud-toast{transition:left .42s var(--hud-ease),right .42s var(--hud-ease),bottom .42s var(--hud-ease)}
+main.immersive .scene-note{top:calc(var(--hud-top) + 10px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);font-family:var(--hud-mono);color:#9fd3e3}
+main.immersive .gestures{left:calc(var(--hud-left) + var(--hud-gap) + 16px);bottom:calc(var(--hud-bottom) + var(--hud-gap) + 6px);font-family:var(--hud-mono)}
+main.immersive .legend,main.immersive .cloud-key{right:calc(var(--hud-right) + var(--hud-gap) + 16px);bottom:calc(var(--hud-bottom) + var(--hud-gap) + 6px)}
+main.immersive .legend{font-family:var(--hud-mono)}
+main.immersive .cloud-key{background:rgba(6,17,24,.78);border:1px solid rgba(127,224,255,.12);backdrop-filter:blur(8px)}
+main.immersive .aspect-key{right:calc(var(--hud-right) + var(--hud-gap) + 16px);bottom:calc(var(--hud-bottom) + var(--hud-gap) + 32px)}
+main.immersive .fallback-grid,main.immersive .systems-map{inset:calc(var(--hud-top) + 60px) calc(var(--hud-right) + 90px) calc(var(--hud-bottom) + 70px) calc(var(--hud-left) + 90px)}
+main.immersive .systems-map{width:calc(100% - var(--hud-left) - var(--hud-right) - 180px);height:calc(100% - var(--hud-top) - var(--hud-bottom) - 130px)}
+.hud-frame{position:absolute;z-index:2;pointer-events:none;top:var(--hud-top);left:calc(var(--hud-left) + var(--hud-gap));right:calc(var(--hud-right) + var(--hud-gap));bottom:calc(var(--hud-bottom) + var(--hud-gap))}
+.hud-frame i{position:absolute;width:18px;height:18px;border:0 solid rgba(127,224,255,.35)}
+.hud-frame i:nth-child(1){top:0;left:0;border-top-width:1px;border-left-width:1px}
+.hud-frame i:nth-child(2){top:0;right:0;border-top-width:1px;border-right-width:1px}
+.hud-frame i:nth-child(3){bottom:0;left:0;border-bottom-width:1px;border-left-width:1px}
+.hud-frame i:nth-child(4){bottom:0;right:0;border-bottom-width:1px;border-right-width:1px}
+.hud-keys-hint{position:absolute;z-index:4;top:calc(var(--hud-top) + 8px);right:calc(var(--hud-right) + var(--hud-gap) + 14px);padding:5px 8px;border:1px solid rgba(127,224,255,.2);border-radius:3px;background:rgba(6,17,24,.6);color:#9fd3e3;font:500 9px/1 var(--hud-mono);letter-spacing:1.6px}
+.hud-keys-hint kbd{margin:0 5px 0 0}
+.hud-keys-hint:hover{border-color:var(--hud-accent);color:#fff}
+.hud-tab{position:absolute;z-index:4;top:50%;display:flex;align-items:center;gap:8px;padding:14px 7px;writing-mode:vertical-rl;border:1px solid rgba(127,224,255,.25);background:rgba(7,18,26,.82);color:#9fd3e3;font:600 9px/1 var(--hud-mono);letter-spacing:2.4px;backdrop-filter:blur(10px);animation:hud-fade-in .4s ease-out backwards}
+.hud-tab kbd{margin:0;writing-mode:horizontal-tb}
+.hud-tab:hover{color:#fff;border-color:var(--hud-accent);box-shadow:0 0 14px rgba(127,224,255,.2)}
+.hud-tab-left{left:0;transform:translateY(-50%) rotate(180deg);border-left:0;border-radius:4px 0 0 4px}
+.hud-tab-right{right:0;transform:translateY(-50%);border-right:0;border-radius:4px 0 0 4px}
+.hud-toast{position:absolute;z-index:6;top:calc(var(--hud-top) + 44px);left:calc(var(--hud-left) + (100% - var(--hud-left) - var(--hud-right)) / 2);transform:translateX(-50%);padding:9px 16px;white-space:nowrap;border:1px solid rgba(127,224,255,.35);border-radius:3px;background:rgba(6,18,26,.88);color:#e2f7ff;font:600 10px/1 var(--hud-mono);letter-spacing:2px;box-shadow:0 0 26px rgba(127,224,255,.16);pointer-events:none}
+.hud-error{position:absolute;z-index:7;top:calc(var(--hud-top) + 44px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);right:calc(var(--hud-right) + var(--hud-gap) + 16px);display:flex;align-items:center;gap:12px;justify-content:space-between;margin:0;padding:10px 12px 10px 16px;border:1px solid rgba(255,138,128,.55);border-radius:3px;background:rgba(60,22,26,.92);color:#ffd7d3;font-size:12px}
+.hud-error .hud-icon{border-color:rgba(255,138,128,.5);color:#ffd7d3}
+.hud-help{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:rgba(3,9,13,.55);backdrop-filter:blur(3px)}
+.hud-help-card{width:min(420px,calc(100% - 32px));padding:0 16px 14px}
+.hud-help-card .hud-panel-head .hud-icon{margin-left:auto}
+.hud-help dl{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:14px 0 2px;align-items:baseline}
+.hud-help dt{white-space:nowrap;text-align:right}
+.hud-help dt kbd{margin:0 0 0 4px;padding:3px 6px;font-size:10px;color:#e2f7ff;opacity:1;border-color:rgba(127,224,255,.45);background:rgba(127,224,255,.06)}
+.hud-help dd{margin:0;font-size:12px;color:#cfe9f3}
+.hud-help dd small{display:inline;margin-left:8px;font:9px var(--hud-mono);letter-spacing:1px;color:#6f97a6;text-transform:uppercase}
+.hud-fade-enter-active,.hud-fade-leave-active{transition:opacity .25s ease}
+.hud-fade-enter-from,.hud-fade-leave-to{opacity:0}
+
+/* A narrow stream panel shows the pipeline readout as 2 x 2. */
+@container (max-width:290px){.stream-telemetry{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:8px}}
+
+/* Short screens: the grid scan gives its room to the event stream. */
+@media(max-height:820px){.data-stream .stream-scan-block{display:none}}
+
+/* Narrow screens: the panels are drawers over the scene (nothing is reserved for them). */
+main.immersive.hud-drawers>.control-panel,main.immersive.hud-drawers .data-stream{box-shadow:0 18px 60px rgba(0,0,0,.6)}
+@media(max-width:760px){
+ main.immersive .scene-head{padding:0 8px 0 12px;gap:8px}
+ main.immersive .scene-head>div:first-child{max-width:none;flex:1 1 auto}
+ main.immersive .scene-head .eyebrow{display:none}
+ main.immersive .scene-head h2{font-size:13px;margin:0}
+ main.immersive .view-switch{display:none}
+ main.immersive .scene-actions .reset:not(.fullscreen-toggle):not(.hud-toggle){display:none}
+ main.immersive>.control-panel,main.immersive .data-stream{width:calc(100% - 2 * var(--hud-gap))}
+ main.immersive .hud-keys-hint,main.immersive .gestures{display:none}
+ .hud-toast{white-space:normal;text-align:center;width:80%}
+}
+
+/* Leaving the stage: the page's scene settles back in. */
+main.stage-return>article{animation:hud-return .5s var(--hud-ease) backwards}
+
+@keyframes hud-stage-in{from{opacity:.35;filter:saturate(.6) brightness(.8)}}
+@keyframes hud-in-left{from{opacity:0;transform:translateX(-28px)}}
+@keyframes hud-in-right{from{opacity:0;transform:translateX(28px)}}
+@keyframes hud-in-top{from{opacity:0;transform:translateY(-14px)}}
+@keyframes hud-in-bottom{from{opacity:0;transform:translateY(14px)}}
+@keyframes hud-fade-in{from{opacity:0}}
+@keyframes hud-return{from{opacity:.4;transform:scale(1.015)}}
+@keyframes stream-in{from{opacity:0;transform:translateX(10px);background:rgba(127,224,255,.14)}to{opacity:1;transform:none;background:transparent}}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 rgba(88,224,160,.9)}100%{box-shadow:0 0 0 8px rgba(88,224,160,0)}}
+@keyframes live-breathe{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){
+ main.immersive *,main.immersive *::before,main.stage-return *,.data-stream *{animation:none !important;transition:none !important}
+ main.immersive>.control-panel,main.immersive .data-stream,main.immersive .viewport,main.immersive .scene-head,main.immersive .timeline{animation:none !important;transition:none !important}
+}
+@media(hover:none){.fullscreen-toggle kbd,.hud-keys-hint{display:none}}
+
+/* ---- Data points that explain themselves ----------------------------------------------------------------------------
+   Hover: a small translucent tip with the value and its meaning. Click: an inspector window in the style of macOS
+   (rounded, half transparent, traffic lights) whose sentences type themselves out; values fill their gaps. */
+:root{--mac-font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue','DM Sans',system-ui,sans-serif}
+.legend span small{margin-top:3px;font-size:8.5px;letter-spacing:.3px;color:#7f98a4}
+.legend span:last-child small{text-align:right}
+.hover-tip{position:absolute;z-index:7;display:grid;grid-template-columns:auto auto;justify-content:start;align-items:baseline;column-gap:5px;padding:7px 12px 8px;transform:translate(18px,18px);border-radius:10px;pointer-events:none;white-space:nowrap;
+ font-family:var(--mac-font);color:#fff;background:rgba(30,36,44,.6);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);border:1px solid rgba(255,255,255,.14);box-shadow:0 0 0 .5px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.4);animation:tip-in .18s ease-out}
+.hover-tip.flip{transform:translate(calc(-100% - 18px),18px)}
+.hover-tip b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.hover-tip em{font-style:normal;font-size:11px;color:rgba(255,255,255,.6)}
+.hover-tip span{grid-column:1/-1;font-size:11.5px;color:#ffd98a}
+.hover-tip small{grid-column:1/-1;margin-top:2px;font-size:9.5px;color:rgba(255,255,255,.45)}
+
+.mac-tether{position:absolute;inset:0;z-index:8;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mac-tether path{fill:none;stroke:rgba(255,255,255,.55);stroke-width:1.2;stroke-dasharray:3 4}
+.mac-tether-dot{fill:#ffd166;stroke:#1a1206;stroke-width:1.5}
+.mac-tether-pulse{fill:none;stroke:#ffd166;stroke-width:1.5;opacity:0;animation:tether-pulse 1.8s ease-out 3;transform-box:fill-box;transform-origin:center}
+
+.mac-window{position:absolute;z-index:9;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;color:#eef3f6;font-family:var(--mac-font);-webkit-font-smoothing:antialiased;
+ background:rgba(30,36,44,.5);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);border:1px solid rgba(255,255,255,.16);
+ box-shadow:0 0 0 .5px rgba(0,0,0,.55),0 24px 64px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);animation:mac-open .34s cubic-bezier(.2,.9,.25,1.08) backwards;transition:width .3s cubic-bezier(.2,.9,.25,1)}
+.mac-window{transform-origin:0 0}
+.mac-window.dragging,.mac-window.dragging *{cursor:grabbing !important;user-select:none}
+.mac-body{cursor:grab}
+.mac-titlebar{position:relative;flex:none;display:flex;align-items:center;height:34px;padding:0 12px;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-bottom:1px solid rgba(255,255,255,.08)}
+.mac-titlebar:active{cursor:grabbing}
+.mac-window.minimised .mac-titlebar{border-bottom:0}
+.mac-lights{position:relative;z-index:1;display:flex;gap:8px}
+.mac-light{display:grid;place-items:center;width:12px;height:12px;padding:0;border-radius:50%;border:.5px solid rgba(0,0,0,.28)}
+.mac-light svg{width:8px;height:8px;fill:none;stroke:rgba(0,0,0,.62);stroke-width:1.5;stroke-linecap:round;opacity:0;transition:opacity .12s}
+.mac-lights:hover .mac-light svg,.mac-light:focus-visible svg{opacity:1}
+.mac-light.close{background:#ff5f57}.mac-light.min{background:#febc2e}.mac-light.zoom{background:#28c840}
+.mac-light:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:1px}
+.mac-title{position:absolute;left:78px;right:78px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:rgba(255,255,255,.86);pointer-events:none}
+.mac-body{overflow-y:auto;padding:14px 18px 14px;font-size:12.5px;line-height:1.55;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+.mac-hero{display:flex;align-items:baseline;gap:7px}
+.mac-value{font-size:36px;font-weight:600;line-height:1.1;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.mac-unit{font-size:15px;color:rgba(255,255,255,.6);opacity:0;transition:opacity .3s}
+.mac-unit.on{opacity:1}
+.mac-verdict{margin:5px 0 12px;font-size:14px;line-height:1.45;color:#fff}
+.mac-window .tv{font-weight:600;color:#fff;font-variant-numeric:tabular-nums}
+.mac-window .tone-class{color:#ffd98a}
+.mac-window .ghost{color:transparent}
+.mac-window .ghost.gap{border-radius:4px;background:linear-gradient(90deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.07) 100%);background-size:200% 100%;animation:gap-shimmer 1.1s linear infinite}
+.mac-window .caret{display:inline-block;width:2px;height:1.05em;margin:0 1px -2px;border-radius:1px;background:#7fe0ff;box-shadow:0 0 6px #7fe0ff;animation:caret-blink .8s steps(1) infinite}
+.mac-section{padding:10px 0 4px;border-top:1px solid rgba(255,255,255,.08)}
+.mac-section h4{margin:0 0 5px;font-size:10.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:rgba(255,255,255,.45);opacity:0;transform:translateY(3px);transition:opacity .25s,transform .25s}
+.mac-section h4.on{opacity:1;transform:none}
+.mac-section p{margin:0 0 4px;color:rgba(236,243,247,.86)}
+.mac-section-body{display:flex;flex-direction:column;gap:8px}
+.sec-around .mac-section-body,.sec-also .mac-section-body{flex-direction:row;align-items:flex-start}
+.mac-text{flex:1;min-width:0}
+.mac-skip{margin:8px 0 0;font-size:10px;text-align:center;color:rgba(255,255,255,.35)}
+.mac-graphic{display:block;flex:none;opacity:0;transition:opacity .35s}
+.mac-graphic.on{opacity:1}
+.mac-graphic .g-small{font-size:8.5px;fill:rgba(255,255,255,.5)}
+.mac-graphic .g-label{font-size:9.5px;fill:rgba(255,255,255,.78);font-variant-numeric:tabular-nums}
+.g-dist,.g-spark,.g-cats{width:100%;height:auto}
+.g-cats rect{opacity:0;transform-box:fill-box;transform-origin:left center}
+.g-cats.on rect{animation:bar-grow .45s ease-out forwards}
+.g-cats rect.current{stroke:#ffd166;stroke-width:2}
+.g-dist .g-mean{stroke:rgba(255,255,255,.7);stroke-width:1.2;stroke-dasharray:2 2}
+.g-dist .g-marker{transition:transform 1s cubic-bezier(.2,.9,.2,1)}
+.g-dist .g-marker circle{fill:rgba(255,255,255,.18);stroke:#fff;stroke-width:2}
+.g-dist .g-marker .g-core{fill:#fff;stroke:none}
+.g-near{width:112px;height:112px}
+.g-near rect{opacity:0;transform-box:fill-box;transform-origin:center}
+.g-near.on rect{animation:cell-pop .4s cubic-bezier(.2,.9,.25,1.2) forwards}
+.g-near rect.centre{stroke:#ffd166;stroke-width:2}
+.g-near .g-arrow line,.g-near .g-arrow path{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 2px rgba(0,0,0,.8))}
+.g-near .g-arrow{opacity:0}
+.g-near.on .g-arrow{animation:arrow-in .4s .5s forwards}
+.g-spark .g-line{fill:none;stroke:#7fe0ff;stroke-width:1.8;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
+.g-spark.on .g-line{stroke-dashoffset:0;transition:stroke-dashoffset 1.1s ease}
+.g-spark .g-now{stroke:rgba(255,209,102,.6);stroke-dasharray:2 2}
+.g-spark .g-dot{fill:#ffd166;stroke:#1a1206;stroke-width:1.5}
+.g-compass{width:90px;height:90px}
+.g-compass .g-ring{fill:rgba(255,255,255,.04);stroke:rgba(255,255,255,.25)}
+.g-compass .g-wind line{stroke:#7fe0ff;stroke-width:2.2;stroke-linecap:round}
+.g-compass .g-wind path,.g-compass .g-wind circle{fill:#7fe0ff}
+.g-compass.on .g-wind{animation:wind-swing .9s cubic-bezier(.2,.9,.25,1.2) backwards}
+@keyframes mac-open{from{opacity:0}}
+@keyframes tip-in{from{opacity:0}}
+@keyframes bar-grow{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:none}}
+@keyframes arrow-in{from{opacity:0}to{opacity:1}}
+@keyframes gap-shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
+@keyframes caret-blink{50%{opacity:0}}
+@keyframes cell-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+@keyframes wind-swing{from{opacity:0}}
+@keyframes tether-pulse{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(3.2)}}
+@media(prefers-reduced-motion:reduce){.mac-window,.mac-window *,.hover-tip,.mac-tether *{animation:none !important;transition:none !important}.g-near rect{opacity:1}.g-spark .g-line{stroke-dashoffset:0}.g-near .g-arrow{opacity:1}}
+@media(max-width:700px){.hover-tip{display:none}}
+
+/* ---- Terrain ---------------------------------------------------------------------------------------------------- */
+.relief-note{position:absolute;top:66px;left:23px;padding:3px 7px;border:1px solid rgba(177,217,164,.25);border-radius:3px;background:rgba(9,21,29,.55);font-size:8.5px;letter-spacing:1px;color:#b1d9a4;pointer-events:auto;cursor:help}
+main.immersive .relief-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);font-family:var(--hud-mono);transition:left .42s var(--hud-ease)}
+@media(max-width:700px){.relief-note{left:15px;top:60px}}
+
+/* Draggable, wobbly overlays in the scene (legends and keys): grab to move, double-click to put back. */
+.wobbly{pointer-events:auto !important;cursor:grab;touch-action:none;user-select:none;will-change:transform}
+.wobbly.wobbly-dragging{cursor:grabbing;z-index:6}
+.legend.wobbly{padding:6px 8px;margin:-6px -8px;border-radius:6px}
+.legend.wobbly:hover,.cloud-key.wobbly:hover{box-shadow:0 0 0 1px rgba(127,224,255,.25)}
+.wave-note{position:absolute;top:66px;left:23px;padding:3px 7px;border:1px solid rgba(127,224,255,.28);border-radius:3px;background:rgba(9,21,29,.55);font-size:8.5px;letter-spacing:1px;color:#9fd3e3;pointer-events:auto;cursor:help}
+.wave-note.second{top:92px}
+main.immersive .wave-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);font-family:var(--hud-mono);transition:left .42s var(--hud-ease)}
+main.immersive .wave-note.second{top:calc(var(--hud-top) + 78px)}
+@media(max-width:700px){.wave-note{left:15px;top:60px}.wave-note.second{top:84px}}
+
+/* ---- Storm watch report ------------------------------------------------------------------------------------------ */
+.storm-report .bulletin{margin:10px 0;padding:10px 14px;border-left:3px solid #52707e;background:rgba(9,21,29,.6);font-size:12px;line-height:1.7;color:#cfe0e8}
+.storm-report .bulletin.alert{border-left-color:#ff3b30;background:rgba(60,18,20,.55);color:#ffe1dd}
+.storm-report .bulletin b{letter-spacing:1px;color:#fff}

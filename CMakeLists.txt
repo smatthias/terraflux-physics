@@ -241,6 +241,11 @@ if(BUILD_TESTING)
     add_test(NAME weather.severe_convection COMMAND terraflux-severe-convection-test)
     add_test(NAME weather.storm_systems_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/storm_systems_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    # The supercell & tornado watch view: the tornado-outbreak request with hourly snapshots.
+    add_test(NAME weather.viewer_supercell_outbreak
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_ocean_example.py --build-dir ${CMAKE_CURRENT_BINARY_DIR}
+        --cli terraflux-run-coupled-wind --request ${CMAKE_CURRENT_SOURCE_DIR}/examples/supercell-outbreak-request.json
+        --output ${CMAKE_CURRENT_SOURCE_DIR}/viewer/public/supercell/engine-timeline.json --check)
     add_executable(terraflux-orography-test tests/weather/orography_test.cpp)
     target_link_libraries(terraflux-orography-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.orography COMMAND terraflux-orography-test)
