@@ -46,8 +46,10 @@ Open the URL printed by Vite. There is no login, database, backend service or li
 | Open JSON | Import forecast/v1, mobile_response/v1 or timeline/v1; coupled forecast and climate timelines open in the Coupled Earth workspace |
 | Open comparison JSON | Import a timeline matching baseline grid, times, terrain, rainfall, atmosphere and coverage |
 | Export all frames (CSV) | Full comparison timeline, values, deltas, units, parameters and coverage counts |
+| Fullscreen (button in the scene head, or F) | The scene fills the screen; the same control panel floats on the left (every control keeps its state), a data stream on the right shows what is rendered: dataset, view, layer, frame, field statistics with a histogram, a grid scan of the rendered values (click it to probe a cell), the frame's data blocks with the ones feeding the layer highlighted, active overlays, renderer numbers and one log line per scene rebuild. Keys: F or Esc leave, [ and ] hide/show the panels (the scene re-centres between them), Space plays, ←/→ step frames, R resets the camera, ? lists the keys. Uses the browser Fullscreen API when allowed, otherwise covers the window |
 
 - Orbit/zoom/cell inspection in Three.js; interactive 2D fallback if WebGL is unavailable.
+- Fullscreen logic is in [immersive.js](../viewer/src/immersive.js) (shortcuts, HUD geometry, camera offset and zoom) and [dataStream.js](../viewer/src/dataStream.js) with [DataStream.vue](../viewer/src/DataStream.vue) (the stream); the stream reads the same arrays the scene draws, nothing in it is simulated.
 - Terrain geometry and exaggeration are display controls.
 - Terrain-adjusted temperature is an optional stored C++ diagnostic, applied once per snapshot.
 - Surface/soil colors represent depth; no geometrically accurate flood surface is claimed.
