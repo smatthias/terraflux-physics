@@ -212,6 +212,13 @@ export function explainCell(ctx) {
   const also = (ctx.also ?? []).filter(a => a.value !== null && a.value !== undefined && Number.isFinite(a.value))
   const lines = []
   if (ctx.wind && ctx.wind.speed >= 0.05) lines.push(['Wind ', V(withUnit(ctx.wind.speed, 'm/s')), ' from the ', V(ctx.wind.from), `: ${ctx.wind.label}.`])
+  // Waves (estimated from the wind in the viewer, waves.js): height, sea state, period, spacing, direction and speed.
+  if (ctx.waves) {
+    const w = ctx.waves
+    if (!(w.hs >= 0.05)) lines.push([w.regime === 'damped by sea ice' ? 'No waves: sea ice damps them.' : 'A calm sea: no wind waves here.'])
+    else lines.push(['Waves ', V(withUnit(w.hs, 'm')), ` high (${w.state}), every `, V(`${formatNumber(w.tp)} s`), ', ', V(`${formatNumber(w.length)} m`), ' apart, running towards the ', V(compass8(w.towardDeg)), ' at ', V(withUnit(w.speed, 'm/s')),
+      `: ${w.regime === 'fully developed' ? 'a fully developed sea' : w.regime === 'depth-limited' ? 'limited by the shallow water' : w.regime === 'damped by sea ice' ? 'damped by sea ice' : `still growing over ${formatNumber(w.fetchKm)} km of open water`} (estimated from the wind).`])
+  }
   for (const a of also.slice(0, 4)) { const c = classify(a.key, a.value); lines.push([`${a.title} `, V(withUnit(a.value, a.unit)), c ? ` (${c}).` : '.']) }
   if (lines.length) sections.push({ id: 'also', heading: 'Also at this point', lines, graphic: ctx.wind && ctx.wind.speed >= 0.05 ? 'compass' : null })
 

@@ -292,7 +292,7 @@ export function surfaceSkirt(geometry, floor = 0, { iceDepth = 0 } = {}) {
 //   uIso / uIsoOn       the hovered value (0..1): a glowing line through every place with that value
 //   uContours           faint contour lines of the value, so the shape of the field reads like a map
 // GLSL helpers shared by the terrain chunks: sRGB colours to linear, a cheap value-noise fbm for surface texture.
-const TERRAIN_GLSL = `
+export const TERRAIN_GLSL = `
 vec3 srgb(vec3 c){ return pow(c, vec3(2.2)); }
 float thash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float tnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);

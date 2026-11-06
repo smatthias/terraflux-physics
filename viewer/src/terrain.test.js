@@ -50,7 +50,9 @@ test('the app shows terrain realistically, honestly exaggerated, and its overlay
     'setTerrainLighting(', 'v-model="terrainStyle.realistic"', 'v-model.number="terrainStyle.dataMix"', 'class="relief-note"', "v-wobbly=\"'key'\""]) assert.ok(app.includes(needle), `App.vue: ${needle}`)
   // The rebuild watch must see the terrain style, and terrainStyle must be declared before that watch runs.
   assert.ok(app.indexOf('const terrainStyle=') < app.indexOf('watch([data,layer'), 'declared before the rebuild watch')
-  assert.ok(/watch\(\[data,layer[^\]]*terrainStyle\],draw/.test(app))
+  const rebuild = app.match(/watch\(\[data,layer[^\]]*\],draw/)[0]
+  for (const dep of ['terrainStyle', 'waveStyle']) assert.ok(new RegExp(`[,\\[]${dep}[,\\]]`).test(rebuild), `the rebuild watch sees ${dep}`)
+  assert.ok(app.indexOf('waveStyle=ref(') < app.indexOf('watch([data,layer'), 'waveStyle declared before the watch')
   const overlay = readFileSync(new URL('./InspectOverlay.vue', import.meta.url), 'utf8')
   assert.ok(overlay.includes('createWobble()') && overlay.includes('popFrom(') && overlay.includes("window.addEventListener('pointermove', moveDrag)"))
 })

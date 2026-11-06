@@ -406,3 +406,8 @@ main.immersive .relief-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-
 .wobbly.wobbly-dragging{cursor:grabbing;z-index:6}
 .legend.wobbly{padding:6px 8px;margin:-6px -8px;border-radius:6px}
 .legend.wobbly:hover,.cloud-key.wobbly:hover{box-shadow:0 0 0 1px rgba(127,224,255,.25)}
+.wave-note{position:absolute;top:66px;left:23px;padding:3px 7px;border:1px solid rgba(127,224,255,.28);border-radius:3px;background:rgba(9,21,29,.55);font-size:8.5px;letter-spacing:1px;color:#9fd3e3;pointer-events:auto;cursor:help}
+.wave-note.second{top:92px}
+main.immersive .wave-note{top:calc(var(--hud-top) + 52px);left:calc(var(--hud-left) + var(--hud-gap) + 16px);font-family:var(--hud-mono);transition:left .42s var(--hud-ease)}
+main.immersive .wave-note.second{top:calc(var(--hud-top) + 78px)}
+@media(max-width:700px){.wave-note{left:15px;top:60px}.wave-note.second{top:84px}}

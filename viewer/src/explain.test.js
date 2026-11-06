@@ -138,3 +138,12 @@ test('the domain is named in the comparison', () => {
   const c = explainCell({ key: 'sunbrightness', title: 'Brightness', unit: 'K', value: 5900, values: [5000, 5500, 5900, 6100], i: 2, grid: null, domain: 'the disk' })
   assert.equal(lineText(c.verdict), 'Brighter than 63 % of the disk.')
 })
+
+test('waves at a point are told as height, sea state, period, spacing, direction and speed', () => {
+  const base = { key: 'current', title: 'Current', unit: 'm/s', value: 0.2, values: [0.1, 0.2, 0.3], i: 1, grid: null }
+  const c = explainCell({ ...base, waves: { hs: 3.2, tp: 8.1, length: 102, speed: 12.6, towardDeg: 45, state: 'rough', regime: 'fetch-limited', fetchKm: 180 } })
+  assert.ok(text(c).includes('Waves 3.2 m high (rough), every 8.1 s, 102 m apart, running towards the north-east at 12.6 m/s: still growing over 180 km of open water (estimated from the wind).'), text(c))
+  assert.ok(text(explainCell({ ...base, waves: { hs: 0, regime: 'calm' } })).includes('A calm sea: no wind waves here.'))
+  assert.ok(text(explainCell({ ...base, waves: { hs: 0, regime: 'damped by sea ice' } })).includes('No waves: sea ice damps them.'))
+  assert.ok(text(explainCell({ ...base, waves: { hs: 9, tp: 13, length: 260, speed: 20, towardDeg: 0, state: 'high', regime: 'fully developed', fetchKm: 900 } })).includes('a fully developed sea'))
+})
