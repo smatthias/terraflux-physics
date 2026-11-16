@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-coupled-wind-test.dir/tests/weather/coupled_wind_test.cpp.o -o terraflux-coupled-wind-test  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 

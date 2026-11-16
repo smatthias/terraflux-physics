@@ -189,6 +189,37 @@ CTest runs the regeneration check. The comparison allows relative floating-point
 
 **Weather map** (scene header) switches from the field explorer to a flat map with layers that can be toggled independently in **01b / Weather map layers**: base field (temperature / surface pressure / none), isobars at 1, 2 or 4 hPa with labels, fronts, cloud cover by genus, 3D cloud volumes, precipitation rate shading, precipitation symbols, ⚡/◆ hazard markers and wind vectors. The legend follows the active layers. It works for any coupled timeline; cloud and precipitation layers need the cloud formation example or mock.
 
+### Flight weather and sailing weather views
+
+**Flight weather** and **Sailing weather** (scene header) are full views of the 3D scene. Their reports fill the page below it. In Flight weather, click near an aerodrome to select it. In Sailing weather, click to move the boat, or 📌 to pin it. Everything follows playback, and the trend strips jump the timeline.
+
+- **Flight weather:**
+  - In the scene: fixed synthetic **aerodromes** (`XA01`…, sited from the run on low land, runways along the prevailing wind), each with a **weather card** floating over it. The ground is coloured by flight category (VFR/MVFR/IFR/LIFR), and **winds aloft** show as wind barbs. Each winds-aloft level from 3 000 ft to FL390 is a layer of barbs, or stack them all. A barb mast over the selected aerodrome shows every level, and the planned route is drawn at its altitude.
+  - **The weather at a glance:** weather symbols (sun, cloud, rain, showers, thunderstorm, snow, fog…) on the map and on every aerodrome card, and the air above in colour-coded layers at their altitudes: thunderstorm columns, cloud layers, icing, turbulence and the 0 °C freezing-level surface. There are presets (*Layered weather*, *Winds aloft*, *Minimal*) and a layer key.
+  - **Flight planning by coordinates:** departure, waypoints and destination as aerodromes or typed coordinates (decimal, degrees-minutes or ICAO `4657N00727E`), or picked on the map. Legs are great circles, with distance and initial and final true course, projected with the engine's projection. Plus cruise level, TAS, fuel burn and departure time. The route is flown through the timeline (each leg meets the weather of its time), giving the time en route, ETA, fuel with reserve, the destination weather at the ETA, an alternate, checks, a route cross-section with barbs at every level, a navigation log and the best level.
+  - **The route in 3D:** a tube coloured by head or tail wind, with hazard sleeves, waypoints, TOC and TOD, the ground track, and the clouds along the corridor.
+  - **Flight rules and return trip:** every plan says *VFR possible*, *VFR marginal*, *IFR required* or *Not advisable*, from the VFR band (500 ft over the terrain up to clear of cloud, ground in sight) and the GAFOR category when each part is flown. *Return trip on a later day* flies the reversed route on a chosen day and time (for example out Monday, back Wednesday), judges both ways, and shows the VFR windows of both days by departure time.
+  - **✈ Fly the route in 3D:** an aircraft flies the plan, with a chase or cockpit perspective window showing the build-ups, CBs, terrain and winds ahead, and a flight display (altitude, heading against track, groundspeed, wind, OAT, the hazard now and the next one ahead). The weather steps with the flight time.
+  - In the report: a METAR-style line (WMO FM 15 form, `ZZZZ`, `RMK SIMULATED`), the decoded observation, and a winds-aloft table with a barb, FB code, temperature and shear per level. It also gives runway wind, pressure and density altitude, an icing band, hazards and the category over the run.
+- **Sailing weather:**
+  - In the scene: the sea coloured by Beaufort force or wave height, surface wind barbs, isobars, currents and the boat sheeted to the apparent wind.
+  - Clicking the map **reads a point** (wind, waves, current, water, weather, distance and bearing from the boat) with a card in the scene. The boat stays where it is; *Move the boat here* and *Steer NNN°* are buttons.
+  - In the report: a shipping-forecast style line ("Southwest 5, veering west gale 8 soon."), the warning level, apparent wind and point of sail, sea, current, barometer tendency, the wind above the boat, a sail-plan hint against your own limits, and hazards.
+
+Winds aloft are diagnosed from the engine's pressure and temperature fields with the geostrophic and thermal-wind balance of the severe-convection kernel, limited to each scale's quasi-geostrophic depth. The engine has no upper-air model, and runs without a pressure field have no winds aloft. Missing engine quantities are printed as solidi or "not available". Visibility is estimated. Gusts, swell and tides are not modelled. These views are not for navigation or flight planning. See [requirements, sources and derivations](docs/weather/flight-sailing-reports.md).
+
+### VFR view with GAFOR categories (Germany)
+
+**VFR · GAFOR** (scene header) classifies the simulated weather in the German GAFOR categories and shows the VFR airspace at every point:
+
+- **Categories:** Charlie (blue, ≥ 10 km / ≥ 5 000 ft), Oscar (green, ≥ 8 km / ≥ 2 000 ft), Delta (yellow, 5–8 km / 1 000–2 000 ft), Mike (orange, 1.5–5 km / 500–1 000 ft) and X-ray (red, below). The worse of visibility and the main cloud base (BKN/OVC) decides.
+- **VFR airspace:** a column from 500 ft above the ground to the clear-of-cloud limit, with the ground in sight (SERA), coloured by the category. Its height is the room below the cloud.
+- **Report:** the category table, the share of the map, the picked point over time, and the official GAFOR areas loaded from a GeoJSON file (code, name and reference altitude; none are built in) with a per-area table over the 2-hour periods.
+- **Flight planning:** each route leg shows its GAFOR category at the time it is flown.
+- **Example:** *Load Germany VFR (GAFOR) example*, an engine run over Germany (synthetic inputs) from Monday 2 to Thursday 5 November 2026 with 2-hour snapshots, long enough for a Monday outbound and a Wednesday return.
+
+Country borders (Natural Earth, public domain) and cities give orientation. See [the GAFOR/VFR document](docs/weather/gafor-vfr.md).
+
 ### Hurricanes, mergers, landfall and tornadoes
 
 With `surface` (coastline, sea-surface temperature) and `storms` sections the coupled CLI tracks tropical cyclones as objects: their energy is Emanuel's potential intensity from the enthalpy of saturated air at the sea surface versus the boundary layer; genesis follows the Emanuel–Nolan index (vorticity, mid-level humidity, potential intensity, shear); storms move with the steering flow and beta drift, rotate around each other through their induced winds (Fujiwhara) and merge when their cores overlap; at landfall the wind drops, a surge estimate is recorded and the storm decays by Kaplan–DeMaria. A `severe` section with a `column` inversion adds tornado potential: the capping inversion stores CAPE until heating breaks it, the Ekman turning of the surface wind supplies low-level helicity, and the Significant Tornado Parameter classifies the environment. See [storm systems](docs/weather/storm-systems-model.md) and [severe convection](docs/weather/severe-convection-model.md).

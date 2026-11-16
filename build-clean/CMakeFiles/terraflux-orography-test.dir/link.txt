@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-orography-test.dir/tests/weather/orography_test.cpp.o -o terraflux-orography-test  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 

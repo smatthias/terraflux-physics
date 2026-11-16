@@ -1,18 +1,20 @@
 <script setup>
 // Coupled Earth: the climate drivers, the CO2 impact, the 3-10 day weather forecast, the 1-3 day wind forecast and the
 // severe-weather warnings of the coupled runs (terraflux-run-earth-climate and terraflux-run-earth-forecast). The maps
-// are flat: the forecast grid in its azimuthal frame, the climate on a global latitude-longitude grid.
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+// are 3D (EarthScene.vue): the forecast grid in its azimuthal frame as terrain, the climate grid as a globe.
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
   EARTH_VIEWS, HORIZONS, HAZARDS, LEVELS, SYMBOLS, PERIODS, FORECAST_FIELDS, SEVERE_LAYERS, CO2_LAYERS, CLIMATE_LAYERS, CATEGORY_LABELS,
-  earthDocumentKind, validateEarthForecast, validateEarthClimate, forecastGrid, projectToGrid, climateGrid, geoToClimateCell,
+  earthDocumentKind, validateEarthForecast, validateEarthClimate, forecastGrid, projectToGrid, climateGrid,
   symbolInfo, hazardInfo, fieldInfo, noonFrame, dayLabel, validTime, cityForecast, cellForecast, skillSeries, usefulLead,
   windFrames, windField, directionFrom, compass, beaufort, cityWindTable, meteogram,
   warningMatrix, warningLevels, warningList, warningCounts, peakValueLabel, trackLines, trackSpread, categoryColor,
   driverBars, scenarioChart, forcingByGroup, impactRows, feedbackRows, groupColor, scenarioColor,
-  co2LayerInfo, co2Budget, couplingGraph, edgePath, strengthWeight, keyAnswers, contourLines,
+  co2LayerInfo, co2Budget, couplingGraph, edgePath, strengthWeight, keyAnswers,
   temperatureColor, windColor, probabilityColor, levelColor, warmingColor, localWarmingColor, fmt, signed,
 } from './coupledEarth.js'
+import EarthScene from './EarthScene.vue'
+import { trackAt, galeRadius, fluxArrows, nextFrame, ensembleStorm, nearestFrame } from './earthScene.js'
 
 const props = defineProps({ document: { type: Object, default: null }, goto: { type: Object, default: null } })
 const base = import.meta.env.BASE_URL
@@ -115,9 +117,10 @@ const windStats = computed(() => {
 })
 let timer = null
 function togglePlay() {
-  playing.value = !playing.value
+  if (playing.value) { stopPlay(); return }
+  playing.value = true
   clearInterval(timer)
-  if (playing.value) timer = setInterval(() => { windIndex.value = (windIndex.value + 1) % windList.value.length }, 700)
+  timer = setInterval(step, STEP_MS[view.value] ?? 800)
 }
 onBeforeUnmount(() => clearInterval(timer))
 
@@ -179,28 +182,17 @@ const sensitivity = computed(() => {
 })
 const scenarioName = key => climate.value?.scenarios.find(s => s.key === key)?.name ?? key
 
-// ---- Map drawing ---------------------------------------------------------------------------------------------------
-const mapHost = ref(null), canvas = ref(null)
+// ---- The 3D map (EarthScene) --------------------------------------------------------------------------------------
+// The forecast views draw the forecast domain as terrain with the forecast's clouds, rain, winds, isobars, pressure
+// systems, warnings and the hurricane; the climate views a turning globe. Play steps the days (weather), the hours
+// (wind, storm plume) or the decades (drivers).
 const mapKind = computed(() => (['weather', 'wind', 'severe'].includes(view.value) ? 'forecast' : ['drivers', 'co2'].includes(view.value) ? 'climate' : null))
 const mapGrid = computed(() => (mapKind.value === 'forecast' ? fgrid.value : mapKind.value === 'climate' ? cgrid.value : null))
-const mapSize = ref({ w: 800, h: 500 })
-let resize = null
 onMounted(() => {
   if (props.document) { try { const kind = accept(props.document, 'Opened file'); view.value = kind === 'forecast' ? 'weather' : 'drivers' } catch (err) { error.value = err.message } }
   if (props.goto?.view && !props.document) view.value = props.goto.view
   ensureData()
-  resize = new ResizeObserver(() => layout())
-  watch(mapHost, el => { if (el) { resize.observe(el); layout() } }, { immediate: true, flush: 'post' })
 })
-onBeforeUnmount(() => resize?.disconnect())
-function layout() {
-  const el = mapHost.value, g = mapGrid.value
-  if (!el || !g) return
-  const w = el.clientWidth, h = Math.round(w * g.ny / g.nx)
-  mapSize.value = { w, h }
-  nextTick(draw)
-}
-watch(mapGrid, () => nextTick(layout))
 
 // The value and colour of a cell in the current view.
 const cellValue = computed(() => {
@@ -248,201 +240,110 @@ const mapTitle = computed(() => {
   return cellValue.value?.label ?? ''
 })
 
-function draw() {
-  const cv = canvas.value, g = mapGrid.value, cv2 = cellValue.value
-  if (!cv || !g || !cv2) return
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), { w, h } = mapSize.value
-  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr)
-  cv.style.width = `${w}px`; cv.style.height = `${h}px`
-  const ctx = cv.getContext('2d')
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.fillStyle = '#0b1a23'; ctx.fillRect(0, 0, w, h)
-  const cw = w / g.nx, ch = h / g.ny
-  const X = x => x * cw, Y = y => h - y * ch   // fractional cells from the south-west corner -> pixels
-  const forecastMap = mapKind.value === 'forecast'
-  const land = forecastMap ? forecast.value.static.land_mask : climate.value.map.land_mask
-  // Cells: the base colour (land grey-green, sea dark blue), then the field.
-  // Cell edges snapped to whole pixels: no seams between the cells.
-  const px = i => Math.round(X(i)), py = j => Math.round(Y(j))
-  for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
-    const k = j * g.nx + i, x0 = px(i), y0 = py(j + 1), cwk = px(i + 1) - x0, chk = py(j) - y0
-    ctx.fillStyle = land[k] ? '#26352c' : '#0d2433'
-    ctx.fillRect(x0, y0, cwk, chk)
-    const col = cv2.color(k)
-    if (col) {
-      ctx.globalAlpha = cv2.level ? 0.85 : 1
-      ctx.fillStyle = col; ctx.fillRect(x0, y0, cwk, chk)
-      ctx.globalAlpha = 1
+const sceneReady = computed(() => !!(mapGrid.value && cellValue.value && (mapKind.value === 'forecast' ? forecast.value : climate.value)))
+const sceneLand = computed(() => (mapKind.value === 'forecast' ? forecast.value?.static.land_mask : climate.value?.map.land_mask) ?? [])
+const sceneElevation = computed(() => (mapKind.value === 'forecast' ? forecast.value?.static.elevation_m ?? null : null))
+const sceneColors = computed(() => {
+  const v = cellValue.value, g = mapGrid.value
+  return v && g ? Array.from({ length: g.nx * g.ny }, (_, i) => v.color(i) ?? null) : null
+})
+// Drivers: the globe raised by the size of the value (warming or cooling alike).
+const sceneHeights = computed(() => {
+  const v = cellValue.value
+  if (view.value !== 'drivers' || !v) return null
+  const finite = v.values.filter(x => x !== null && Number.isFinite(x)), max = Math.max(1e-9, ...finite.map(Math.abs))
+  return v.values.map(x => (x === null || !Number.isFinite(x) ? 0 : Math.abs(x) / max))
+})
+const frameOf = hour => nearestFrame(forecast.value.frame_hours, hour)
+const atGrid = (lat, lon) => projectToGrid(lat, lon, fgrid.value)
+const inside = (p, g) => p.x >= 0 && p.y >= 0 && p.x <= g.nx && p.y <= g.ny
+// The storm of the ensemble at an hour, sized by the gale radius of the ensemble-mean wind of that hour.
+function stormAt(hour) {
+  const s = ensembleStorm(tracks.value, hour), g = fgrid.value
+  if (!s) return null
+  const p = atGrid(s.lat, s.lon)
+  if (!inside(p, g)) return null
+  const speed = windField(forecastDoc.value, frameOf(hour)).speed
+  const name = tracks.value[0]?.name?.replace(' (synthetic)', '') ?? 'Storm'
+  return { x: p.x, y: p.y, wind: s.wind, gale: galeRadius(speed, g.nx, g.ny, p.x, p.y), northern: s.lat >= 0, colour: categoryColor(s.category), label: `${name} · ${CATEGORY_LABELS[s.category] ?? s.category} · ${Math.round(s.wind)} m/s` }
+}
+const membersAt = hour => tracks.value.filter(t => !t.truth).map(t => trackAt(t.points, hour)).filter(Boolean).map(p => ({ ...atGrid(p.lat, p.lon), colour: categoryColor(p.category) }))
+const sceneOverlays = computed(() => {
+  const f = forecast.value, c = climate.value
+  if (mapKind.value === 'forecast' && f) {
+    const g = fgrid.value
+    const cities = f.cities.filter(x => x.inside).map(x => ({ name: x.name, ...atGrid(x.latitude_deg, x.longitude_deg), highlight: view.value === 'wind' && x.name === windCityName.value }))
+    const windOf = k => { const w = windField(forecastDoc.value, k); return { u: w.u, v: w.v } }
+    const systems = fr => fr.systems_member_1.map(s => ({ kind: s.kind, ...atGrid(s.latitude_deg, s.longitude_deg) })).filter(p => inside(p, g))
+    if (view.value === 'weather') {
+      const k = noonFrame(f, day.value), d = dayBlock.value
+      return { pressure: f.frames[k].pressure_hpa, wind: windOf(k), clouds: { cover: d.cloud_pct, precip: d.precip_mm, thunder: d.p_thunder }, systems: systems(f.frames[k]), cities, hurricane: stormAt(f.frame_hours[k]) }
     }
-  }
-  // Coastlines from the land mask.
-  ctx.strokeStyle = 'rgba(235,245,250,.75)'; ctx.lineWidth = 1; ctx.beginPath()
-  for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
-    const k = j * g.nx + i
-    if (!land[k]) continue
-    if (i + 1 < g.nx && !land[k + 1]) { ctx.moveTo(X(i + 1), Y(j)); ctx.lineTo(X(i + 1), Y(j + 1)) }
-    if (i > 0 && !land[k - 1]) { ctx.moveTo(X(i), Y(j)); ctx.lineTo(X(i), Y(j + 1)) }
-    if (j + 1 < g.ny && !land[k + g.nx]) { ctx.moveTo(X(i), Y(j + 1)); ctx.lineTo(X(i + 1), Y(j + 1)) }
-    if (j > 0 && !land[k - g.nx]) { ctx.moveTo(X(i), Y(j)); ctx.lineTo(X(i + 1), Y(j)) }
-  }
-  ctx.stroke()
-  // Graticule.
-  ctx.strokeStyle = 'rgba(200,220,230,.16)'; ctx.lineWidth = 0.8; ctx.fillStyle = 'rgba(200,220,230,.55)'; ctx.font = '10px DM Sans, sans-serif'
-  if (forecastMap) {
-    const st = forecast.value.static
-    for (const [values, levels, suffix] of [[st.latitude_deg, [10, 20, 30, 40, 50, 60, 70], '°N'], [st.longitude_deg, [-120, -100, -80, -60, -40, -20, 0, 20, 40], '°']]) {
-      for (const level of levels) {
-        const segs = contourLines(values, g.nx, g.ny, level)
-        if (!segs.length) continue
-        ctx.beginPath()
-        for (const [a, b] of segs) { ctx.moveTo(X(a[0]), Y(a[1])); ctx.lineTo(X(b[0]), Y(b[1])) }
-        ctx.stroke()
-        const labelAt = suffix === '°N' ? segs.reduce((m, s) => (s[0][0] < m[0][0] ? s : m)) : segs.reduce((m, s) => (s[0][1] < m[0][1] ? s : m))
-        ctx.fillText(suffix === '°N' ? `${level}°N` : `${Math.abs(level)}°${level < 0 ? 'W' : level > 0 ? 'E' : ''}`, X(labelAt[0][0]) + 3, Y(labelAt[0][1]) - 3)
+    if (view.value === 'wind' && windFrame.value) {
+      const fr = f.frames[windFrame.value.index], hour = windFrame.value.hour
+      return { pressure: fr.pressure_hpa, wind: { u: windNow.value.u, v: windNow.value.v }, clouds: { cover: fr.cloud_pct, precip: fr.precip_mm, thunder: fr.p_thunder }, systems: systems(fr), cities, members: membersAt(hour), hurricane: stormAt(hour) }
+    }
+    if (view.value === 'severe') {
+      const k = noonFrame(f, severeDay.value), d = f.days[severeDay.value - 1]
+      const out = { pressure: f.frames[k].pressure_hpa, wind: windOf(k), clouds: { cover: d.cloud_pct, precip: d.precip_mm, thunder: d.p_thunder }, cities }
+      if (severeLayer.value === 'warnings') out.warnings = { levels: warningLevels(f, severeDay.value, severeHazard.value) }
+      if (showTracks.value) {
+        out.tracks = tracks.value.map(t => ({ truth: t.truth, points: t.points.map(p => ({ ...atGrid(p.lat, p.lon), colour: categoryColor(p.category) })) }))
+        out.members = membersAt(trackHour.value)
+        out.hurricane = stormAt(trackHour.value)
       }
+      return out
     }
-  } else {
-    ctx.beginPath()
-    for (let lat = -60; lat <= 60; lat += 30) { const y = Y((lat + 90) / g.dy); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.fillText(`${Math.abs(lat)}°${lat < 0 ? 'S' : lat > 0 ? 'N' : ''}`, 3, y - 3) }
-    for (let lon = -120; lon <= 120; lon += 60) { const x = X((lon + 180) / g.dx); ctx.moveTo(x, 0); ctx.lineTo(x, h) }
-    ctx.stroke()
   }
-  if (forecastMap) drawForecastOverlays(ctx, g, X, Y, cw, ch)
-  else drawClimateOverlays(ctx, g, X, Y)
-  // The selected cell.
-  const sel = inspectCell.value
-  if (sel !== null && forecastMap && ['weather', 'severe'].includes(view.value)) {
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2
-    ctx.strokeRect(X(sel % g.nx), Y(Math.floor(sel / g.nx) + 1), cw, ch)
+  if (mapKind.value === 'climate' && c && view.value === 'co2') {
+    const g = cgrid.value
+    const markers = [
+      ...c.co2.regions.slice(0, 8).filter(r => r.latitude_deg !== null).map(r => ({ kind: 'ring', lat: r.latitude_deg, lon: r.longitude_deg, size: 0.25 + Math.sqrt(r.fossil_gt_co2_yr + r.land_use_gt_co2_yr) * 0.3, label: r.name.split(' (')[0] })),
+      ...c.co2.hotspots.slice(0, 6).map(h => ({ kind: 'pin', lat: h.latitude_deg, lon: h.longitude_deg, colour: '#ffd166' })),
+    ]
+    const fluxes = fluxArrows(c.co2.net_t_km2_yr, g.nx, g.ny, { stride: 3, min: 40 }).map(a => ({ lat: -90 + (Math.floor(a.i / g.nx) + 0.5) * g.dy, lon: -180 + ((a.i % g.nx) + 0.5) * g.dx, up: a.up, strength: a.strength }))
+    return { markers, fluxes }
   }
-}
+  return {}
+})
 
-function drawIsobars(ctx, g, X, Y, pressure) {
-  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1
-  ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = '9px DM Sans, sans-serif'
-  const lo = Math.ceil(Math.min(...pressure) / 4) * 4, hi = Math.max(...pressure)
-  for (let level = lo; level <= hi; level += 4) {
-    const segs = contourLines(pressure, g.nx, g.ny, level)
-    if (!segs.length) continue
-    ctx.beginPath()
-    for (const [a, b] of segs) { ctx.moveTo(X(a[0]), Y(a[1])); ctx.lineTo(X(b[0]), Y(b[1])) }
-    ctx.stroke()
-    const mid = segs[Math.floor(segs.length / 2)][0]
-    ctx.fillText(String(level), X(mid[0]) + 2, Y(mid[1]) - 2)
-  }
+// Play: one clock for every view.
+const canPlay = computed(() => ['weather', 'wind', 'drivers'].includes(view.value) || (view.value === 'severe' && showTracks.value && trackHours.value.length > 1))
+const playLabel = computed(() => {
+  if (view.value === 'weather') return `Day ${day.value}`
+  if (view.value === 'wind') return windFrame.value ? `+${windFrame.value.hour} h` : ''
+  if (view.value === 'severe') return `+${trackHour.value} h`
+  if (view.value === 'drivers') return String(climateYear.value ?? '')
+  return ''
+})
+// The frame slider of the fullscreen map: the same steps as Play.
+const sceneSteps = computed(() => {
+  if (view.value === 'weather') return { n: dayOptions.value.length, k: day.value - 1, set: k => { day.value = k + 1 } }
+  if (view.value === 'wind') return { n: windList.value.length, k: windIndex.value, set: k => { windIndex.value = k } }
+  if (view.value === 'severe' && showTracks.value) return { n: trackHours.value.length, k: Math.max(0, trackHours.value.indexOf(trackHour.value)), set: k => { trackHour.value = trackHours.value[k] } }
+  if (view.value === 'drivers' && climate.value) return { n: climate.value.map.frames.length, k: Math.min(climateFrame.value, climate.value.map.frames.length - 1), set: k => { climateFrame.value = k } }
+  return null
+})
+const STEP_MS = { weather: 1400, wind: 700, severe: 650, drivers: 800 }
+function step() {
+  const s = sceneSteps.value
+  if (!s) { stopPlay(); return }
+  s.set(nextFrame(s.k, s.n))
+  // The storm plume carries the warnings along: the day follows the hour.
+  if (view.value === 'severe' && forecast.value) severeDay.value = Math.min(forecast.value.forecast_days, Math.floor(trackHour.value / 24) + 1)
 }
+function stopPlay() { playing.value = false; clearInterval(timer); timer = null }
+watch(view, stopPlay)
+watch(showTracks, on => { if (!on && view.value === 'severe') stopPlay() })
 
-function drawArrow(ctx, x, y, u, v, scale) {
-  const len = Math.hypot(u, v) * scale
-  if (len < 1.5) return
-  const a = Math.atan2(-v, u)   // screen y points down
-  const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len
-  ctx.moveTo(x, y); ctx.lineTo(x2, y2)
-  ctx.moveTo(x2, y2); ctx.lineTo(x2 - Math.cos(a - 0.5) * 4, y2 - Math.sin(a - 0.5) * 4)
-  ctx.moveTo(x2, y2); ctx.lineTo(x2 - Math.cos(a + 0.5) * 4, y2 - Math.sin(a + 0.5) * 4)
-}
-
-function drawForecastOverlays(ctx, g, X, Y, cw, ch) {
-  const f = forecast.value
-  const P = (lat, lon) => { const p = projectToGrid(lat, lon, g); return [X(p.x), Y(p.y)] }
-  if (view.value === 'weather') {
-    drawIsobars(ctx, g, X, Y, f.frames[noonFrame(f, day.value)].pressure_hpa)
-    if (weatherField.value === 'symbol') {
-      ctx.font = `${Math.max(9, Math.min(cw, ch) * 0.9)}px DejaVu Sans, DM Sans, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      for (let j = 0; j < g.ny; j += 2) for (let i = 0; i < g.nx; i += 2) {
-        const k = j * g.nx + i, s = symbolInfo(dayBlock.value.symbol[k])
-        ctx.fillStyle = '#0b1a23'; ctx.fillText(s.glyph, X(i + 0.5), Y(j + 0.5))
-      }
-      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'
-    }
-  }
-  if (view.value === 'wind') {
-    const frame = f.frames[windFrame.value.index], w = windNow.value
-    drawIsobars(ctx, g, X, Y, frame.pressure_hpa)
-    ctx.strokeStyle = 'rgba(10,20,28,.85)'; ctx.lineWidth = 1.1; ctx.beginPath()
-    const stride = cw < 14 ? 2 : 1
-    for (let j = 0; j < g.ny; j += stride) for (let i = 0; i < g.nx; i += stride) { const k = j * g.nx + i; drawArrow(ctx, X(i + 0.5), Y(j + 0.5), w.u[k], w.v[k], cw * stride * 0.06) }
-    ctx.stroke()
-    // Highs and lows of member 1 (the pressure systems that steer the weather).
-    ctx.font = 'bold 15px DM Sans, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    for (const s of frame.systems_member_1) {
-      const [x, y] = P(s.latitude_deg, s.longitude_deg)
-      if (x < 0 || y < 0 || x > mapSize.value.w || y > mapSize.value.h) continue
-      ctx.fillStyle = s.kind === 'low' ? '#ff6b6b' : '#64b5f6'; ctx.fillText(s.kind === 'low' ? 'L' : 'H', x, y)
-    }
-    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'
-    // The hurricane of every member at this hour.
-    for (const t of tracks.value) {
-      const p = t.points.find(q => q.hour === windFrame.value.hour)
-      if (!p) continue
-      const [x, y] = P(p.lat, p.lon)
-      ctx.strokeStyle = t.truth ? '#ffffff' : categoryColor(p.category); ctx.lineWidth = t.truth ? 2 : 1.2
-      ctx.beginPath(); ctx.arc(x, y, t.truth ? 5 : 3.5, 0, 2 * Math.PI); ctx.stroke()
-    }
-  }
-  if (view.value === 'severe' && showTracks.value) {
-    for (const t of tracks.value) {
-      ctx.lineWidth = t.truth ? 2.2 : 1.2; ctx.setLineDash(t.truth ? [5, 3] : [])
-      for (let k = 1; k < t.points.length; k++) {
-        const a = t.points[k - 1], b = t.points[k]
-        ctx.strokeStyle = t.truth ? 'rgba(255,255,255,.95)' : categoryColor(b.category)
-        ctx.globalAlpha = t.truth ? 1 : 0.75
-        ctx.beginPath(); ctx.moveTo(...P(a.lat, a.lon)); ctx.lineTo(...P(b.lat, b.lon)); ctx.stroke()
-      }
-      ctx.globalAlpha = 1; ctx.setLineDash([])
-      const p = t.points.find(q => q.hour === trackHour.value)
-      if (p) { const [x, y] = P(p.lat, p.lon); ctx.fillStyle = t.truth ? '#fff' : categoryColor(p.category); ctx.beginPath(); ctx.arc(x, y, t.truth ? 4 : 2.6, 0, 2 * Math.PI); ctx.fill() }
-    }
-  }
-  // Cities.
-  ctx.font = '10px DM Sans, sans-serif'
-  for (const c of f.cities.filter(x => x.inside)) {
-    const [x, y] = P(c.latitude_deg, c.longitude_deg)
-    ctx.fillStyle = '#0b1a23'; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 2 * Math.PI); ctx.fill()
-    ctx.fillStyle = c.name === windCityName.value && view.value === 'wind' ? '#ffd166' : '#f4f8fa'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 2 * Math.PI); ctx.fill()
-    ctx.fillStyle = 'rgba(10,20,28,.8)'; ctx.fillText(c.name, x + 5.5, y + 3.5)
-    ctx.fillStyle = '#eef5f8'; ctx.fillText(c.name, x + 5, y + 3)
-  }
-}
-
-function drawClimateOverlays(ctx, g, X, Y) {
-  const c = climate.value
-  ctx.font = '10px DM Sans, sans-serif'
-  const P = (lat, lon) => { const p = geoToClimateCell(lat, lon, g); return [X(p.x), Y(p.y)] }
-  if (view.value === 'co2') {
-    for (const r of c.co2.regions.slice(0, 8)) {
-      if (r.latitude_deg === null) continue
-      const [x, y] = P(r.latitude_deg, r.longitude_deg), rad = 3 + Math.sqrt(r.fossil_gt_co2_yr + r.land_use_gt_co2_yr) * 4
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y, rad, 0, 2 * Math.PI); ctx.stroke()
-      ctx.fillStyle = '#ffffff'; ctx.fillText(r.name.split(' (')[0], x + rad + 2, y + 3)
-    }
-    ctx.fillStyle = '#ffd166'
-    for (const hsp of c.co2.hotspots.slice(0, 6)) {
-      const [x, y] = P(hsp.latitude_deg, hsp.longitude_deg)
-      ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 5, y + 4); ctx.lineTo(x - 5, y + 4); ctx.closePath(); ctx.fill()
-    }
-  }
-}
-
-watch([cellValue, mapSize, inspectCell, showTracks, trackHour, windCityName], () => nextTick(draw))
-
-function cellAt(event) {
-  const g = mapGrid.value, el = canvas.value
-  if (!g || !el) return null
-  const r = el.getBoundingClientRect(), x = (event.clientX - r.left) / r.width * g.nx, y = (1 - (event.clientY - r.top) / r.height) * g.ny
-  const i = Math.floor(x), j = Math.floor(y)
-  return i >= 0 && j >= 0 && i < g.nx && j < g.ny ? j * g.nx + i : null
-}
 const hoverText = ref('')
-function onMove(event) {
-  const k = cellAt(event)
+function onSceneHover(k) {
   hoverCell.value = k
-  hoverText.value = k === null ? '' : describeCell(k)
+  hoverText.value = k === null || k === undefined ? '' : describeCell(k)
 }
-function onLeave() { hoverCell.value = null; hoverText.value = '' }
-function onClick(event) {
-  const k = cellAt(event)
-  if (view.value === 'wind' && forecast.value && k !== null) {
+function onScenePick(k) {
+  if (k === null || k === undefined) return
+  if (view.value === 'wind' && forecast.value) {
     // Pick the nearest city for the meteogram.
     const lat = forecast.value.static.latitude_deg[k], lon = forecast.value.static.longitude_deg[k]
     const near = forecast.value.cities.filter(c => c.inside && c.hourly).reduce((a, c) => { const d = Math.hypot(c.latitude_deg - lat, (c.longitude_deg - lon) * Math.cos(lat * Math.PI / 180)); return d < a.d ? { d, c } : a }, { d: Infinity, c: null })
@@ -570,14 +471,29 @@ const timeLabel = h => (forecast.value ? validTime(forecast.value, h).toISOStrin
     <div v-if="mapKind && (mapKind === 'forecast' ? forecast : climate)" class="earth-grid map-grid">
       <article class="earth-panel map-panel">
         <div class="map-title"><strong>{{ mapTitle }}</strong><small v-if="hoverText">{{ hoverText }}</small><small v-else>{{ mapKind === 'forecast' ? 'Hover for values · click a cell to pin it' + (view === 'wind' ? ' (wind: the nearest city)' : '') : 'Hover for values' }}</small></div>
-        <div ref="mapHost" class="earth-map"><canvas ref="canvas" @mousemove="onMove" @mouseleave="onLeave" @click="onClick" /></div>
+        <EarthScene v-if="sceneReady" :kind="mapKind" :grid="mapGrid" :land="sceneLand" :elevation="sceneElevation" :colors="sceneColors" :heights="sceneHeights" :overlays="sceneOverlays"
+          :selected="['weather', 'severe'].includes(view) ? selectedCell : null" :playing="playing" :can-play="canPlay" :play-label="playLabel"
+          @hover="onSceneHover" @pick="onScenePick" @toggle-play="togglePlay">
+          <!-- Fullscreen: the title, the value under the pointer, the frame slider and the legend come along. -->
+          <div class="earth-scene-hud">
+            <strong>{{ mapTitle }}</strong>
+            <small>{{ hoverText || 'Drag to turn · scroll to zoom · F leaves fullscreen' }}</small>
+            <input v-if="sceneSteps && sceneSteps.n > 1" type="range" min="0" :max="sceneSteps.n - 1" :value="sceneSteps.k" @input="sceneSteps.set(+$event.target.value)" aria-label="Frame">
+            <div v-if="legend" class="earth-legend">
+              <template v-if="legend.css"><i class="bar" :style="{ background: legend.css }"></i><span class="ticks"><span v-for="(t, k) in legend.ticks" :key="k" :style="{ left: `${t.left}%` }" :class="{ end: t.left > 90, start: t.left < 10 }">{{ t.label }}</span></span></template>
+              <template v-else><span v-for="c in legend.classes" :key="c.label" class="cls"><i :style="{ background: c.color }"></i>{{ c.label }}</span></template>
+            </div>
+          </div>
+        </EarthScene>
         <div v-if="legend" class="earth-legend">
           <template v-if="legend.css"><i class="bar" :style="{ background: legend.css }"></i><span class="ticks"><span v-for="(t, k) in legend.ticks" :key="k" :style="{ left: `${t.left}%` }" :class="{ end: t.left > 90, start: t.left < 10 }">{{ t.label }}</span></span></template>
           <template v-else><span v-for="c in legend.classes" :key="c.label" class="cls"><i :style="{ background: c.color }"></i>{{ c.label }}</span></template>
         </div>
-        <p v-if="view === 'wind'" class="hint">Arrows: the ensemble-mean wind at 10 m (the coupled 1.5 km layer slowed by surface friction, plus the hurricane vortex) · white lines: isobars (hPa) · H/L: pressure systems of member 1 · circles: the hurricane in every member (white: the truth run).</p>
-        <p v-if="view === 'weather'" class="hint">White lines: ensemble-mean isobars at noon of the day (hPa). Synthetic weather situation on a 210 km grid; real land mask.</p>
-        <p v-if="view === 'severe'" class="hint">Warnings are issued for land and the sea next to it. Tracks: the hurricane in every member (colour: category) and in the truth run (dashed white); dots: +{{ trackHour }} h.</p>
+        <p v-if="view === 'wind'" class="hint">Gliding arrows: the ensemble-mean wind at 10 m (the coupled 1.5 km layer slowed by surface friction, plus the hurricane vortex) · lines: isobars every 4 hPa · H/L: pressure systems of member 1 · clouds and rain: the cover, rain and thunder chance of the hour · dots: the hurricane in every member, coloured by category; the spinning storm is the ensemble mean, as wide as its gale-force (17 m/s) winds.</p>
+        <p v-if="view === 'weather'" class="hint">Lines: ensemble-mean isobars at noon of the day (hPa) · clouds: the day's cover, rain and thunder chance drawn as cloud forms (thunder ≥ 40 % → cumulonimbus, overcast with rain → nimbostratus, mostly covered → stratocumulus, else cumulus; heights typical, not forecast). Synthetic weather situation on a 210 km grid; real land mask and relief (exaggerated).</p>
+        <p v-if="view === 'severe'" class="hint">Warnings are issued for land and the sea next to it; pulsing curtains ring the orange and red areas. Tracks: the hurricane in every member (colour: category) and in the truth run (dashed white); dots: +{{ trackHour }} h; the spinning storm: the ensemble mean. Play moves the storm and the day with it.</p>
+        <p v-if="view === 'drivers'" class="hint">The globe is raised by the size of the value (warming and cooling alike) — toggle “Height by value”. Play steps the decades 1850–2100.</p>
+        <p v-if="view === 'co2'" class="hint">Pulsing rings: the largest emitters (size: annual emissions) · ▲ hotspots of the impact · arrows rise from the sources and sink into the sinks (every third cell with a net flux of at least 40 t CO₂/km²/yr, length on a log scale).</p>
       </article>
 
       <!-- Side panel per view -->

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-decode-temperature-map.dir/src/weather/decode_temperature_map.cpp.o -o terraflux-decode-temperature-map  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 
