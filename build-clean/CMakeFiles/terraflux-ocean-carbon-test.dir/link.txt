@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-ocean-carbon-test.dir/tests/weather/ocean_carbon_test.cpp.o -o terraflux-ocean-carbon-test  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 

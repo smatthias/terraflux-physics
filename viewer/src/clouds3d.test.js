@@ -63,3 +63,20 @@ test('the cloud and precipitation meshes carry one instance per puff and per sha
   assert.ok(Math.abs(e[5] - 1.8) < 1e-6 && Math.abs(e[13] - 0.2) < 1e-6, 'from the ground up to the cloud base')
   assert.equal(precipitationIntensity(0), 0); assert.equal(precipitationIntensity(40), 1); assert.ok(precipitationIntensity(2) > 0.2 && precipitationIntensity(2) < 0.5)
 })
+
+test('heaped clouds get cauliflower bulges on request, and every puff knows its cloud middle', () => {
+  const plain = shape('towering_cumulus'), bulgy = shape('towering_cumulus', { bulges: 2 })
+  assert.equal(bulgy.length, plain.length * 3, 'two bulges per puff')
+  assert.ok(bulgy.every(p => p.y >= base - 0.01 && p.y <= top + 0.01), 'bulges stay between base and top')
+  assert.equal(shape('stratus', { bulges: 2 }).length, shape('stratus').length, 'sheets stay smooth')
+  const cb = shape('cumulonimbus', { bulges: 1, wind: [0, 1] })
+  assert.ok(cb.filter(p => p.y > top - 0.3).every(p => p.sy < p.sx), 'the anvil gets no bulges')
+  // The middle is stored relative to each puff: the same point for all puffs, also after moving the cloud.
+  const mids = bulgy.map(p => [p.x + p.centre[0], p.z + p.centre[1]])
+  assert.ok(mids.every(m => Math.abs(m[0] - mids[0][0]) < 1e-9 && Math.abs(m[1] - mids[0][1]) < 1e-9))
+  assert.ok(bulgy.every(p => p.centre[2] > 0 && p.centre[2] >= Math.hypot(p.centre[0], p.centre[1])), 'a radius around all puffs')
+  const mesh = cloudMesh(bulgy.map((p, k) => ({ ...p, base, depth: top - base, cell: k % 2 ? 4 : undefined })))
+  assert.equal(mesh.geometry.attributes.aCentre.count, bulgy.length)
+  assert.ok(mesh.material.vertexShader.includes('aCentre') && mesh.material.fragmentShader.includes('silver lining'))
+  assert.equal(mesh.userData.cells[1], 4); assert.equal(mesh.userData.cells[0], -1)
+})

@@ -187,6 +187,7 @@ export const EXAMPLE_GROUPS = [
     { action: 'loadCloudExample', label: '⛅ Load cloud formation example', tooltip: 'Fronts, frontal and convective clouds, afternoon thunderstorms and what they rain.' },
     { action: 'loadSupercellExample', label: '🌪 Load supercell & tornado outbreak example', tooltip: 'The engine\'s tornado-outbreak run, hourly: a capping inversion breaks, supercells rotate in strong helicity and tornado watches come and go (Storm watch view).' },
     { action: 'loadHurricaneExample', label: '🌀 Load hurricane landfall example', tooltip: 'Two tropical cyclones merge, intensify over warm water, make landfall with a storm surge and decay inland.' },
+    { action: 'loadGermanyVfrExample', label: '✈ Load Germany VFR (GAFOR) example', tooltip: 'Engine run over Germany (synthetic inputs): two November days with night fog, morning mist, a front with low cloud and clearer afternoons, for the VFR view with the GAFOR categories Charlie, Oscar, Delta, Mike and X-ray.' },
     { action: 'loadAlpsExample', label: '⛰ Load Alps foehn example', tooltip: 'Southerly flow over an Alpine ridge: rain on the windward side, foehn in the lee, cold pools in the valleys.' },
     { action: 'useCloudMock', label: '⛈ Cloud formation mock (synthetic)', tooltip: 'A hand-built mock in the cloud-formation format; not engine output.' },
     { action: 'useRegionalDemo', label: '☁ Regional weather demo', tooltip: 'An analytic illustration of pressure systems, a front and cloud bands; not engine output.' },

@@ -5,6 +5,7 @@
 export const VIEW_LABELS = {
   field: 'Field explorer', map: 'Weather map', severe: 'Storm watch', water: 'Catchment', hazards: 'Hazards', ocean: 'Ocean streams', polar: 'Polar melt',
   coast: 'Sea level & coasts', carbon: 'Carbon & ocean life', solar: 'Sun & solar cycle', dust: 'Cosmic dust', solarwind: 'Solar wind & poles',
+  flight: 'Flight weather', sail: 'Sailing weather',
 }
 
 // Readable names of the frame's data blocks (the keys validateSequence attaches to a frame).

@@ -230,6 +230,8 @@ if(BUILD_TESTING)
     add_test(NAME weather.cloud_formation COMMAND terraflux-cloud-formation-test)
     add_test(NAME weather.cloud_formation_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/cloud_formation_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
+    add_test(NAME weather.germany_vfr_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/germany_vfr_check.py $<TARGET_FILE:terraflux-run-coupled-wind>)
     add_executable(terraflux-precipitation-outcomes-test tests/weather/precipitation_outcomes_test.cpp)
     target_link_libraries(terraflux-precipitation-outcomes-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.precipitation_outcomes COMMAND terraflux-precipitation-outcomes-test)

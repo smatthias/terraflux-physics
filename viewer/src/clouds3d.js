@@ -29,7 +29,7 @@ export const CLOUD_FORMS = {
 // The puffs of one cell's cloud. base and top are scene heights, w the cell size in scene units, wind a horizontal unit
 // vector [x, z] (towards where the wind blows). Puff positions are relative to the cell centre.
 //   { x, y, z, sx, sy, sz, yaw, shade (brightness of its base), opacity, flat (1: cut flat at the cloud base), tint }
-export function cloudPuffs({ type, base, top, fraction = 1, w = 1, wind = [1, 0], seed = 1 }) {
+export function cloudPuffs({ type, base, top, fraction = 1, w = 1, wind = [1, 0], seed = 1, bulges = 0 }) {
   const r = rng(seed), depth = Math.max(0.05, top - base), f = Math.min(1, Math.max(0.15, fraction))
   const jitter = s => (r() - 0.5) * 2 * s, out = []
   const yawWind = Math.atan2(wind[1], wind[0])
@@ -89,6 +89,36 @@ export function cloudPuffs({ type, base, top, fraction = 1, w = 1, wind = [1, 0]
     }
     default: break
   }
+  if (bulges > 0 && BULGING[type]) addBulges(out, { base, top, n: bulges, r, storm: type === 'cumulonimbus' })
+  return withCentre(out)
+}
+
+// Heaped clouds are cauliflowers: smaller bulges sit on the upper, outer side of every puff above the base tier.
+const BULGING = { cumulus: true, towering_cumulus: true, cumulonimbus: true, stratocumulus: true }
+function addBulges(out, { base, top, n, r, storm }) {
+  const depth = top - base, cx = out.reduce((a, p) => a + p.x, 0) / out.length, cz = out.reduce((a, p) => a + p.z, 0) / out.length
+  const ceiling = storm ? top - depth * 0.16 : top
+  for (const p of out.slice()) {
+    if (storm && p.y > ceiling) continue   // the anvil stays smooth
+    const size = Math.min(p.sx, p.sz), away = Math.atan2(p.z - cz, p.x - cx)
+    for (let k = 0; k < n; k++) {
+      // Upwards and away from the cloud's axis, on the puff's surface.
+      const up = 0.35 + 0.6 * r(), side = Math.sqrt(1 - up * up), a = away + (r() - 0.5) * 2.2, s = size * (0.38 + 0.2 * r())
+      const y = Math.max(base + s * 0.45, Math.min(p.y + up * p.sy * 0.78, ceiling - s * 0.35))
+      out.push({ ...p, x: p.x + Math.cos(a) * side * p.sx * 0.72, z: p.z + Math.sin(a) * side * p.sz * 0.72, y, sx: s, sy: s * 0.9, sz: s, shade: Math.min(1, p.shade + 0.12), yaw: 0 })
+    }
+  }
+}
+
+// Every puff knows where the middle of its cloud is (relative to itself, so it survives moving the cloud) and how wide
+// the cloud is: the shader lights the whole cloud as one body, bright towards the sun and shaded away from it.
+function withCentre(out) {
+  if (!out.length) return out
+  let wsum = 0, cx = 0, cz = 0
+  for (const p of out) { const v = p.sx * p.sy * p.sz; wsum += v; cx += p.x * v; cz += p.z * v }
+  cx /= wsum || 1; cz /= wsum || 1
+  const R = Math.max(...out.map(p => Math.hypot(p.x - cx, p.z - cz) + Math.max(p.sx, p.sz) * 0.8))
+  for (const p of out) p.centre = [cx - p.x, cz - p.z, R]
   return out
 }
 
@@ -98,8 +128,9 @@ attribute vec4 aCloud;   // x: base y, y: depth, z: shade at the base, w: opacit
 attribute vec3 aTint;
 attribute vec2 aMisc;    // x: flat base + 2 * storm (0..3), y: seed
 attribute vec3 aSpin;    // rotation about a vertical axis: centre x, z (mesh coordinates) and angular speed (rad/s, + counter-clockwise from above)
+attribute vec3 aCentre;  // the middle of the puff's cloud relative to the puff (x, z) and the cloud's radius (0: light the puff alone)
 uniform float uTime;
-varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vSphereW; varying vec4 vCloud; varying vec3 vTint; varying vec2 vMisc;
+varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vSphereW; varying vec4 vCloud; varying vec3 vTint; varying vec2 vMisc; varying vec3 vCentre;
 float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float n3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y),
@@ -121,6 +152,12 @@ void main(){
   vec4 local = instanceMatrix * vec4(p, 1.0);
   local.xz = vec2(aSpin.x, aSpin.y) + (spin * vec3(local.x - aSpin.x, 0.0, local.z - aSpin.y)).xz;
   vec4 world = modelMatrix * local;
+  // The cloud's middle, turned with the spin like the puff.
+  vec3 mid = vec3(instanceMatrix[3].x + aCentre.x, 0.0, instanceMatrix[3].z + aCentre.y);
+  mid.xz = vec2(aSpin.x, aSpin.y) + (spin * vec3(mid.x - aSpin.x, 0.0, mid.z - aSpin.y)).xz;
+  vec3 midW = (modelMatrix * vec4(mid, 1.0)).xyz;
+  float radius = aCentre.z > 0.0 ? aCentre.z : length(instanceMatrix[0].xyz);
+  vCentre = vec3(aCentre.z > 0.0 ? midW.x : (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).x, aCentre.z > 0.0 ? midW.z : (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).z, radius * length(modelMatrix[0].xyz));
   vWorld = world.xyz;
   mat3 m = mat3(modelMatrix) * spin * mat3(instanceMatrix);
   vNormalW = normalize(m * nl); vSphereW = normalize(m * q);
@@ -129,24 +166,33 @@ void main(){
 }`
 export const CLOUD_FRAGMENT = `
 uniform vec3 uSun; uniform float uTime; uniform float uFlash; uniform float uOpacity;
-varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vSphereW; varying vec4 vCloud; varying vec3 vTint; varying vec2 vMisc;
+varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vSphereW; varying vec4 vCloud; varying vec3 vTint; varying vec2 vMisc; varying vec3 vCentre;
 void main(){
   vec3 n = normalize(vNormalW), v = normalize(cameraPosition - vWorld), sun = normalize(uSun);
-  // Dark only near the base: tall towers are bright in the sun above their lower part.
+  // Where this point sits in its whole cloud: -1..1 across it, from its base (-1) to its top (+1).
+  vec3 rel = vec3((vWorld.x - vCentre.x) / max(vCentre.z, 1e-3), (vWorld.y - (vCloud.x + vCloud.y * 0.5)) / max(vCloud.y * 0.5, 0.05), (vWorld.z - vCentre.y) / max(vCentre.z, 1e-3));
+  // The body of the cloud shades itself: the side towards the sun is bright, the far side and the inside in shadow.
+  float toSun = dot(rel, sun);
+  float body = smoothstep(-0.95, 0.75, toSun) * (0.55 + 0.45 * smoothstep(0.0, 0.9, length(rel)));
   float rise = smoothstep(vCloud.x, vCloud.x + min(vCloud.y * 0.45, 1.2) + 0.05, vWorld.y);
-  float ndl = max(dot(n, sun), 0.0), edge = clamp(abs(dot(normalize(vSphereW), v)), 0.0, 1.0);
-  // Sunlit tops, cool blue shadows, darker bases, and a bright rim where the sun shines through the thin edge.
-  float light = 0.7 + 0.32 * ndl + 0.2 * pow(1.0 - edge, 2.0) * max(dot(-v, sun) * 0.5 + 0.5, 0.0);
+  float wrap = clamp(dot(n, sun) * 0.6 + 0.4, 0.0, 1.0), edge = clamp(abs(dot(normalize(vSphereW), v)), 0.0, 1.0);
+  // Light from the sun (warm white), the sky (blue, from above) and the ground (grey, from below).
+  vec3 sunCol = vec3(1.0, 0.97, 0.91), sky = vec3(0.6, 0.7, 0.86), ground = vec3(0.42, 0.44, 0.5);
+  vec3 ambient = mix(ground, sky, n.y * 0.5 + 0.5) * 0.68;
+  vec3 light = ambient + sunCol * (0.85 * mix(0.3, 1.0, body) * wrap);
+  // Bright rims where the sun shines through the thin edge of a backlit cloud (the silver lining).
+  float back = pow(max(dot(-v, sun), 0.0), 3.0) * pow(1.0 - edge, 2.5);
+  light += sunCol * back * 0.7;
   vec3 c = vTint * light * mix(vCloud.z, 1.0, rise);
-  c = mix(c * vec3(0.86, 0.9, 1.0), c, ndl);
   // Lightning: a storm cloud lights up now and then, each at its own moments.
   float storm = step(1.5, vMisc.x), flatBase = step(0.5, mod(vMisc.x, 2.0));
   float tick = floor(uTime * 9.0 + vMisc.y * 37.0);
   float flash = uFlash * storm * step(0.975, fract(sin(tick * 12.9898 + vMisc.y * 78.233) * 43758.5453)) * (1.0 - rise * 0.5);
   c += vec3(0.75, 0.72, 1.0) * flash;
-  // Soft silhouettes: a puff fades out towards its outline, so overlapping puffs merge into one cloud.
-  // Both the lumpy and the round outline fade, so no lump shows a hard edge.
-  float alpha = uOpacity * vCloud.w * smoothstep(0.0, 0.45, edge) * smoothstep(0.0, 0.5, abs(dot(n, v)));
+  // Soft silhouettes: a puff fades out towards its outline, so overlapping puffs merge into one cloud; the middle of a
+  // puff is dense, so the cloud reads as a body rather than a flat sticker.
+  float alpha = uOpacity * vCloud.w * smoothstep(0.0, 0.42, edge) * smoothstep(0.0, 0.45, abs(dot(n, v)));
+  alpha = min(1.0, alpha * 1.12);
   if (flatBase > 0.5) alpha *= smoothstep(vCloud.x - 0.03, vCloud.x + 0.06, vWorld.y);   // flat base
   if (alpha < 0.01) discard;
   gl_FragColor = vec4(c, alpha);
@@ -156,8 +202,8 @@ void main(){
 // opacity: 1 in the field explorer; lower over composed maps, so the map stays readable under a storm's anvils.
 export function cloudMesh(puffs, { sun = new THREE.Vector3(-30, 19, 10), opacity = 1 } = {}) {
   // Finer puffs while there are not too many of them (a hurricane of storm towers has thousands).
-  const n = puffs.length, geometry = new THREE.IcosahedronGeometry(1, n < 2500 ? 3 : 2)
-  const aCloud = new Float32Array(n * 4), aTint = new Float32Array(n * 3), aMisc = new Float32Array(n * 2), aSpin = new Float32Array(n * 3)
+  const n = puffs.length, geometry = new THREE.IcosahedronGeometry(1, n < 400 ? 4 : n < 2500 ? 3 : 2)
+  const aCloud = new Float32Array(n * 4), aTint = new Float32Array(n * 3), aMisc = new Float32Array(n * 2), aSpin = new Float32Array(n * 3), aCentre = new Float32Array(n * 3)
   const uniforms = { uTime: { value: 0 }, uSun: { value: sun.clone().normalize() }, uFlash: { value: 1 }, uOpacity: { value: opacity } }
   const material = new THREE.ShaderMaterial({ vertexShader: CLOUD_VERTEX, fragmentShader: CLOUD_FRAGMENT, uniforms, transparent: true, depthWrite: false })
   const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, n))
@@ -168,14 +214,18 @@ export function cloudMesh(puffs, { sun = new THREE.Vector3(-30, 19, 10), opacity
     aCloud.set([p.base, p.depth, p.shade, p.opacity], i * 4); aTint.set(p.tint, i * 3)
     aMisc.set([(p.flat ? 1 : 0) + (p.storm ? 2 : 0), p.seed ?? i * 0.137], i * 2)
     if (p.spin) aSpin.set([p.spin.x, p.spin.z, p.spin.omega], i * 3)
+    if (p.centre) aCentre.set(p.centre, i * 3)
   })
   mesh.count = n
   geometry.setAttribute('aCloud', new THREE.InstancedBufferAttribute(aCloud, 4))
   geometry.setAttribute('aTint', new THREE.InstancedBufferAttribute(aTint, 3))
   geometry.setAttribute('aMisc', new THREE.InstancedBufferAttribute(aMisc, 2))
   geometry.setAttribute('aSpin', new THREE.InstancedBufferAttribute(aSpin, 3))
+  geometry.setAttribute('aCentre', new THREE.InstancedBufferAttribute(aCentre, 3))
   mesh.frustumCulled = false; mesh.renderOrder = 2
   mesh.userData.uniforms = uniforms
+  // The grid cell of every puff, where the caller gave one: a click on a cloud picks the cell it belongs to.
+  mesh.userData.cells = puffs.some(p => Number.isInteger(p.cell)) ? Int32Array.from(puffs, p => (Number.isInteger(p.cell) ? p.cell : -1)) : null
   return mesh
 }
 

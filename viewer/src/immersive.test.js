@@ -67,8 +67,11 @@ test('wide screens reserve the open panels; narrow screens overlay them as drawe
   assert.equal(wide.docked, true)
   assert.equal(wide.left, wide.panelLeft + wide.gap)
   assert.equal(wide.right, wide.panelRight + wide.gap)
-  assert.equal(wide.top, wide.bar + 2 * wide.gap)
+  assert.equal(wide.top, wide.bar + wide.gap, 'the slim top bar is flush with the top edge')
   assert.equal(wide.bottom, wide.timelineHeight + 2 * wide.gap)
+  const dock = hudLayout({ width: 1600, height: 900, timeline: true, taskbar: true })
+  assert.equal(dock.bottom, dock.taskbarHeight + dock.timelineHeight + 2 * dock.gap, 'the taskbar sits under the timeline')
+  assert.equal(hudLayout({ width: 1600, taskbar: true }).bottom, dock.taskbarHeight + dock.gap)
   assert.ok(wide.panelLeft >= 272 && wide.panelLeft <= 340 && wide.panelRight >= 260 && wide.panelRight <= 330)
   const closed = hudLayout({ width: 1600, height: 900, controls: false, stream: false })
   assert.equal(closed.left, 0); assert.equal(closed.right, 0); assert.equal(closed.bottom, 0)
@@ -98,7 +101,7 @@ test('the camera offset centres the scene in the free area and eases there frame
 
 test('hudStyle exposes the layout as pixel custom properties', () => {
   const style = hudStyle(hudLayout({ width: 1600, controls: true, stream: false, timeline: true }))
-  for (const k of ['--hud-gap', '--hud-bar', '--hud-top', '--hud-left', '--hud-right', '--hud-bottom', '--hud-panel-left', '--hud-panel-right', '--hud-timeline']) assert.match(style[k], /^\d+px$/, k)
+  for (const k of ['--hud-gap', '--hud-bar', '--hud-top', '--hud-left', '--hud-right', '--hud-bottom', '--hud-panel-left', '--hud-panel-right', '--hud-timeline', '--hud-dock', '--hud-taskbar']) assert.match(style[k], /^\d+px$/, k)
   assert.equal(style['--hud-right'], '0px')
 })
 

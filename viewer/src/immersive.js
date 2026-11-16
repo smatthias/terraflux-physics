@@ -58,21 +58,26 @@ export function shortcutAction(event, { immersive = false } = {}) {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
-// The HUD frame for a screen of width x height. Wide screens reserve room for the open panels (the scene is framed
-// between them); narrow screens let the panels slide over the scene like drawers, so nothing is reserved for them.
-export function hudLayout({ width = 1600, height = 900, controls = true, stream = true, timeline = false } = {}) {
+// The HUD frame for a screen of width x height. The top bar is slim and flush with the top edge; the taskbar runs
+// along the bottom edge. Wide screens reserve room for the open panels (the scene is framed between them); narrow
+// screens let the panels slide over the scene like drawers, so nothing is reserved for them.
+export const TASKBAR_HEIGHT = 42
+export function hudLayout({ width = 1600, height = 900, controls = true, stream = true, timeline = false, taskbar = false } = {}) {
   const compact = width < 760
   const gap = compact ? 10 : 14
-  const bar = compact ? 52 : 60
+  const bar = compact ? 42 : 46
   const panelLeft = Math.round(clamp(width * 0.21, 272, 340))
   const panelRight = Math.round(clamp(width * 0.2, 260, 330))
   const docked = width >= 1100
   const timelineHeight = timeline ? 74 : 0
-  const top = bar + gap * 2
+  const taskbarHeight = taskbar ? TASKBAR_HEIGHT : 0
+  // dock: what the taskbar takes from the bottom (the panels and the timeline end above it).
+  const dock = taskbar ? taskbarHeight : 0
+  const top = bar + gap
   const left = docked && controls ? panelLeft + gap : 0
   const right = docked && stream ? panelRight + gap : 0
-  const bottom = timeline ? timelineHeight + gap * 2 : 0
-  return { width, height, gap, bar, panelLeft, panelRight, docked, compact, timelineHeight, top, left, right, bottom }
+  const bottom = dock + (timeline ? timelineHeight + gap * 2 : taskbar ? gap : 0)
+  return { width, height, gap, bar, panelLeft, panelRight, docked, compact, timelineHeight, taskbarHeight, dock, top, left, right, bottom }
 }
 
 // Panels shown when fullscreen opens: both on wide screens, only the controls on medium screens, none on phones.
@@ -110,5 +115,6 @@ export function hudStyle(layout) {
   return {
     '--hud-gap': px(layout.gap), '--hud-bar': px(layout.bar), '--hud-panel-left': px(layout.panelLeft), '--hud-panel-right': px(layout.panelRight),
     '--hud-top': px(layout.top), '--hud-left': px(layout.left), '--hud-right': px(layout.right), '--hud-bottom': px(layout.bottom), '--hud-timeline': px(layout.timelineHeight),
+    '--hud-dock': px(layout.dock ?? 0), '--hud-taskbar': px(layout.taskbarHeight ?? 0),
   }
 }

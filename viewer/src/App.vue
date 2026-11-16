@@ -3,6 +3,14 @@ import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick 
 import CoupledEarth from './CoupledEarth.vue'
 import DataStream from './DataStream.vue'
 import InspectOverlay from './InspectOverlay.vue'
+import Taskbar from './Taskbar.vue'
+import WorkspaceClock from './WorkspaceClock.vue'
+import FlightWeather from './FlightWeather.vue'
+import SailingWeather from './SailingWeather.vue'
+import FlightPlan from './FlightPlan.vue'
+import FlyOverlay from './FlyOverlay.vue'
+import { openWindow, raiseWindow, minimiseWindow, closeWindow, nextFocus, taskbarAction, linkArrow } from './workspace.js'
+import { atmosphereColumn } from './atmosphereColumn.js'
 import { vWobbly } from './wobbly.js'
 import { cloudPuffs, cloudMesh, precipitationMesh, precipitationIntensity, CLOUD_FORMS } from './clouds3d.js'
 import { arrowField } from './flowArrows.js'
@@ -16,6 +24,24 @@ import { explainCell, whereWords, windAt, senseOf, compass8 } from './explain.js
 import { SHORTCUTS, isEditable, shortcutAction, hudLayout, hudStyle, defaultPanels, sceneOffset, fitZoom, approach } from './immersive.js'
 import { VIEW_LABELS, frameChannels, overlayChips, describeChanges, appendEntries } from './dataStream.js'
 import { earthDocumentKind } from './coupledEarth.js'
+import { flightReport, flightCategorySeries, flightConditions, categoryShares, CATEGORIES as FLIGHT_CATEGORIES, DEFAULT_FLIGHT_SETTINGS } from './aviation.js'
+import { sailingReport, pointReadout, beaufortSeries, marineWindForecast, BEAUFORT_COLOURS, DEFAULT_SAILING_SETTINGS } from './sailing.js'
+import { centreCell, surfaceWind, beaufort as beaufortOf, validTime, inverseProject, cellLocation } from './station.js'
+import { parseCoordinate, gridBounds, project } from './geo.js'
+import { windsockMarker, boatMarker, aircraftMarker, bearingVector } from './stationMarkers.js'
+import { windsAloftField, strongestAloft, ALL_LEVELS, FB_LEVELS } from './windsAloft.js'
+import { barbLayer, levelSheet } from './windBarbs.js'
+import { labelSprite } from './sceneKit.js'
+import { barbColour, BARB_COLOURS } from './barbs.js'
+import { siteAirports, nearestAirport } from './airports.js'
+import { planFlight, activeRunway, planStateAt, climbDescentPoints, routePoint, hoursAtDistance, flightRules, returnTrip, ruleWindows, DEFAULT_PLAN, HAZARD_INFO } from './flightPlan.js'
+import { cardContent, drawAirportCard, probeCardContent, drawProbeCard } from './airportCard.js'
+import { weatherSymbol, weatherColumn, cloudFamily, isNight, LAYER_COLOURS, SYMBOLS } from './weatherLayers.js'
+import { GAFOR_CATEGORIES, GAFOR, UNKNOWN_GAFOR, vfrAt, parseGaforAreas, areaCells, areaCategory } from './gafor.js'
+import VfrReport from './VfrReport.vue'
+import { borderRuns, citiesOnGrid, landMaskFromCountries } from './geography.js'
+import { drawWeatherIcon } from './weatherIcons.js'
+import WeatherIcon from './WeatherIcon.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { demo, validateSequence } from './data.js'
@@ -677,6 +703,14 @@ function addRidge(){coupledForm.value.ridges.push({orientation_deg:90,center_eas
 function removeRidge(i){coupledForm.value.ridges.splice(i,1)}
 function addBasin(){coupledForm.value.basins.push({center_east_m:0,center_north_m:150000,depth_m:250,radius_m:50000})}
 function removeBasin(i){coupledForm.value.basins.splice(i,1)}
+async function loadGermanyVfrExample(){
+ loading.value=true;error.value=''
+ try{
+  const response=await fetch(`${import.meta.env.BASE_URL}gafor-germany/engine-timeline.json`)
+  if(!response.ok)throw Error(`Could not load the Germany VFR example (${response.status}).`)
+  loadFrames(await response.json());source.value='Engine output · Germany VFR (synthetic inputs)';view.value='vfr';layer.value='temperature';selected.value=null
+ }catch(err){error.value=err.message}finally{loading.value=false}
+}
 async function loadAlpsExample(){
  loading.value=true;error.value=''
  try{
@@ -708,12 +742,15 @@ function onGroupToggle(id,event){const open=event.target.open,has=openGroups.val
 function onExampleToggle(id,event){const open=event.target.open,has=openExamples.value.includes(id);if(open&&!has)openExamples.value=[...openExamples.value,id];else if(!open&&has)openExamples.value=openExamples.value.filter(g=>g!==id)}
 const mapLayers=ref({base:'temperature',isobars:true,isobarIntervalHpa:2,fronts:true,clouds:true,volumes:true,precipitation:true,symbols:true,hazards:true,wind:false,landSea:true,storms:true,stormWind:true,surge:true,tornado:true,relief:false,lifting:true,foehn:true,coldPools:true,oroPrecip:true,blocking:false})
 const precipitationMetrics=computed(()=>data.value.precipitation?summarizePrecipitation(data.value):null)
-const isobarLines=computed(()=>{try{return data.value.coupled&&view.value==='map'&&mapLayers.value.isobars?isobars(data.value.coupled.pressure,grid.value,mapLayers.value.isobarIntervalHpa*100):[]}catch{return []}})
+const isobarLines=computed(()=>{try{return data.value.coupled&&((view.value==='map'&&mapLayers.value.isobars)||(view.value==='sail'&&sailLayers.value.isobars))?isobars(data.value.coupled.pressure,grid.value,mapLayers.value.isobarIntervalHpa*100):[]}catch{return []}})
 const temperatureRange=computed(()=>{let lo=Infinity,hi=-Infinity;for(const d of snapshots.value)for(const v of d.forecast.fields.air_temperature.values){if(v<lo)lo=v;if(v>hi)hi=v}return [lo,hi]})   // a loop: large timelines exceed the argument limit of Math.min(...)
 const pressureRange=computed(()=>data.value.coupled?[Math.min(...data.value.coupled.pressure),Math.max(...data.value.coupled.pressure)]:[0,1])
 // Composite map colour of one cell as a THREE.Color.
 function mapCellColor(d,i){
  if(view.value==='severe')return severeCellColor(d,i)
+ if(view.value==='flight'&&stationToolsAvailable.value)return flightCellColor(d,i)
+ if(view.value==='vfr'&&stationToolsAvailable.value)return vfrCellColor(d,i)
+ if(view.value==='sail'&&stationToolsAvailable.value)return sailCellColor(d,i)
  if(view.value==='solar'&&d.solar)return solarCellColor(d,i)
  if(view.value==='dust'&&d.dust)return dustCellColor(d,i)
  if(view.value==='solarwind'&&d.solarWind)return windCellColor(d,i)
@@ -740,9 +777,11 @@ function mapCellColor(d,i){
 }
 const categoryForWind=w=>w<17?'depression':w<33?'tropical_storm':w<43?'category_1':w<50?'category_2':w<58?'category_3':w<70?'category_4':'category_5'
 const mapCellStyles=computed(()=>view.value!=='field'?Array.from({length:grid.value.nx*grid.value.ny},(_,i)=>mapCellColor(data.value,i).getStyle()):[])
-function glyphSprite(text,color,size=1.1){const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;const ctx=canvas.getContext('2d');ctx.font='bold 64px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.fillText(text,48,52);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.scale.set(size,size,1);return sprite}
+// Labels live on their own render layer: the main camera shows them, the fly-through's close-up camera does not.
+const LABEL_LAYER=1,ROUTE_LAYER=2
+function glyphSprite(text,color,size=1.1){const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;const ctx=canvas.getContext('2d');ctx.font='bold 64px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.fillText(text,48,52);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.scale.set(size,size,1);sprite.layers.set(LABEL_LAYER);return sprite}
 // A text label that grows with its text (no clipping), with a dark halo for contrast over any colour.
-function textSprite(text,color,size=1){const font='bold 40px sans-serif',probe=document.createElement('canvas').getContext('2d');probe.font=font;const w=Math.max(256,Math.ceil(probe.measureText(text).width)+28);const canvas=document.createElement('canvas');canvas.width=w;canvas.height=64;const ctx=canvas.getContext('2d');ctx.font=font;ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(4,12,18,.9)';ctx.shadowBlur=8;ctx.fillStyle=color;ctx.fillText(text,w/2,34);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.scale.set(size*4*w/256,size,1);return sprite}
+function textSprite(text,color,size=1){const font='bold 40px sans-serif',probe=document.createElement('canvas').getContext('2d');probe.font=font;const w=Math.max(256,Math.ceil(probe.measureText(text).width)+28);const canvas=document.createElement('canvas');canvas.width=w;canvas.height=64;const ctx=canvas.getContext('2d');ctx.font=font;ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(4,12,18,.9)';ctx.shadowBlur=8;ctx.fillStyle=color;ctx.fillText(text,w/2,34);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.scale.set(size*4*w/256,size,1);sprite.layers.set(LABEL_LAYER);return sprite}
 const symbolStride=computed(()=>Math.max(1,Math.ceil(Math.sqrt(grid.value.nx*grid.value.ny/160))))
 const cloudVolumes=ref(true), frontOverlay=ref(true)
 const cloudMetrics=computed(()=>data.value.clouds?summarizeClouds(data.value):null)
@@ -782,7 +821,7 @@ const snapshots=ref(validateSequence(demo())), frameIndex=ref(0), playing=ref(fa
 const comparisonFrames=ref(null),comparisonName=ref('Variant'),comparisonView=ref('baseline')
 const data=computed(()=>comparisonView.value==='variant'&&comparisonFrames.value?comparisonFrames.value[frameIndex.value]:snapshots.value[frameIndex.value])
 const source=ref('Synthetic demonstration'), layer=ref('temperature'), vectors=ref(true), selected=ref(null), error=ref(''), fallback=ref(false), host=ref(null)
-let renderer, scene, camera, controls, observer, frame, group, cells=[], cellHeights=[], playback
+let renderer, scene, camera, controls, observer, frame, group, cells=[], cloudPicks=[], cellHeights=[], playback
 function stop(){playing.value=false;clearInterval(playback)}
 function seek(index){stop();frameIndex.value=Number(index)}
 function togglePlayback(){
@@ -796,7 +835,7 @@ function togglePlayback(){
 function loadFrames(input){const parsed=validateSequence(input);stop();stormTrail.clear();comparisonFrames.value=null;comparisonView.value='baseline';snapshots.value=parsed;frameIndex.value=0;selected.value=null}
 watch(data,()=>{if(!data.value.terrainTemperature)adjustedTemperature.value=false;if(!LAYERS.find(l=>l.key===layer.value)?.needs(data.value))layer.value=data.value.solar?'sunbrightness':data.value.solarWind?'windaurora':'temperature';if(view.value==='polar'&&!data.value.polar)view.value='field';if((view.value==='water'||view.value==='hazards')&&!data.value.hydrology)view.value='field';if(view.value==='ocean'&&!data.value.ocean)view.value='field';if(view.value==='coast'&&!data.value.coast)view.value='field';if(view.value==='carbon'&&!data.value.carbon)view.value='field';if(view.value==='solar'&&!data.value.solar)view.value='field';if(view.value==='dust'&&!data.value.dust)view.value='field';if(view.value==='solarwind'&&!data.value.solarWind)view.value='field';if(view.value==='severe'&&!data.value.severe&&!data.value.storms)view.value='field'})
 watch(layer,k=>{const g=groupOfLayer(k);if(g&&!openGroups.value.includes(g))openGroups.value=[...openGroups.value,g]},{immediate:true})
-function runExample(action){const actions={loadSupercellExample,openEarthForecast,openEarthClimate,loadEngineExample,loadOutletExample,loadComparisonDemo,loadCoupledExample,loadCloudExample,loadHurricaneExample,loadAlpsExample,loadFloodExample,loadOceanExample,loadOceanHeatExample,loadPolarExample,loadPolarOceanExample,loadCoastExample,loadCarbonExample:()=>loadCarbonExample('today'),loadCarbon2100Example,loadSolarExample,loadDustExample,loadWindExample,useCloudMock,useRegionalDemo};actions[action]?.()}
+function runExample(action){const actions={loadGermanyVfrExample,loadSupercellExample,openEarthForecast,openEarthClimate,loadEngineExample,loadOutletExample,loadComparisonDemo,loadCoupledExample,loadCloudExample,loadHurricaneExample,loadAlpsExample,loadFloodExample,loadOceanExample,loadOceanHeatExample,loadPolarExample,loadPolarOceanExample,loadCoastExample,loadCarbonExample:()=>loadCarbonExample('today'),loadCarbon2100Example,loadSolarExample,loadDustExample,loadWindExample,useCloudMock,useRegionalDemo};actions[action]?.()}
 const forecast=computed(()=>data.value.forecast), grid=computed(()=>forecast.value.grid)
 // The values of any layer in a frame (the inspector also reads the other layers at a point).
 function layerValuesFor(d,key){
@@ -1010,7 +1049,7 @@ function fieldColor(value){
 function draw(){const t0=performance.now();drawScene();recordRender(renderer&&!fallback.value?performance.now()-t0:null)}
 function drawScene(){
  if(!renderer || fallback.value)return
- disposeGroup(); group=new THREE.Group();scene.add(group);cells=[];animated=[];animatedUpdates=[]
+ disposeGroup(); group=new THREE.Group();scene.add(group);cells=[];cloudPicks=[];animated=[];animatedUpdates=[]
  // Arrows are collected and drawn at the end as one animated field (flowArrows.js): same arguments as THREE.ArrowHelper,
  // plus an optional flow strength 0..1 where the length does not carry it.
  const flowList=[]
@@ -1024,7 +1063,7 @@ function drawScene(){
  // heights, so that metres of lowland stay visible next to hills of hundreds of metres.
  const reliefOn=!!elevations&&(terrainEnabled.value||layer.value==='terrain'||(mapLike&&mapLayers.value.relief))
  const coastView=view.value==='coast'&&!!data.value.coast,polarView=view.value==='polar'&&!!data.value.polar,heightScale=Number(exaggeration.value)
- const relief=reliefRange(elevations),vscale=verticalScale(relief.range,scale),coastK=RELIEF_TARGET*.6/2/Math.sqrt(Math.max(1,relief.max))
+ const relief=reliefRange(elevations),vscale=stationView.value?aloftScale()/Number(exaggeration.value):verticalScale(relief.range,scale),coastK=RELIEF_TARGET*.6/2/Math.sqrt(Math.max(1,relief.max))
  // Realistic terrain (rock, snow, ice, water, shadows) wherever relief is shown, unless switched off.
  const realistic=reliefOn&&terrainStyle.value.realistic&&!(view.value==='solarwind'&&windLayers.value.globe)
  const waterCell=i=>coastView?!!(data.value.coast.sea[i]||coastLostAt(i)>=1):polarView?!data.value.polar.land[i]:elevations[i]<0
@@ -1034,6 +1073,8 @@ function drawScene(){
  // (Not in the storm watch: everything there is engine output, and the waves are the viewer's estimate.)
  const wavesShown=waveStyle.value.on&&!!waveInfo.value&&(reliefOn||mapLike)&&view.value!=='severe'
  const seaLevelY=coastView?0.15:0.15+(0-relief.min)*vscale*heightScale
+ // The weather views' altitudes start at the drawn sea level over relief, at the cloud ground on the flat map.
+ aloftBaseY=stationView.value&&reliefOn?seaLevelY:ALOFT_GROUND
  const bedDepth=i=>{const e=data.value.terrain?.values[i];return Number.isFinite(e)&&e<0?-e:1}
  let deepest=1;if(wavesShown&&elevations)for(let i=0;i<elevations.length;i++)if(waterCell(i))deepest=Math.max(deepest,bedDepth(i))
  const seabed=i=>seaLevelY-(.04+Math.sqrt(bedDepth(i)/deepest)*.7*heightScale/2)
@@ -1107,7 +1148,7 @@ function drawScene(){
   // the ocean and carbon views, the weather map, or a field layer with values over the sea.
   const w=waveInfo.value,n=count,ice=data.value.ocean?.seaIce?.concentration
   let seaValued=0,seaCount=0;for(let i=0;i<n;i++)if(w.sea[i]){seaCount++;const v=values.value[i];if(v!==null&&v!==undefined&&Number.isFinite(v))seaValued++}
-  const seaCarriesData=['ocean','carbon','map'].includes(view.value)||(view.value==='field'&&!['terrain','slope','aspect'].includes(layer.value)&&seaValued>.3*seaCount)
+  const seaCarriesData=['ocean','carbon','map','flight','sail'].includes(view.value)||(view.value==='field'&&!['terrain','slope','aspect'].includes(layer.value)&&seaValued>.3*seaCount)
   const glass=!terrainLook||seaCarriesData
   const f32=()=>new Float32Array(n),cellsW={sea:f32(),amp:f32(),len:f32(),per:f32(),dirX:f32(),dirZ:f32(),foam:f32(),depth:f32()}
   let highest=0
@@ -1123,7 +1164,7 @@ function drawScene(){
  }
  reliefInfo.value=reliefOn?{factor:exaggerationFactor(vscale,scale,heightScale),sqrt:coastView,realistic:!!terrainLook,snowline}:null
  const pickMesh=new THREE.Mesh(pickGeometry,new THREE.MeshBasicMaterial({visible:false}));pickMesh.userData.surface=true;group.add(pickMesh);cells.push(pickMesh)
- surfaceInfo={nx:g.nx,ny:g.ny,colouredByValue,anchorOf,wrap:!!windGlobe,centre:windGlobe?windGlobe.centre:null}
+ surfaceInfo={nx:g.nx,ny:g.ny,colouredByValue,anchorOf,wrap:!!windGlobe,centre:windGlobe?windGlobe.centre:null,dx,dz,seaY:wavesShown&&!windGlobe?(reliefOn?seaLevelY:.2)+.015:null}
  if(dustHeights&&(dustLayers.value.sources||dustLayers.value.labels)){
   // The sources' zenith points (where each source stands overhead) and the subsolar point.
   const at=(lat,lon,lift)=>new THREE.Vector3(((lon+180)/360*g.nx-g.nx/2)*dx,3.4+lift,-((lat+90)/180*g.ny-g.ny/2)*dz)
@@ -1365,7 +1406,7 @@ function drawScene(){
     const tower=cloud.filter(q=>q.y<anvilFrom),ax=tower.reduce((a,q)=>a+q.x,0)/Math.max(1,tower.length),az=tower.reduce((a,q)=>a+q.z,0)/Math.max(1,tower.length)
     const spin={x:cx+ax,z:cz+az,omega}
     if(SL.supercells){
-     for(const q of cloud)puffs.push({...q,x:q.x+cx,z:q.z+cz,base,depth:top-base,storm:true,seed:(sc.i*.618)%1,spin:q.y<anvilFrom?spin:null})
+     for(const q of cloud)puffs.push({...q,x:q.x+cx,z:q.z+cz,base,depth:top-base,storm:true,seed:(sc.i*.618)%1,spin:q.y<anvilFrom?spin:null,cell:sc.i})
      puffs.push({x:cx+ax,z:cz+az,y:base-.08,sx:w*.17,sy:.08,sz:w*.17,yaw:0,shade:.28,opacity:.92,flat:0,tint:[.7,.72,.78],base:base-.2,depth:.3,storm:false,seed:.3,spin})
     }
     // Tornado possible: a funnel under the wall cloud, from the ground to the engine's cloud base (LCL).
@@ -1401,16 +1442,20 @@ function drawScene(){
  // and top heights, the anvils and streaks turned with the wind; rain or snow falls from the precipitating ones.
  if(data.value.clouds){
   const c=data.value.clouds,heightScale=6/Math.max(1,c.config.max_cloud_top_m)
-  if(view.value==='field'?cloudVolumes.value:mapLayers.value.volumes){
+  const corridor=view.value==='flight'&&!flightLayers.value.clouds&&flightLayers.value.routeClouds?routeCorridor.value:null
+  if(view.value==='vfr'?false:view.value==='field'?cloudVolumes.value:view.value==='flight'?flightLayers.value.clouds||!!corridor:view.value==='sail'?sailLayers.value.clouds:mapLayers.value.volumes){
    const puffs=[],shafts=[],p=data.value.precipitation,w=Math.min(dx,dz),fw=forecast.value.fields
+   // Cauliflower bulges on heaped clouds while there are not too many clouds to draw (each doubles its puffs).
+   const bulges=c.cloudy<=140?1:0
    for(let i=0;i<g.nx*g.ny;i++){
     const type=c.type[i];if(type==='none'||!Number.isFinite(c.base[i])||!Number.isFinite(c.top[i]))continue
     if(severeOn&&(!SL.others||severeCellSet.has(i)||inHurricane(i)))continue
+    if(corridor&&!corridor.has(i))continue
     const floor=surface(i)??.2,ground=floor+.3,base=ground+c.base[i]*heightScale,top=ground+c.top[i]*heightScale
     const cx=((i%g.nx)+.5-g.nx/2)*dx,cz=-(Math.floor(i/g.nx)+.5-g.ny/2)*dz
     const u=fw.wind_east?.values[i]??0,v=fw.wind_north?.values[i]??0,sp=Math.hypot(u,v),wind=sp>.01?[u/sp,-v/sp]:[1,0]
     const storm=!!c.thunderstorm[i]&&type==='cumulonimbus'
-    for(const q of cloudPuffs({type,base,top,fraction:c.fraction[i],w,wind,seed:i+1}))puffs.push({...q,x:q.x+cx,z:q.z+cz,base,depth:top-base,storm,seed:(i*.618)%1})
+    for(const q of cloudPuffs({type,base,top,fraction:c.fraction[i],w,wind,seed:i+1,bulges}))puffs.push({...q,x:q.x+cx,z:q.z+cz,base,depth:top-base,storm,seed:(i*.618)%1,cell:i})
     const rate=p?.rate?.[i]
     if(Number.isFinite(rate)&&rate>.1)shafts.push({x:cx,z:cz,top:base,bottom:floor,radius:w*(type==='cumulonimbus'?.3:.42),intensity:precipitationIntensity(rate),snow:p.phase?.[i]==='solid'})
    }
@@ -1441,12 +1486,16 @@ function drawScene(){
     const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128
     const ctx=canvas.getContext('2d');ctx.font='bold 90px sans-serif';ctx.textAlign='center';ctx.fillStyle=system.kind==='low'?'#ffa28c':'#9fd7ff';ctx.fillText(system.kind==='low'?'L':'H',64,96)
     const marker=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}))
-    marker.position.set((system.u-.5)*g.nx*dx,3.8,-(system.v-.5)*g.ny*dz);marker.scale.set(2.5,2.5,1);group.add(marker)
+    marker.position.set((system.u-.5)*g.nx*dx,3.8,-(system.v-.5)*g.ny*dz);marker.scale.set(2.5,2.5,1);marker.layers.set(LABEL_LAYER);group.add(marker)
    }
   }
  }
 
+ drawWeatherViews(g,dx,dz,surface)
+ if(sailOn.value&&sailLayers.value.currents&&data.value.ocean){const o=data.value.ocean,stride=Math.max(1,Math.ceil(Math.sqrt(g.nx*g.ny/260))),y=(surfaceInfo?.seaY??.2)+.12
+  for(let yy=0;yy<g.ny;yy+=stride)for(let xx=0;xx<g.nx;xx+=stride){const i=yy*g.nx+xx;if(!o.mask[i]||!(o.speed[i]>.02))continue;flowArrow(new THREE.Vector3(o.u[i],0,-o.v[i]).normalize(),new THREE.Vector3((xx+.5-g.nx/2)*dx,y,-(yy+.5-g.ny/2)*dz),Math.min(1.6,.35+o.speed[i]*1.6),0x7fe0ff,.25,.12,Math.min(1,o.speed[i]/.8))}}
  if(flowList.length){const field=arrowField(flowList,{moving:!prefersReducedMotion(),seed:g.nx*7+g.ny});animated.push(field.userData.uniforms);group.add(field)}
+ drawStations()
 }
 function reset(){if(!controls)return;const globe=view.value==='solarwind'&&data.value.solarWind&&windLayers.value.globe
  if(globe){camera.position.set(2,17,50);controls.target.set(0,7.6,0)}else{if(data.value.dust||data.value.solarWind)camera.position.set(0,25,21);else camera.position.set(26,27,31);controls.target.set(0,0,0)}controls.update()}
@@ -1476,7 +1525,16 @@ async function loadCoupledExample(){
 const terrainStyle=ref({realistic:true,dataMix:35}),reliefInfo=ref(null),waveStyle=ref({on:true}),waveNote=ref(null)
 // The storm watch view (see "Storm watch" below): what it shows.
 const severeLayers=ref({base:'auto',watch:true,supercells:true,funnels:true,hurricanes:true,tracks:true,motion:true,labels:true,others:false})
-watch([data,layer,vectors,terrainEnabled,exaggeration,adjustedTemperature,cloudsEnabled,systemsEnabled,cloudVolumes,frontOverlay,view,mapLayers,waterLayers,hazardLayers,oceanLayers,polarLayers,coastLayers,carbonLayers,solarLayers,dustLayers,windLayers,selectedPath,selectedStream,terrainStyle,waveStyle,severeLayers],draw,{deep:true})
+// The flight and sailing weather views (see "Flight weather and sailing weather views" below): what they show.
+const FLIGHT_PRESETS={
+ layers:{level:'off',all:false,sheets:false,mast:true,category:true,symbols:true,freezing:true,cloudSlabs:true,icing:true,turbulence:true,storms:true,routeClouds:false,clouds:false},
+ winds:{level:'FL340',all:false,sheets:true,mast:true,category:true,symbols:true,freezing:false,cloudSlabs:false,icing:false,turbulence:true,storms:true,routeClouds:true,clouds:false},
+ minimal:{level:'off',all:false,sheets:false,mast:false,category:true,symbols:true,freezing:false,cloudSlabs:false,icing:false,turbulence:false,storms:true,routeClouds:false,clouds:false},
+}
+const flightLayers=ref({borders:true,preset:'layers',level:'off',all:false,density:1,category:true,clouds:false,routeClouds:false,mast:true,sheets:false,station:true,labels:true,cards:true,route:true,symbols:true,freezing:true,cloudSlabs:true,icing:true,turbulence:true,storms:true})
+function applyFlightPreset(name){flightLayers.value={...flightLayers.value,...FLIGHT_PRESETS[name],preset:name}}
+const sailLayers=ref({ground:'beaufort',barbs:true,density:1,isobars:true,currents:true,clouds:false,boat:true,aloft:'off'})
+watch([data,layer,vectors,terrainEnabled,exaggeration,adjustedTemperature,cloudsEnabled,systemsEnabled,cloudVolumes,frontOverlay,view,mapLayers,waterLayers,hazardLayers,oceanLayers,polarLayers,coastLayers,carbonLayers,solarLayers,dustLayers,windLayers,selectedPath,selectedStream,terrainStyle,waveStyle,severeLayers,flightLayers,sailLayers],draw,{deep:true})
 watch([solarBlock,()=>solarLayers.value.window,butterflyCanvas],drawButterfly,{flush:'post'})
 // ---- Surface interaction ------------------------------------------------------------------------------------------
 // Hovering lights the data point under the pointer (and, in the field explorer, a line through every place with the
@@ -1491,7 +1549,7 @@ let animated=[],animatedUpdates=[]
 const stormTrail=new Map()
 const motionQuery=window.matchMedia?.('(prefers-reduced-motion: reduce)'),prefersReducedMotion=()=>!!motionQuery?.matches
 function addClouds(puffs,shafts){
- if(puffs.length){const mesh=cloudMesh(puffs,{sun:sunLight?.position??new THREE.Vector3(12,30,20),opacity:view.value==='field'||view.value==='severe'?1:.55});if(prefersReducedMotion())mesh.userData.uniforms.uFlash.value=0;animated.push(mesh.userData.uniforms);group.add(mesh)}
+ if(puffs.length){const mesh=cloudMesh(puffs,{sun:sunLight?.position??new THREE.Vector3(12,30,20),opacity:view.value==='field'||view.value==='severe'?1:view.value==='flight'?(flightLayers.value.clouds?.32:.6):.55});if(prefersReducedMotion())mesh.userData.uniforms.uFlash.value=0;animated.push(mesh.userData.uniforms);group.add(mesh);if(mesh.userData.cells)cloudPicks.push(mesh)}
  if(shafts.length){const mesh=precipitationMesh(shafts);animated.push(mesh.userData.uniforms);group.add(mesh)}
 }
 // ---- Realistic terrain ------------------------------------------------------------------------------------------------
@@ -1540,6 +1598,454 @@ const waveInfo=computed(()=>{
  return {sea,...waveField({sea,nx:g.nx,ny:g.ny,dxm:g.spacing_east_m,dym:g.spacing_north_m,originEast:g.origin_east_m,originNorth:g.origin_north_m,u:f.wind_east?.values,v:f.wind_north?.values,
   depth,ice:d.ocean?.seaIce?.concentration??null,storms,stormSpeed:storms?d.storms.env.storm_wind_speed_m_s:null,northernHemisphere:(g.geographic_anchor_latitude_deg??1)>=0})}
 })
+// ---- Flight weather and sailing weather views (docs/weather/flight-sailing-reports.md) --------------------------------
+// Two full views of the weather for pilots and sailors. The map is the 3D scene: the flight view colours the ground by
+// flight category and stacks the winds aloft as layers of wind barbs at the winds-aloft (FB) levels (windsAloft.js,
+// barbs.js), with a barb mast at the station showing every level; the sailing view colours the sea by Beaufort force
+// (or wave height) under surface wind barbs, isobars and currents, with the boat at the station. The reports fill the
+// page below the scene and follow the simulation live: the frame, the aerodrome or the boat (clicks in the sailing view read a point, the boat stays), and the settings.
+// Not offered for the space-weather runs (the Sun, cosmic dust, solar wind).
+const flightSettings=ref({...DEFAULT_FLIGHT_SETTINGS}),sailSettings=ref({...DEFAULT_SAILING_SETTINGS})
+const stationToolsAvailable=computed(()=>!data.value.solar&&!data.value.dust&&!data.value.solarWind)
+const stationView=computed(()=>(view.value==='flight'||view.value==='sail'||view.value==='vfr')&&stationToolsAvailable.value)
+watch(data,()=>{if((view.value==='flight'||view.value==='sail'||view.value==='vfr')&&!stationToolsAvailable.value)view.value='field'})
+const northernGrid=computed(()=>(grid.value.geographic_anchor_latitude_deg??1)>=0)
+// The aerodromes of the run (airports.js): fixed, sited from the run itself; one is selected for the report and the
+// barb mast. Picking the map selects the nearest aerodrome; the aerodromes never move.
+const selectedAirportId=ref(null)
+// The route: aerodromes or coordinates, departure first and destination last ({ kind: 'airport', id } or
+// { kind: 'coord', name, text }); null until edited (then the first two aerodromes).
+const planSettings=ref({...DEFAULT_PLAN,departure:'current',route:null,returnEnabled:false,returnDeparture:null})
+const pickingWaypoints=ref(false)
+// Land for siting the aerodromes: the run's own land/sea mask; otherwise the country outlines (Natural Earth), so that
+// no aerodrome lands in the sea; otherwise unknown (every cell).
+const airportLand=computed(()=>{const d=snapshots.value[0],sea=seaCellsOf(d);if(sea)return Uint8Array.from(sea,v=>v?0:1)
+ if(countryOutlines.value){const g=d.forecast.grid,land=landMaskFromCountries(countryOutlines.value,g.nx*g.ny,i=>cellLocation(g,i));if(land.some(Boolean))return land}
+ return null})
+const airports=computed(()=>flightOn.value?safeReport(()=>siteAirports(snapshots.value,{land:airportLand.value}))??[]:[])
+const selectedAirport=computed(()=>airports.value.find(a=>a.id===selectedAirportId.value)??airports.value[0]??null)
+function selectAirport(id){selectedAirportId.value=id}
+watch(snapshots,()=>{selectedAirportId.value=null;pickingWaypoints.value=false;planSettings.value={...planSettings.value,fromId:null,toId:null,departure:'current',route:null}})
+const flightCell=computed(()=>selectedAirport.value?.i??centreCell(grid.value))
+// The boat stays where it is put (the centre of the run until moved); clicking the map reads a point instead — the
+// probe (the selected cell) — with its wind, sea, current and the distance and bearing from the boat.
+const boatCell=ref(null)
+const sailCell=computed(()=>{const g=grid.value;return boatCell.value!==null&&boatCell.value<g.nx*g.ny?boatCell.value:centreCell(g)})
+const sailProbe=computed(()=>{const g=grid.value;return sailOn.value&&selected.value!==null&&selected.value<g.nx*g.ny?selected.value:null})
+// The sea for the sailing report: the wave field's mask; an all-land mask when the run has land/sea information but no
+// sea (the report then says there is nowhere to sail); null when the run has no such information at all.
+const sailSea=computed(()=>{const d=data.value,sea=waveInfo.value?.sea??seaCellsOf(d);if(sea)return sea;return d.coast||d.polar||d.ocean||d.carbon||d.surface?.land||d.terrain?new Uint8Array(grid.value.nx*grid.value.ny):null})
+function safeReport(build){try{return build()}catch(err){console.warn('Weather report failed:',err);return null}}
+const flightOn=computed(()=>view.value==='flight'&&stationToolsAvailable.value),sailOn=computed(()=>view.value==='sail'&&stationToolsAvailable.value)
+// Winds aloft of the frame: once per frame, shared by the scene, the flight report and the sailing report.
+const aloftCache=new WeakMap()
+function aloftFor(frame){if(!aloftCache.has(frame))aloftCache.set(frame,safeReport(()=>windsAloftField(frame)));return aloftCache.get(frame)}
+const aloftField=computed(()=>flightOn.value||sailOn.value?aloftFor(data.value):null)
+const aloftNote=computed(()=>{const a=aloftField.value;return !a?'':!a.available?a.reason:a.note??''})
+const airportReports=computed(()=>flightOn.value?airports.value.map(a=>({airport:a,symbol:safeReport(()=>weatherSymbol(data.value,a.i)),report:safeReport(()=>flightReport(data.value,a.i,{runwayDeg:activeRunway(data.value,a),crosswindLimitKt:flightSettings.value.crosswindLimitKt,station:a}))})).filter(x=>x.report):[])
+const flightData=computed(()=>airportReports.value.find(x=>x.airport.id===selectedAirport.value?.id)?.report??null)
+// The flight plan between two aerodromes (flightPlan.js), flown through the timeline from the departure frame.
+const planIds=computed(()=>{const a=airports.value,has=id=>a.some(x=>x.id===id);return {fromId:has(planSettings.value.fromId)?planSettings.value.fromId:a[0]?.id??null,toId:has(planSettings.value.toId)?planSettings.value.toId:a[1]?.id??null}})
+const planRoute=computed(()=>{const r=planSettings.value.route;if(r&&r.length>=2)return r;const ids=planIds.value;return ids.fromId&&ids.toId?[{kind:'airport',id:ids.fromId},{kind:'airport',id:ids.toId}]:[]})
+const planView=computed(()=>({...planSettings.value,...planIds.value,route:planRoute.value}))
+// The route items as planner waypoints; a coordinate that cannot be read stops the plan with its message.
+const planWaypoints=computed(()=>{
+ try{return {points:planRoute.value.map((it,k)=>{
+  if(it.kind==='airport'){const a=airports.value.find(x=>x.id===it.id);if(!a)throw Error(`Point ${k+1}: aerodrome ${it.id} is not in this run.`);return {airport:a,name:a.id}}
+  let pos;try{pos=parseCoordinate(it.text)}catch(err){throw Error(`${it.name||`Point ${k+1}`}: ${err.message}`)}
+  return {name:(it.name||`WP${k}`).toUpperCase().slice(0,12),lat:pos.lat,lon:pos.lon}})}}catch(err){return {error:err.message}}
+})
+// The simulated area in latitude and longitude (for the coordinate hint).
+const planBounds=computed(()=>{const g=grid.value;return flightOn.value?gridBounds(g,(e,n)=>inverseProject(g,e,n)):null})
+const flightPlanData=computed(()=>{
+ if(!flightOn.value||airports.value.length<2)return null
+ const s=planView.value,start=s.departure==='current'?frameIndex.value:Math.min(visibleFrames.value.length-1,Number(s.departure)||0)
+ const w=planWaypoints.value;if(w.error)return {ok:false,reason:w.error}
+ return safeReport(()=>planFlight({frames:visibleFrames.value,startIndex:start,waypoints:w.points,airports:airports.value,cruiseFt:s.cruiseFt,tasKt:s.tasKt,fuelPerHour:s.fuelPerHour,crosswindLimitKt:flightSettings.value.crosswindLimitKt,aloftFor}))
+})
+function updatePlan(patch){planSettings.value={...planSettings.value,...patch}}
+// ---- Flight rules and the return trip (flightPlan.js flightRules / returnTrip / ruleWindows) ------------------------
+// The outbound plan's flight rules (VFR possible, marginal, IFR required, not advisable); with a return trip the reversed
+// route at its own departure time, and the flight rules of every departure time on the outbound and return days.
+const frameTimes=computed(()=>visibleFrames.value.map(f=>validTime(f)))
+const planRules=computed(()=>flightPlanData.value?.ok?safeReport(()=>flightRules(flightPlanData.value,visibleFrames.value)):null)
+const planOptions=computed(()=>{const s=planView.value;return {airports:airports.value,cruiseFt:s.cruiseFt,tasKt:s.tasKt,fuelPerHour:s.fuelPerHour,crosswindLimitKt:flightSettings.value.crosswindLimitKt,aloftFor}})
+const dayOf=ms=>new Date(ms).toISOString().slice(0,10)
+// The return's departure frame: the one chosen, else two days after the outbound at the same time (or the last frame).
+const returnIndex=computed(()=>{
+ const p=flightPlanData.value,t=frameTimes.value;if(!p?.ok)return null
+ const chosen=planSettings.value.returnDeparture;if(chosen!==null&&chosen!==undefined&&Number(chosen)<t.length)return Number(chosen)
+ const target=p.departMs+2*86400000;let best=t.length-1;for(let k=0;k<t.length;k++)if(Math.abs(t[k]-target)<Math.abs(t[best]-target))best=k
+ return best})
+const returnData=computed(()=>{
+ if(!planSettings.value.returnEnabled||!flightPlanData.value?.ok||returnIndex.value===null)return null
+ const w=planWaypoints.value;if(w.error)return null
+ return safeReport(()=>returnTrip({frames:visibleFrames.value,outbound:flightPlanData.value,returnIndex:returnIndex.value,waypoints:w.points,...planOptions.value}))})
+// The VFR windows: flight rules for every departure time of the outbound day and of the return day.
+const planWindows=computed(()=>{
+ if(!planSettings.value.returnEnabled||!flightPlanData.value?.ok)return null
+ const w=planWaypoints.value;if(w.error)return null
+ const t=frameTimes.value,indicesOf=day=>t.map((ms,k)=>[k,dayOf(ms)]).filter(([,d])=>d===day).map(([k])=>k)
+ const outDay=dayOf(flightPlanData.value.departMs),retDay=returnIndex.value!==null?dayOf(t[returnIndex.value]):null
+ const scan=(indices,wps)=>safeReport(()=>ruleWindows({frames:visibleFrames.value,indices,waypoints:wps,...planOptions.value}))??[]
+ return {outbound:{day:outDay,windows:scan(indicesOf(outDay),w.points)},back:retDay?{day:retDay,windows:scan(indicesOf(retDay),[...w.points].reverse())}:null}})
+// A waypoint at a picked cell (its centre), inserted before the destination.
+function addWaypointAt(i){const r=[...planRoute.value],pos=cellLocation(grid.value,i),n=r.filter(x=>x.kind==='coord').length+1
+ r.splice(Math.max(1,r.length-1),0,{kind:'coord',name:`WP${n}`,text:`${pos.lat.toFixed(4)}, ${pos.lon.toFixed(4)}`});updatePlan({route:r})}
+const routeCorridor=computed(()=>{const p=flightPlanData.value;if(!p?.ok)return null;const g=grid.value,set=new Set();for(const sg of p.segments){const x=sg.i%g.nx,y=Math.floor(sg.i/g.nx);for(let b=-1;b<=1;b++)for(let a=-1;a<=1;a++){const xx=x+a,yy=y+b;if(xx>=0&&yy>=0&&xx<g.nx&&yy<g.ny)set.add(yy*g.nx+xx)}}return set})
+// ---- Flying the route: an aircraft on the planned path and a chase / cockpit view of what it meets ---------------------
+// The aircraft flies the plan (planStateAt) at a chosen simulation speed; the run's frame follows the time flown, so the
+// clouds, build-ups and winds in both views are those of that time. While flying the departure is held at its frame
+// (the plan must not change under the aircraft); closing the fly-through restores the setting.
+const fly=ref({open:false,playing:false,hours:0,speed:300,mode:'chase'})
+let flyHeldDeparture=null,flyStartFrame=null
+const flyState=computed(()=>fly.value.open&&flightPlanData.value?.ok?planStateAt(flightPlanData.value,fly.value.hours):null)
+function openFly(){
+ const p=flightPlanData.value;if(!p?.ok)return
+ flyHeldDeparture=planSettings.value.departure;flyStartFrame=frameIndex.value
+ if(planSettings.value.departure==='current')planSettings.value={...planSettings.value,departure:String(visibleFrames.value.findIndex(f=>validTime(f)===p.departMs))}
+ fly.value={...fly.value,open:true,playing:true,hours:0}
+ nextTick(()=>host.value?.scrollIntoView?.({block:'center',behavior:'smooth'}))
+}
+// Closing returns to the frame the flight started from, so the plan shown is the one that was flown.
+function closeFly(){fly.value={...fly.value,open:false,playing:false};if(flyStartFrame!==null&&flyStartFrame<visibleFrames.value.length&&flyStartFrame!==frameIndex.value)seek(flyStartFrame);flyStartFrame=null;if(flyHeldDeparture!==null){planSettings.value={...planSettings.value,departure:flyHeldDeparture};flyHeldDeparture=null}removeAircraft()}
+function flyPatch(patch){fly.value={...fly.value,...patch}}
+function flyTogglePlay(){const f=fly.value,p=flightPlanData.value;if(!f.playing&&p?.ok&&f.hours>=p.hours)flyPatch({hours:0,playing:true});else flyPatch({playing:!f.playing})}
+function advanceFlight(dt){
+ const f=fly.value,p=flightPlanData.value
+ if(!f.open||!f.playing||!p?.ok||!(dt>0))return
+ const hours=Math.min(p.hours,f.hours+dt*f.speed/3600)
+ fly.value={...f,hours,playing:hours<p.hours}
+}
+// The weather follows the flight: show the frame of the segment being flown.
+watch(()=>flyState.value?.frameIndex,idx=>{if(idx!==undefined&&idx!==null&&idx!==frameIndex.value)seek(idx)})
+watch(flightOn,on=>{if(!on&&fly.value.open)closeFly()})
+watch(()=>flightPlanData.value?.ok,ok=>{if(!ok&&fly.value.open)closeFly()})
+// The window of the perspective view inside the viewport (CSS px from its top-left): bottom-left, clear of the panels.
+const flyRect=computed(()=>{
+ const W=viewportSize.value.width||900,H=viewportSize.value.height||560,left=immersive.value?hud.value.left+hud.value.gap+6:16,bottom=immersive.value?hud.value.bottom+hud.value.gap:44
+ const w=Math.round(Math.min(680,Math.max(320,(W-left)*.5))),h=Math.round(Math.min(420,Math.max(220,H*.56)))
+ return {x:left,y:Math.max(8,H-bottom-h),w,h}
+})
+let aircraftObj=null,flyCam=null,flySky=null,routeMap=null
+function removeAircraft(){if(aircraftObj){scene?.remove(aircraftObj);aircraftObj.traverse(o=>{o.geometry?.dispose();o.material?.dispose?.()});aircraftObj=null}}
+// A sky for the perspective view: deep blue overhead to a pale horizon, with the haze of the same colour.
+function skyTexture(){
+ if(flySky)return flySky
+ const c=document.createElement('canvas');c.width=4;c.height=256;const g=c.getContext('2d'),gr=g.createLinearGradient(0,0,0,256)
+ gr.addColorStop(0,'#0e2a4a');gr.addColorStop(.55,'#4f7ea6');gr.addColorStop(.75,'#a9c6dc');gr.addColorStop(1,'#5d6f72');g.fillStyle=gr;g.fillRect(0,0,4,256)
+ flySky=new THREE.CanvasTexture(c);return flySky
+}
+function renderFlightInset(){
+ const st=flyState.value
+ if(!st||!routeMap||!renderer||fallback.value){if(aircraftObj&&!fly.value.open)removeAircraft();return}
+ if(!aircraftObj){aircraftObj=aircraftMarker({size:Math.min(.7,Math.max(.35,routeMap.cell*.9))});scene.add(aircraftObj)}
+ // The scene is the grid's frame: the aircraft and the cameras use the grid-frame heading and track.
+ const P=routeMap.pt(st.distNm,st.altFt),[hx,hz]=bearingVector(st.gridHeadingDeg),[tx,tz]=bearingVector(st.gridTrackDeg)
+ aircraftObj.userData.set(P,st.gridHeadingDeg,st.pitchDeg);aircraftObj.userData.update(glow.time)
+ if(!flyCam)flyCam=new THREE.PerspectiveCamera(62,1,.01,160)
+ const r=flyRect.value,el=renderer.domElement,W=el.clientWidth,H=el.clientHeight,cockpit=fly.value.mode==='cockpit',a=routeMap.cell
+ if(cockpit){flyCam.position.set(P.x+hx*a*.35,P.y+a*.06,P.z+hz*a*.35);flyCam.lookAt(P.x+hx*12,P.y+a*.02,P.z+hz*12)}
+ else{flyCam.position.set(P.x-tx*a*2.2,P.y+a*.7,P.z-tz*a*2.2);flyCam.lookAt(P.x+tx*a*4,P.y,P.z+tz*a*4)}
+ flyCam.aspect=r.w/r.h;flyCam.updateProjectionMatrix();if(cockpit)flyCam.layers.disable(ROUTE_LAYER);else flyCam.layers.enable(ROUTE_LAYER)
+ const bg=scene.background,fog=scene.fog;scene.background=skyTexture();scene.fog=new THREE.Fog('#a9c6dc',a*6,a*40)
+ aircraftObj.visible=!cockpit
+ renderer.setScissorTest(true);renderer.setScissor(r.x,H-r.y-r.h,r.w,r.h);renderer.setViewport(r.x,H-r.y-r.h,r.w,r.h)
+ renderer.render(scene,flyCam)
+ renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);scene.background=bg;scene.fog=fog;aircraftObj.visible=true
+}
+const flightAloft=computed(()=>flightData.value&&aloftField.value?.available?safeReport(()=>aloftField.value.profile(flightCell.value)):null)
+const flightStrongest=computed(()=>flightOn.value&&aloftField.value?.available?safeReport(()=>strongestAloft(aloftField.value,grid.value)):null)
+const flightShares=computed(()=>flightOn.value?safeReport(()=>categoryShares(data.value)):null)
+const flightSeries=computed(()=>flightData.value?safeReport(()=>flightCategorySeries(visibleFrames.value,flightCell.value,flightSettings.value))??[]:[])
+const sailData=computed(()=>sailOn.value?safeReport(()=>sailingReport(data.value,sailCell.value,{sea:sailSea.value,waves:waveInfo.value,frames:visibleFrames.value,index:frameIndex.value,settings:sailSettings.value})):null)
+const sailForecast=computed(()=>sailData.value?.available?safeReport(()=>marineWindForecast(visibleFrames.value,frameIndex.value,sailData.value.station.i)):null)
+const sailAloft=computed(()=>sailData.value?.available&&aloftField.value?.available?safeReport(()=>aloftField.value.profile(sailData.value.station.i)):null)
+const sailSeries=computed(()=>sailData.value?.available?safeReport(()=>beaufortSeries(visibleFrames.value,sailData.value.station.i))??[]:[])
+const sailProbeData=computed(()=>sailProbe.value!==null&&sailData.value?.available?safeReport(()=>pointReadout(data.value,sailProbe.value,{sea:sailSea.value,waves:waveInfo.value,boat:sailData.value.station,settings:sailSettings.value})):null)
+const sailProbeSeries=computed(()=>sailProbeData.value?safeReport(()=>beaufortSeries(visibleFrames.value,sailProbe.value))??[]:[])
+function moveBoatToProbe(){if(sailProbe.value!==null){boatCell.value=sailProbe.value;selected.value=null}}
+function steerToProbe(){const b=sailProbeData.value?.fromBoat;if(b&&b.nm>0.05)sailSettings.value={...sailSettings.value,headingDeg:Math.round(b.bearingDeg)%360}}
+const stationFrameLabels=computed(()=>{const f=visibleFrames.value,span=f.at(-1)?.forecast.elapsed_seconds??0;return f.map(x=>frameLabel(x,span))})
+function updateStationSettings(k,patch){if(k==='flight')flightSettings.value={...flightSettings.value,...patch};else sailSettings.value={...sailSettings.value,...patch}}
+watch(snapshots,()=>{boatCell.value=null})
+// Map colours of the two views. Flight: the flight category of each cell over a dark land/sea base. Sailing: the sea by
+// Beaufort force of the surface wind (or by wave height), the land dark.
+const flightCellColours=computed(()=>flightOn.value&&flightLayers.value.category?Array.from({length:grid.value.nx*grid.value.ny},(_,i)=>flightConditions(data.value,i).category.colour):null)
+function flightCellColor(d,i){
+ const land=d.surface?d.surface.land[i]:d.terrain?d.terrain.values[i]>=0:true,c=new THREE.Color(land?'#26332a':'#0f2533')
+ const cat=flightCellColours.value?.[i];if(cat)c.lerp(new THREE.Color(cat),cat===FLIGHT_CATEGORIES.UNKNOWN.colour?.15:.5)
+ return c
+}
+function sailCellColor(d,i){
+ const sea=sailSea.value?!!sailSea.value[i]:true
+ if(!sea)return new THREE.Color('#2a3529')
+ if(sailLayers.value.ground==='waves'&&waveInfo.value){const hs=waveInfo.value.hs[i];return new THREE.Color().setHSL((205-Math.min(1,hs/6)*205)/360,.6,.22+Math.min(1,hs/6)*.25)}
+ const w=surfaceWind(d,i);return new THREE.Color(BEAUFORT_COLOURS[beaufortOf(w.speed).force]).multiplyScalar(.85)
+}
+// ---- The VFR view (GAFOR): categories Charlie to X-ray, the VFR airspace clear of cloud with the ground in sight -----
+// gafor.js holds the category table (visibility and main cloud base) and the SERA clear-of-cloud rules. The GAFOR areas
+// come only from an official area file loaded by the user (GeoJSON with code, name and reference altitude).
+const vfrOn=computed(()=>view.value==='vfr'&&stationToolsAvailable.value)
+const vfrLayers=ref({space:true,deck:true,symbols:true,areas:true,labels:true,borders:true})
+// Country borders (Natural Earth 1:110m, public domain) and cities for orientation, loaded once when first needed.
+const countryOutlines=shallowRef(null)
+async function ensureCountryOutlines(){if(countryOutlines.value)return;try{const r=await fetch(`${import.meta.env.BASE_URL}geo/countries-110m.geojson`);if(r.ok)countryOutlines.value=await r.json()}catch{}}
+watch(()=>vfrOn.value||flightOn.value,on=>{if(on)ensureCountryOutlines()},{immediate:false})
+watch(countryOutlines,()=>{if(vfrOn.value||flightOn.value)draw()})
+const gaforAreas=ref(null),gaforAreaError=ref(''),gaforAreaSource=ref('')
+async function loadGaforAreas(e){const file=e.target.files?.[0];e.target.value='';if(!file)return
+ try{if(file.size>20*1024*1024)throw Error('Choose a file smaller than 20 MB.');gaforAreas.value=parseGaforAreas(JSON.parse(await file.text()));gaforAreaSource.value=file.name;gaforAreaError.value=''}
+ catch(err){gaforAreaError.value=err.message}}
+function clearGaforAreas(){gaforAreas.value=null;gaforAreaSource.value='';gaforAreaError.value=''}
+const vfrCells=computed(()=>vfrOn.value?Array.from({length:grid.value.nx*grid.value.ny},(_,i)=>safeReport(()=>vfrAt(data.value,i))):[])
+function vfrCellColor(d,i){const v=vfrCells.value[i],c=new THREE.Color('#1d2b32');if(v)c.lerp(new THREE.Color(v.category.colour),v.category.rank<0?.1:.62);return c}
+const vfrShares=computed(()=>{const cells=vfrCells.value.filter(Boolean);if(!cells.length)return null;const out={};for(const v of cells)out[v.category.key]=(out[v.category.key]??0)+1;for(const k in out)out[k]=out[k]/cells.length*100;return out})
+const vfrPicked=computed(()=>vfrOn.value&&selected.value!==null?vfrCells.value[selected.value]??null:null)
+const vfrPickedSeries=computed(()=>vfrPicked.value?visibleFrames.value.map(f=>safeReport(()=>vfrAt(f,selected.value).category.key)):[])
+// The areas on this grid: their cells (centres inside the polygon) and their category in every frame.
+const gaforAreaCells=computed(()=>{const a=gaforAreas.value;if(!a||!vfrOn.value)return null;const g=grid.value;return areaCells(a,g.nx*g.ny,i=>cellLocation(g,i))})
+const gaforAreaTable=computed(()=>{const a=gaforAreas.value,cells=gaforAreaCells.value;if(!a||!cells)return null
+ return a.map(area=>{const c=cells.get(area.id);return {area,cellCount:c.length,frames:c.length?visibleFrames.value.map(f=>safeReport(()=>areaCategory(f,area,c))):[]}})})
+// ---- The views in the scene ----------------------------------------------------------------------------------------
+// Heights: the cloud volumes' scale (6 scene units for the cloud model's top, 12 km by default) over the flat map, so
+// the wind layers, the cloud tops and the icing levels line up. Altitudes are above mean sea level.
+const ALOFT_GROUND=.5
+const aloftScale=()=>6/Math.max(1,data.value.clouds?.config?.max_cloud_top_m??12000)
+let aloftBaseY=ALOFT_GROUND
+const levelY=ft=>aloftBaseY+(ft/3.2808399)*aloftScale()
+function drawWeatherViews(g,dx,dz,surface){
+ const flight=flightOn.value,sail=sailOn.value,vfr=vfrOn.value;if(!flight&&!sail&&!vfr)return
+ const a=aloftField.value,north=northernGrid.value,count=g.nx*g.ny
+ const cellXZ=i=>[((i%g.nx)+.5-g.nx/2)*dx,-(Math.floor(i/g.nx)+.5-g.ny/2)*dz]
+ const groundY=i=>Math.max(surface(i)??.2,surfaceInfo?.seaY??0)
+ // Barbs over the map at one level, every stride-th cell; staff about a stride long.
+ const layerOf=(key,stride,y,{opacity=1,length=null}={})=>{
+  const cells=a.level(key),items=[],sfc=key==='SFC'
+  for(let yy=Math.floor(stride/2);yy<g.ny;yy+=stride)for(let xx=Math.floor(stride/2);xx<g.nx;xx+=stride){const c=cells[yy*g.nx+xx];if(c.below)continue;const [x,z]=cellXZ(c.i);items.push({x,z,kt:c.kt,fromDeg:c.fromDeg,y:sfc?groundY(c.i)+.12:undefined})}
+  const L=length??Math.min(1.6,Math.max(.45,Math.min(dx,dz)*stride*.42))
+  return barbLayer(items,{y,length:L,width:L*.055,northernHemisphere:north,opacity})
+ }
+ const strideFor=target=>Math.max(1,Math.ceil(Math.sqrt(count/target)))
+ const W=g.nx*dx,D=g.ny*dz,labelX=-W/2-.4
+ if(flight&&a?.available){
+  const L=flightLayers.value,dens=[.5,1,2][L.density]??1
+  const levels=L.all?FB_LEVELS:ALL_LEVELS.filter(l=>l.key===L.level)   // none when the level is 'off'
+  for(const level of levels){
+   const y=level.surface?groundY(0)+.12:levelY(level.ft),stride=strideFor((L.all?28:140)*dens)
+   group.add(layerOf(level.key,stride,y,{opacity:L.all?.9:1}))
+   if(L.sheets&&!level.surface)group.add(levelSheet(W,D,y-.01,{opacity:L.all?.035:.07}))
+   if(L.labels){const cells=a.level(level.key).filter(c=>!c.below),max=cells.reduce((m,c)=>Math.max(m,c.kt),0)
+    const t=textSprite(`${level.label}${cells.length?` · max ${Math.round(max)} kt`:' · below ground'}`,barbColour(max),.7);t.position.set(labelX-2.2,y,0);group.add(t)}
+  }
+  // The mast at the station: every level, barbs larger, from the ground to the top level.
+  if(L.mast&&flightData.value){
+   const i=flightCell.value,[x,z]=cellXZ(i),prof=a.profile(i),top=levelY(FB_LEVELS.at(-1).ft)
+   group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,groundY(i),z),new THREE.Vector3(x,top+.2,z)]),new THREE.LineBasicMaterial({color:0xe8f6ff,transparent:true,opacity:.75})))
+   const items=prof.rows.filter(r=>!r.below).map(r=>({x,z,kt:r.kt,fromDeg:r.fromDeg,y:r.level.surface?groundY(i)+.12:levelY(r.level.ft)}))
+   const Lm=Math.min(1.9,Math.max(.9,Math.min(dx,dz)*3))
+   for(const it of items)group.add(barbLayer([it],{y:it.y,length:Lm,width:Lm*.07,northernHemisphere:north}))
+   if(L.labels)for(const r of prof.rows)if(!r.below&&!r.level.surface){const t=textSprite(`${r.level.label} ${String(Math.round(r.fromDeg/10)*10||360).padStart(3,'0')}/${Math.round(r.kt)}`,'#eef6fa',.46);t.position.set(x+Lm*1.3,levelY(r.level.ft)+.14,z);group.add(t)}
+  }
+ }
+ // ---- The VFR view: the airspace usable under VFR at every point, in its GAFOR colour ------------------------------
+ // A column from the minimum height (500 ft above ground) up to the clear-of-cloud limit; its height is the room below
+ // the cloud, its colour the GAFOR category; a flat red tile where there is no VFR airspace. Above it the main cloud
+ // deck (BKN/OVC); the weather symbols; the GAFOR areas from the loaded area file.
+ if(vfr){
+  const L=vfrLayers.value,cellsV=vfrCells.value,stride=strideFor(320),w=stride*dx*.9,d=stride*dz*.9,m4=new THREE.Matrix4(),box=new THREE.BoxGeometry(1,1,1)
+  const byCat=new Map(),decks=[],closed=[]
+  for(let yy=Math.floor(stride/2);yy<g.ny;yy+=stride)for(let xx=Math.floor(stride/2);xx<g.nx;xx+=stride){const i=yy*g.nx+xx,v=cellsV[i];if(!v)continue;const [x,z]=cellXZ(i)
+   if(L.space){if(v.space.ok){const key=v.category.key;if(!byCat.has(key))byCat.set(key,[]);byCat.get(key).push({x,z,y0:Math.max(groundY(i)+.02,levelY(v.space.bottomFt)),y1:levelY(v.space.topFt)})}else closed.push({x,z,y0:groundY(i)+.02,y1:groundY(i)+.09})}
+   if(L.deck&&Number.isFinite(v.hsFt)){const col=safeReport(()=>weatherColumn(data.value,i));if(col?.cloud)decks.push({x,z,y0:levelY(v.elevationFt+v.hsFt),y1:levelY(Math.max(v.elevationFt+v.hsFt+300,col.cloud.topFt))})}
+  }
+  const instanced=(list,colour,opacity,name,scale=1)=>{if(!list.length)return;const mesh=new THREE.InstancedMesh(box,new THREE.MeshBasicMaterial({color:colour,transparent:true,opacity,depthWrite:false}),list.length)
+   list.forEach((q,k)=>{const h=Math.max(.02,q.y1-q.y0);m4.makeScale(w*scale,h,d*scale).setPosition(q.x,q.y0+h/2,q.z);mesh.setMatrixAt(k,m4)});mesh.instanceMatrix.needsUpdate=true;mesh.name=name;group.add(mesh)}
+  for(const [key,list] of byCat)instanced(list,(GAFOR[key]??UNKNOWN_GAFOR).colour,.38,`vfr-space-${key}`,.78)
+  instanced(closed,GAFOR.X.colour,.85,'vfr-closed',.9)
+  instanced(decks,'#b9c6cf',.3,'vfr-deck',1)
+  if(L.symbols){const sStride=strideFor(60),size=Math.min(1.6,Math.max(.8,sStride*Math.min(dx,dz)*.55))
+   for(let yy=Math.floor(sStride/2);yy<g.ny;yy+=sStride)for(let xx=Math.floor(sStride/2);xx<g.nx;xx+=sStride){const i=yy*g.nx+xx,key=safeReport(()=>weatherSymbol(data.value,i));if(!key)continue
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=128;drawWeatherIcon(canvas.getContext('2d'),key,128,0,0,{night:isNight(data.value,i)})
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthTest:false}));sp.scale.set(size,size,1);sp.center.set(.5,0);sp.layers.set(LABEL_LAYER);sp.renderOrder=15
+    const [x,z]=cellXZ(i);sp.position.set(x,groundY(i)+.1,z);group.add(sp)}}
+  // GAFOR areas: outlines at the ground in the prevailing category's colour, a label with code and categories.
+  const table=gaforAreaTable.value
+  if(L.areas&&table){const toScene=(lon,lat)=>{const q=project(g,{lat,lon});return new THREE.Vector3(((q.east-g.origin_east_m)/g.spacing_east_m-g.nx/2)*dx,.32,-((q.north-g.origin_north_m)/g.spacing_north_m-g.ny/2)*dz)}
+   for(const row of table){const now=row.frames[frameIndex.value],colour=now?.covered?(GAFOR[now.prevailing]??UNKNOWN_GAFOR).colour:'#7f98a5'
+    // The boundary in white over everything (a dark halo under it), so it reads on any category colour.
+    for(const poly of row.area.polygons){const pts=poly[0].map(([lon,lat])=>toScene(lon,lat))
+     for(const [c,o,lift] of [[0x061118,.7,0],[0xffffff,.95,.01]]){const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p=>p.clone().setY(p.y+lift))),new THREE.LineBasicMaterial({color:c,transparent:true,opacity:o,depthTest:false}));line.renderOrder=18;group.add(line)}}
+    if(L.labels&&now?.covered){let sx=0,sz=0;const ring=row.area.polygons[0][0];for(const [lon,lat] of ring){const p=toScene(lon,lat);sx+=p.x;sz+=p.z}
+     const t=labelSprite(`${row.area.id} · ${now.prevailing}${now.worst!==now.prevailing?` (worst ${now.worst})`:''}`,colour,.5,{align:'center',weight:700,background:'rgba(6,17,24,0.85)'});t.layers.set(LABEL_LAYER);t.renderOrder=19;t.position.set(sx/ring.length,1.6,sz/ring.length);group.add(t)}}}
+ }
+ // Borders and cities (geography.js) on the ground, for orientation: in the VFR and flight weather views.
+ if((vfr&&vfrLayers.value.borders)||(flight&&flightLayers.value.borders)){
+  const toScene=(p,y)=>new THREE.Vector3((p.x-g.nx/2)*dx,y,-(p.y-g.ny/2)*dz)
+  if(countryOutlines.value)for(const run of borderRuns(countryOutlines.value,g)){const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(run.map(p=>toScene(p,.3))),new THREE.LineBasicMaterial({color:0xf2f6f8,transparent:true,opacity:.8}));line.renderOrder=6;group.add(line)}
+  for(const c of citiesOnGrid(g)){const p=toScene(c,.3),dot=new THREE.Mesh(new THREE.CircleGeometry(.09,16),new THREE.MeshBasicMaterial({color:0xffffff}));dot.rotation.x=-Math.PI/2;dot.position.copy(p).setY(.33);group.add(dot)
+   const t=textSprite(c.name,'#f4f8fa',.42);t.position.set(p.x,.75,p.z);group.add(t)}
+ }
+ // ---- The weather in layers (weatherLayers.js): what it is like at a glance, and what the air holds above ----------
+ // Stacked at their true altitudes: the 0 degC surface, cloud slabs (low, middle, high, CB), icing slabs, turbulent
+ // bands and thunderstorm columns over the flight-category ground; weather symbols stand on the map.
+ if(flight){
+  const L=flightLayers.value,frame=data.value,stride=strideFor(230*([.5,1,2][L.density]??1)),w=stride*dx*.94,d=stride*dz*.94
+  const slabs={low:[],middle:[],high:[],cb:[],icing:[],turbulence:[],thunder:[]}
+  const wantColumns=L.cloudSlabs||L.icing||L.turbulence||L.storms
+  if(wantColumns)for(let yy=Math.floor(stride/2);yy<g.ny;yy+=stride)for(let xx=Math.floor(stride/2);xx<g.nx;xx+=stride){
+   const i=yy*g.nx+xx,c=safeReport(()=>weatherColumn(frame,i,L.turbulence?a:null));if(!c)continue
+   const [x,z]=cellXZ(i)
+   if(L.cloudSlabs&&c.cloud)slabs[cloudFamily(c.cloud,c.elevFt)].push({x,z,y0:levelY(c.cloud.baseFt),y1:levelY(c.cloud.topFt)})
+   if(L.icing&&c.icing)slabs.icing.push({x,z,y0:levelY(c.icing.fromFt),y1:levelY(c.icing.toFt)})
+   if(L.turbulence)for(const t of c.turbulence)slabs.turbulence.push({x,z,y0:levelY(t.fromFt),y1:levelY(t.toFt)})
+   if(L.storms&&c.thunder)slabs.thunder.push({x,z,y0:groundY(i),y1:levelY(c.thunder.topFt),narrow:true})
+  }
+  const box=new THREE.BoxGeometry(1,1,1),m4=new THREE.Matrix4(),opacity={low:.2,middle:.17,high:.13,cb:.34,icing:.36,turbulence:.3,thunder:.34}
+  for(const [kind,list] of Object.entries(slabs)){
+   if(!list.length)continue
+   const mesh=new THREE.InstancedMesh(box,new THREE.MeshBasicMaterial({color:LAYER_COLOURS[kind],transparent:true,opacity:opacity[kind],depthWrite:false}),list.length)
+   list.forEach((q,k)=>{const h=Math.max(.03,q.y1-q.y0),sx=q.narrow?w*.55:kind==='icing'||kind==='turbulence'?w*.9:w,sz=q.narrow?d*.55:kind==='icing'||kind==='turbulence'?d*.9:d;m4.makeScale(sx,h,sz).setPosition(q.x,q.y0+h/2,q.z);mesh.setMatrixAt(k,m4)})
+   mesh.instanceMatrix.needsUpdate=true;mesh.renderOrder=kind==='thunder'?4:3;mesh.name=`layer-${kind}`;group.add(mesh)
+  }
+  // The freezing level: one translucent surface through the 0 degC height of every cell.
+  if(L.freezing){
+   const pos=new Float32Array(g.nx*g.ny*3),index=[]
+   for(let i=0;i<g.nx*g.ny;i++){const c=safeReport(()=>weatherColumn(frame,i));const [x,z]=cellXZ(i);pos.set([x,levelY(c?c.freezingFt:0),z],i*3)}
+   for(let yy=0;yy<g.ny-1;yy++)for(let xx=0;xx<g.nx-1;xx++){const i=yy*g.nx+xx;index.push(i,i+1,i+g.nx,i+1,i+g.nx+1,i+g.nx)}
+   const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.BufferAttribute(pos,3));fg.setIndex(index)
+   const fm=new THREE.Mesh(fg,new THREE.MeshBasicMaterial({color:LAYER_COLOURS.freezing,transparent:true,opacity:.14,side:THREE.DoubleSide,depthWrite:false}));fm.name='layer-freezing';group.add(fm)
+   const edge=new THREE.LineSegments(new THREE.WireframeGeometry(fg),new THREE.LineBasicMaterial({color:LAYER_COLOURS.freezing,transparent:true,opacity:.12}));group.add(edge)
+   if(L.labels){const k=(g.ny-1)*g.nx,t=textSprite('0 °C · freezing level',LAYER_COLOURS.freezing,.5);t.position.set(pos[k*3]-1.6,pos[k*3+1]+.2,pos[k*3+2]);group.add(t)}
+  }
+  // Weather symbols on the map (not over the aerodromes: their cards carry them).
+  if(L.symbols){const sStride=strideFor(50),near=new Set(airports.value.map(ap=>ap.i)),size=Math.min(1.6,Math.max(.8,sStride*Math.min(dx,dz)*.55))
+   for(let yy=Math.floor(sStride/2);yy<g.ny;yy+=sStride)for(let xx=Math.floor(sStride/2);xx<g.nx;xx+=sStride){const i=yy*g.nx+xx;if([...near].some(j=>Math.abs(j%g.nx-xx)<=1&&Math.abs(Math.floor(j/g.nx)-yy)<=1))continue
+    const key=safeReport(()=>weatherSymbol(frame,i));if(!key)continue
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=128;drawWeatherIcon(canvas.getContext('2d'),key,128,0,0,{night:isNight(data.value,i)})
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthTest:false}));sp.scale.set(size,size,1);sp.center.set(.5,0);sp.layers.set(LABEL_LAYER);sp.renderOrder=15
+    const [x,z]=cellXZ(i);sp.position.set(x,groundY(i)+.12,z);group.add(sp)}}
+ }
+ // The planned route in 3D (flightPlan.js): the mapping from (distance, altitude) to the scene, kept for the aircraft;
+ // the path as a glowing tube coloured by the wind component (green tailwind, red headwind), sleeves around it where it
+ // meets thunderstorms, icing or turbulence, a curtain and the ground track below it, drop lines at the waypoints with
+ // their time and altitude, TOC and TOD, and the winds it meets as barbs (each at the time the aircraft passes).
+ const plan=flight?flightPlanData.value:null
+ routeMap=null
+ if(plan?.ok){
+  // The path follows the great-circle legs as projected on the grid (plan.path: east/north in metres).
+  const toScene=(east,north)=>[((east-g.origin_east_m)/g.spacing_east_m-g.nx/2)*dx,-((north-g.origin_north_m)/g.spacing_north_m-g.ny/2)*dz]
+  const pt=(dNm,altFt)=>{const q=routePoint(plan,dNm),[x,z]=toScene(q.east,q.north);return new THREE.Vector3(x,levelY(altFt),z)}
+  const ground=dNm=>{const sg=plan.segments.find(x=>dNm<=x.toNm+1e-9)??plan.segments.at(-1);return groundY(sg.i)+.03}
+  // cell: the scene size of about a grid cell (capped), the scale of the aircraft and of the chase camera's distance.
+  routeMap={pt,ground,cell:Math.min(1.2,Math.max(.45,Math.min(dx,dz)*1.2))}
+ }
+ if(plan?.ok&&flightLayers.value.route){
+  // The route sits on its own layer: the overview and chase cameras show it, the cockpit camera (inside it) does not.
+  const routeGroup=new THREE.Group();routeGroup.name='route';group.add(routeGroup);{const group=routeGroup
+  const {pt,ground}=routeMap,alt=d=>plan.profile.reduce((a,q)=>Math.abs(q.distNm-d)<Math.abs(a.distNm-d)?q:a).altFt
+  const stops=[{d:0,alt:plan.from.elevationFt,head:plan.profile[0].headKt},...plan.profile.map(q=>({d:q.distNm,alt:q.altFt,head:q.headKt})),{d:plan.lengthNm,alt:plan.to.elevationFt,head:plan.profile.at(-1).headKt}]
+  const curveOf=list=>new THREE.CatmullRomCurve3(list.map(q=>pt(q.d,q.alt)),false,'centripetal',0)
+  const curve=curveOf(stops),segs=Math.max(48,stops.length*4),radial=10
+  const tube=new THREE.TubeGeometry(curve,segs,.09,radial,false),colours=[],c=new THREE.Color()
+  for(let k=0;k<=segs;k++){const q=stops[Math.min(stops.length-1,Math.round(k/segs*(stops.length-1)))],t=Math.max(-1,Math.min(1,q.head/40));c.set(t>0?'#ff5252':'#3ddc84').lerp(new THREE.Color('#f2f7fa'),1-Math.abs(t));for(let r=0;r<=radial;r++)colours.push(c.r,c.g,c.b)}
+  tube.setAttribute('color',new THREE.Float32BufferAttribute(colours,3))
+  group.add(new THREE.Mesh(tube,new THREE.MeshBasicMaterial({vertexColors:true})))
+  group.add(new THREE.Mesh(new THREE.TubeGeometry(curve,segs,.2,radial,false),new THREE.MeshBasicMaterial({color:0xbfefff,transparent:true,opacity:.16,depthWrite:false,blending:THREE.AdditiveBlending})))
+  // Hazard sleeves: a wider translucent tube over each stretch where the route meets a hazard.
+  for(const r of plan.ranges.filter(x=>x.kind!=='cloud')){
+   const part=stops.filter(q=>q.d>=r.fromNm&&q.d<=r.toNm);if(part.length<2)part.splice(0,part.length,{d:r.fromNm,alt:alt(r.fromNm)},{d:Math.max(r.toNm,r.fromNm+.5),alt:alt(r.toNm)})
+   const sc=curveOf([{d:r.fromNm,alt:alt(r.fromNm)},...part,{d:r.toNm,alt:alt(r.toNm)}])
+   group.add(new THREE.Mesh(new THREE.TubeGeometry(sc,Math.max(8,part.length*3),r.kind==='thunderstorm'||r.kind==='cyclone'?.34:.27,radial,false),new THREE.MeshBasicMaterial({color:HAZARD_INFO[r.kind].colour,transparent:true,opacity:.3,depthWrite:false})))
+   const m=pt((r.fromNm+r.toNm)/2,alt((r.fromNm+r.toNm)/2)),t=textSprite(`⚠ ${HAZARD_INFO[r.kind].label} · ${Math.round(r.fromNm)}–${Math.round(r.toNm)} NM`,HAZARD_INFO[r.kind].colour,.42);t.position.set(m.x,m.y+.75,m.z);group.add(t)
+  }
+  // Curtain and ground track.
+  const curtain=[],idx=[],track=[];for(const q of stops){const p=pt(q.d,q.alt),gy=ground(q.d);curtain.push(p.x,p.y,p.z,p.x,gy,p.z);track.push(new THREE.Vector3(p.x,gy+.02,p.z))}
+  for(let k=0;k<stops.length-1;k++){const a=k*2,b=a+2;idx.push(a,a+1,b,b,a+1,b+1)}
+  const cg=new THREE.BufferGeometry();cg.setAttribute('position',new THREE.Float32BufferAttribute(curtain,3));cg.setIndex(idx)
+  group.add(new THREE.Mesh(cg,new THREE.MeshBasicMaterial({color:0x7fe0ff,transparent:true,opacity:.09,side:THREE.DoubleSide,depthWrite:false})))
+  const tl=new THREE.Line(new THREE.BufferGeometry().setFromPoints(track),new THREE.LineDashedMaterial({color:0xe8f6ff,dashSize:.3,gapSize:.2,transparent:true,opacity:.8}));tl.computeLineDistances();group.add(tl)
+  // Waypoints at the leg ends, with TOC and TOD: a drop line to the ground, a bead on the path and a label.
+  const utcOf=ms=>{const d=new Date(ms);return `${String(d.getUTCHours()).padStart(2,'0')}${String(d.getUTCMinutes()).padStart(2,'0')}Z`}
+  const {toc,tod}=climbDescentPoints(plan)
+  const marks=[...plan.points.slice(1,-1).map((q,k)=>({d:plan.cumNm[k+1],label:q.id,ms:plan.departMs+hoursAtDistance(plan,plan.cumNm[k+1])*3.6e6,colour:'#e8f6ff'})),...(toc?[{d:toc.distNm,label:'TOC',ms:toc.ms,colour:'#ffd166'}]:[]),...(tod?[{d:tod.distNm,label:'TOD',ms:tod.ms,colour:'#ffd166'}]:[])]
+  for(const m of marks){const p=pt(m.d,alt(m.d)),gy=ground(m.d)
+   group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,gy,p.z),p]),new THREE.LineBasicMaterial({color:m.colour,transparent:true,opacity:.45})))
+   const bead=new THREE.Mesh(new THREE.SphereGeometry(.11,12,8),new THREE.MeshBasicMaterial({color:m.colour}));bead.position.copy(p);group.add(bead)
+   if(flightLayers.value.labels){const t=textSprite(`${m.label} · ${(Math.round(alt(m.d)/100)*100).toLocaleString('en-US')} ft · ${utcOf(m.ms)}`,m.colour,.36);t.position.set(p.x,p.y+.42,p.z);group.add(t)}}
+  const Lb=Math.min(1.4,Math.max(.6,Math.min(dx,dz)*2.4))
+  group.add(barbLayer(plan.legs.map(l=>{const p=pt((l.fromNm+l.toNm)/2,l.altFt);return {x:p.x,z:p.z,y:p.y+.3,kt:l.wind.kt,fromDeg:l.wind.fromDeg}}),{length:Lb,width:Lb*.07,northernHemisphere:north}))
+  }
+  routeGroup.traverse(o=>{if(!o.isSprite)o.layers.set(ROUTE_LAYER)})
+ }
+ if(sail){
+  const L=sailLayers.value,dens=[.5,1,2][L.density]??1
+  // Surface (10 m) barbs over the map, the engine's wind (with a cyclone's where stronger).
+  if(L.barbs){const stride=strideFor(150*dens),items=[]
+   for(let yy=Math.floor(stride/2);yy<g.ny;yy+=stride)for(let xx=Math.floor(stride/2);xx<g.nx;xx+=stride){const i=yy*g.nx+xx,w=surfaceWind(data.value,i),[x,z]=cellXZ(i);items.push({x,z,kt:w.kt,fromDeg:w.fromDeg,y:groundY(i)+.45})}
+   const Ls=Math.min(1.4,Math.max(.4,Math.min(dx,dz)*stride*.42));group.add(barbLayer(items,{y:.6,length:Ls,width:Ls*.06,northernHemisphere:north}))}
+  if(L.aloft!=='off'&&a?.available){const level=FB_LEVELS.find(l=>l.key===L.aloft);if(level){const y=levelY(level.ft);group.add(layerOf(level.key,strideFor(90*dens),y));group.add(levelSheet(W,D,y-.01,{opacity:.05}));const t=textSprite(level.label,'#cfe9f5',.5);t.position.set(labelX-1.2,y,0);group.add(t)}}
+  if(L.isobars)for(const lv of isobarLines.value)for(const line of lv.lines){
+   const points=line.map(([u,v])=>new THREE.Vector3((u-.5)*W,.46,-(v-.5)*D)),major=Math.round(lv.level_hpa)%4===0
+   group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:major?0xf3f7f9:0xa9bcc6,transparent:true,opacity:major?.9:.5})))
+   if(major){const label=glyphSprite(String(Math.round(lv.level_hpa)),'#f3f7f9',1.2);label.position.copy(points[Math.floor(points.length/2)]).setY(.85);group.add(label)}
+  }
+ }
+}
+// The station markers: their own group, rebuilt when what they show changes (not the whole scene) and after every
+// scene rebuild. They stand on the cell's surface, or on the drawn water over the sea.
+let stationGroup=null,stationUpdates=[]
+// The weather card over an aerodrome: a canvas sprite (airportCard.js), anchored at its bottom centre.
+function airportCardSprite(report,airport,selected,scale,symbol=null){
+ const w=620,h=300,canvas=document.createElement('canvas');canvas.width=w;canvas.height=h
+ drawAirportCard(canvas.getContext('2d'),cardContent(report,airport,{selected,symbol}),w,h,{northernHemisphere:northernGrid.value,drawIcon:drawWeatherIcon})
+ const texture=new THREE.CanvasTexture(canvas);texture.anisotropy=4
+ const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,transparent:true}));sprite.center.set(.5,0);sprite.scale.set(scale*w/h,scale,1);sprite.renderOrder=20;sprite.layers.set(LABEL_LAYER)
+ return sprite
+}
+function drawStations(){
+ if(stationGroup){scene?.remove(stationGroup);stationGroup.traverse(o=>{o.geometry?.dispose();if(o.material)for(const m of [].concat(o.material)){m.map?.dispose();m.dispose()}});stationGroup=null}
+ stationUpdates=[]
+ const info=surfaceInfo,aps=flightOn.value&&flightLayers.value.station?airportReports.value:[],s=sailOn.value&&sailLayers.value.boat&&sailData.value?.available?sailData.value:null
+ if(!renderer||fallback.value||!info?.anchorOf||info.wrap||(!aps.length&&!s))return
+ stationGroup=new THREE.Group();stationGroup.name='station-markers';scene.add(stationGroup)
+ const size=Math.min(2.4,Math.max(1.5,Math.max(info.dx,info.dz)*2.2))
+ // Over the sea the surface under a cell is the drawn seabed: stand on the water instead (an offshore platform).
+ const atop=i=>info.seaY!==null?Math.max(info.seaY,info.anchorOf(i).y):null
+ const place=(marker,i,y)=>{const p=info.anchorOf(i);marker.position.set(p.x,y??p.y,p.z);stationGroup.add(marker);stationUpdates.push(marker.userData.update);return p}
+ // Every aerodrome: the windsock, the runway on its fixed heading, the ring in its category colour and its weather card.
+ for(const {airport,report,symbol} of aps){
+  const selectedOne=airport.id===selectedAirport.value?.id,y=atop(airport.i)
+  const p=place(windsockMarker({fromDeg:report.wind.fromDeg,kt:report.wind.kt,runwayDeg:airport.runwayDeg,colour:report.category.colour,size}),airport.i,y)
+  if(flightLayers.value.cards){const card=airportCardSprite(report,airport,selectedOne,size*(selectedOne?1.3:1.05),symbol);card.position.set(p.x,(y??p.y)+size*.8,p.z);stationGroup.add(card)}
+  else{const t=textSprite(`${airport.id} · ${report.category.name}`,report.category.colour,.5);t.position.set(p.x,(y??p.y)+size*1.05,p.z);stationGroup.add(t)}
+ }
+ if(s)place(boatMarker({headingDeg:s.boat.headingDeg,awa:s.boat.awa,awdFrom:s.boat.awdFrom,colour:s.warning.colour,hs:s.sea?.hs??0,tp:s.sea?.tp??0,size:size*.9}),s.station.i,atop(s.station.i))
+ if(s){const p=info.anchorOf(s.station.i),t=textSprite(`⛵ F${s.wind.beaufort.force}${s.sea&&s.sea.hs>=.05?` · ${s.sea.hs.toFixed(1)} M`:''}`,s.warning.colour,.5);t.position.set(p.x,(atop(s.station.i)??p.y)+size*1.05,p.z);stationGroup.add(t)}
+ // The clicked point of the sailing view: a post with its read-out card, and a dashed line from the boat.
+ const pr=s?sailProbeData.value:null
+ if(pr){
+  const b=info.anchorOf(pr.i),yb=atop(pr.i)??b.y,colour=new THREE.Color(pr.warning.colour)
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(size*.03,size*.03,size*.75,8),new THREE.MeshBasicMaterial({color:colour}));post.position.set(b.x,yb+size*.375,b.z);stationGroup.add(post)
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(size*.09,16,12),new THREE.MeshBasicMaterial({color:colour}));ball.position.set(b.x,yb+size*.78,b.z);stationGroup.add(ball)
+  const w=620,h=260,canvas=document.createElement('canvas');canvas.width=w;canvas.height=h
+  drawProbeCard(canvas.getContext('2d'),probeCardContent(pr),w,h,{northernHemisphere:northernGrid.value})
+  const card=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));card.center.set(.5,0);card.scale.set(size*1.35*w/h,size*1.35,1);card.renderOrder=21;card.layers.set(LABEL_LAYER);card.position.set(b.x,yb+size*.9,b.z);stationGroup.add(card)
+  if(pr.i!==s.station.i){
+   const a=info.anchorOf(s.station.i),ya=(atop(s.station.i)??a.y)+size*.3
+   const geometry=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(a.x,ya,a.z),new THREE.Vector3(b.x,yb+size*.3,b.z)])
+   const line=new THREE.Line(geometry,new THREE.LineDashedMaterial({color:'#ffe3a0',dashSize:size*.25,gapSize:size*.18,depthTest:false,transparent:true,opacity:.9}));line.computeLineDistances();line.renderOrder=19;stationGroup.add(line)
+  }
+ }
+}
+const stationMarkerKey=computed(()=>{const s=sailLayers.value.boat&&sailData.value?.available?sailData.value:null
+ const aps=flightOn.value?airportReports.value.map(({airport,report:r,symbol})=>[symbol,airport.id,Math.round(r.wind.fromDeg),Math.round(r.wind.kt),r.runway.designator,r.category.name,r.metar]):[]
+ return JSON.stringify([aps,selectedAirport.value?.id,flightLayers.value.cards,flightLayers.value.station,s&&[s.station.i,Math.round(s.boat.headingDeg),Math.round(s.boat.awa),Math.round(s.wind.kt),s.warning.key,s.sea&&s.sea.hs.toFixed(1)],s&&sailProbeData.value&&JSON.stringify(probeCardContent(sailProbeData.value))])})
+watch(stationMarkerKey,()=>drawStations())
+watch([gaforAreas,vfrLayers],()=>{if(vfrOn.value)draw()},{deep:true})
+watch(()=>{const p=flightOn.value&&flightLayers.value.route?flightPlanData.value:null;return p?.ok?`${p.points.map(q=>`${q.lat.toFixed(4)},${q.lon.toFixed(4)}`).join(';')}|${p.cruiseFt}|${p.tasKt}|${p.departMs}|${p.legs.map(l=>Math.round(l.wind.kt)).join(',')}`:''},(v,was)=>{if(v!==was)draw()})
+// The station mast moves with the station: a full rebuild (the mast is part of the scene's layers).
+watch(()=>flightOn.value&&flightLayers.value.mast?flightCell.value:null,(v,was)=>{if(v!==was&&v!==null)draw()})
 // ---- Storm watch ----------------------------------------------------------------------------------------------------
 // The ground of the view: a field of the severe-convection or storm-system output over land and sea.
 function severeCellColor(d,i){
@@ -1577,7 +2083,7 @@ function setTerrainLighting(on){
  if(on){sunLight.position.set(-30,19,10);sunLight.intensity=LIGHTS.sun*1.2}else{sunLight.position.set(12,30,20);sunLight.intensity=LIGHTS.sun}
 }
 let surfaceUniforms=null,surfaceInfo=null
-const hoverCell=ref(null),hoverAt=ref(null),inspecting=ref(false),inspectAnchor=ref(null),viewportSize=ref({width:0,height:0})
+const hoverCell=ref(null),hoverAt=ref(null),inspecting=ref(false),viewportSize=ref({width:0,height:0})
 const pointer={x:0,y:0,inside:false,moved:false,down:null,frames:0}
 const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2()
 // The floor: a soft pool of light under the scene instead of grid lines.
@@ -1593,7 +2099,9 @@ function softFloor(){
 function cellAtPointer(x,y){
  if(!renderer||!surfaceInfo||!cells.length)return null
  const el=renderer.domElement;ndc.set(x/el.clientWidth*2-1,-(y/el.clientHeight)*2+1);raycaster.setFromCamera(ndc,camera)
- const hit=raycaster.intersectObjects(cells,false)[0]
+ // Clouds in front of the surface pick the cell they belong to: clicking a cloud opens its column.
+ const hit=raycaster.intersectObjects(cloudPicks.length?[...cells,...cloudPicks]:cells,false)[0]
+ if(hit?.object.userData.cells&&hit.instanceId!==undefined){const c=hit.object.userData.cells[hit.instanceId];return c>=0?c:null}
  return hit?.uv?cellAtUv(hit.uv.x,hit.uv.y,surfaceInfo.nx,surfaceInfo.ny):null
 }
 function onPointerMove(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=e.clientX-r.left;pointer.y=e.clientY-r.top;pointer.inside=true;pointer.moved=true}
@@ -1603,17 +2111,72 @@ function onPointerUp(e){
  const d=pointer.down;pointer.down=null
  if(!d||e.button!==0||Math.hypot(e.clientX-d.x,e.clientY-d.y)>5)return
  const r=renderer.domElement.getBoundingClientRect(),i=cellAtPointer(e.clientX-r.left,e.clientY-r.top)
- if(i===null){inspecting.value=false;selected.value=null;return}
- selected.value=i;inspecting.value=true
+ if(i!==null&&flightOn.value){if(pickingWaypoints.value){addWaypointAt(i);return}const a=nearestAirport(airports.value,grid.value,i);if(a)selectAirport(a.id);return}
+ if(i===null){inspecting.value=false;if(!stationView.value)selected.value=null;return}
+ selected.value=i;inspecting.value=!stationView.value
 }
 // The 2D fallback: its cells are buttons, the inspector anchors at the clicked button.
+let pendingAnchor=null
 function openInspector(i,e){
- selected.value=i;inspecting.value=true
  const b=e.currentTarget.getBoundingClientRect(),v=host.value.getBoundingClientRect()
- inspectAnchor.value={x:b.left+b.width/2-v.left,y:b.top+b.height/2-v.top,visible:true}
+ pendingAnchor={cell:i,a:{x:b.left+b.width/2-v.left,y:b.top+b.height/2-v.top,visible:true}}
+ if(flightOn.value){const a=nearestAirport(airports.value,grid.value,i);if(a)selectAirport(a.id);return}
+ selected.value=i;inspecting.value=!stationView.value
 }
-function closeInspector(){inspecting.value=false}
 watch(selected,v=>{if(v===null)inspecting.value=false})
+// ---- The workspace: a window per clicked point (workspace.js) ----------------------------------------------------------
+// Clicking a point opens its own inspector window (or brings back the one already there); windows stay open side by
+// side, each tied to its cell by an arrow in its colour, and minimise to the taskbar at the bottom. The focused window's
+// cell is the selection (the ring in the scene, the stream's probe).
+const inspectWindows=ref([]),focusedWindow=ref(null),windowAnchors=ref({}),dockPoints=ref({}),taskbarHover=ref(null)
+// Where each window is (not reactive: only read when a new window is placed).
+const windowRects={}
+const avoidFor=id=>inspectWindows.value.filter(w=>w.id!==id&&!w.minimised&&windowRects[w.id]).map(w=>windowRects[w.id])
+let windowSeq=0,windowZ=0
+function openCellWindow(cell){
+ const r=openWindow(inspectWindows.value,cell,{id:windowSeq+1,z:++windowZ})
+ if(r.id===windowSeq+1)windowSeq++
+ inspectWindows.value=r.windows;focusedWindow.value=r.id
+ if(pendingAnchor?.cell===cell){windowAnchors.value={...windowAnchors.value,[r.id]:pendingAnchor.a};pendingAnchor=null}
+}
+function focusCellWindow(id){
+ const w=inspectWindows.value.find(x=>x.id===id);if(!w)return
+ inspectWindows.value=raiseWindow(inspectWindows.value,id,++windowZ);focusedWindow.value=id
+ selected.value=w.cell;inspecting.value=true
+}
+// After the focused window leaves (closed or minimised): focus the next open one, else nothing is inspected.
+function leave(id){
+ if(focusedWindow.value!==id)return
+ const next=nextFocus(inspectWindows.value,id)
+ if(next!==null)focusCellWindow(next);else{focusedWindow.value=null;inspecting.value=false}
+}
+function closeCellWindow(id){leave(id);inspectWindows.value=closeWindow(inspectWindows.value,id);if(taskbarHover.value?.id===id)taskbarHover.value=null}
+function minimiseCellWindow(id){
+ // Fly to its taskbar button: where the button is, in the viewport's pixels.
+ const el=host.value?.querySelector(`.taskbar-item[data-window="${id}"]`),v=host.value?.getBoundingClientRect()
+ if(el&&v){const b=el.getBoundingClientRect();dockPoints.value={...dockPoints.value,[id]:{x:b.left+b.width/2-v.left,y:b.top+b.height/2-v.top}}}
+ inspectWindows.value=minimiseWindow(inspectWindows.value,id);leave(id)
+}
+function activateWindow(id){
+ const w=inspectWindows.value.find(x=>x.id===id);if(!w)return
+ if(taskbarAction(w,focusedWindow.value)==='minimise')minimiseCellWindow(id);else focusCellWindow(id)
+}
+function minimiseAllWindows(){for(const w of inspectWindows.value)if(!w.minimised)minimiseCellWindow(w.id)}
+function closeAllWindows(){inspectWindows.value=[];focusedWindow.value=null;windowAnchors.value={};taskbarHover.value=null;inspecting.value=false}
+function closeInspector(){if(focusedWindow.value!==null)closeCellWindow(focusedWindow.value);else inspecting.value=false}
+// A new selection while inspecting (a click in the scene, the stream, a table row) opens its window.
+watch([selected,inspecting],([s,on])=>{
+ if(!on||s===null)return
+ const f=inspectWindows.value.find(w=>w.id===focusedWindow.value)
+ if(f&&f.cell===s&&!f.minimised)return
+ openCellWindow(s)
+})
+// A new run: its cells are other places, so the windows close.
+watch(snapshots,()=>closeAllWindows())
+function onTaskbarHover(id,point){
+ if(id===null||!point||!host.value){taskbarHover.value=null;return}
+ const v=host.value.getBoundingClientRect();taskbarHover.value={id,point:{x:point.x-v.left,y:point.y-v.top}}
+}
 // Eased lighting: the hover light glides between nearby points and fades in and out; the selection ring breathes.
 const glow={hover:0,x:-100,y:-100,iso:-1,isoOn:0,sel:0,sx:-100,sy:-100,time:0},tmp=new THREE.Vector3()
 let lastSurfaceTick=0
@@ -1626,6 +2189,8 @@ function animateSurface(now){
  const dt=lastSurfaceTick?Math.min(.1,(now-lastSurfaceTick)/1000):0;lastSurfaceTick=now;glow.time+=dt
  if(!prefersReducedMotion())for(const u of animated)u.uTime.value=glow.time
  for(const update of animatedUpdates)update(dt)
+ advanceFlight(dt)
+ if(!prefersReducedMotion())for(const update of stationUpdates)update(glow.time)
  // Re-pick when the pointer moved, and now and then while the camera may still be gliding under a resting pointer.
  if(pointer.inside&&!pointer.down&&(pointer.moved||++pointer.frames%8===0)){
   pointer.moved=false;const i=cellAtPointer(pointer.x,pointer.y)
@@ -1647,14 +2212,19 @@ function animateSurface(now){
   if(sel!==null&&sel<nx*info.ny){glow.sx=sel%nx;glow.sy=Math.floor(sel/nx)}
   glow.sel=approach(glow.sel,sel===null?0:1,dt,.1,.003)
   syncSurfaceUniforms()
-  // The inspector's tether follows the data point as the camera moves.
-  if(inspecting.value&&sel!==null&&info.anchorOf&&renderer){
-   const world=info.anchorOf(sel),el=renderer.domElement
-   tmp.copy(world).project(camera)
-   let visible=tmp.z>-1&&tmp.z<1&&Math.abs(tmp.x)<=1.05&&Math.abs(tmp.y)<=1.05
-   if(visible&&info.centre)visible=world.clone().sub(info.centre).dot(camera.position.clone().sub(world))>0
-   const a={x:(tmp.x+1)/2*el.clientWidth,y:(1-tmp.y)/2*el.clientHeight,visible},b=inspectAnchor.value
-   if(!b||Math.abs(b.x-a.x)>.5||Math.abs(b.y-a.y)>.5||b.visible!==a.visible)inspectAnchor.value=a
+  // The windows' arrows follow their data points as the camera moves.
+  if(inspectWindows.value.length&&info.anchorOf&&renderer){
+   const el=renderer.domElement,old=windowAnchors.value,next={};let changed=false
+   for(const w of inspectWindows.value){
+    if(w.cell>=nx*info.ny)continue
+    const world=info.anchorOf(w.cell)
+    tmp.copy(world).project(camera)
+    let visible=tmp.z>-1&&tmp.z<1&&Math.abs(tmp.x)<=1.05&&Math.abs(tmp.y)<=1.05
+    if(visible&&info.centre)visible=world.clone().sub(info.centre).dot(camera.position.clone().sub(world))>0
+    const a={x:(tmp.x+1)/2*el.clientWidth,y:(1-tmp.y)/2*el.clientHeight,visible},b=old[w.id]
+    if(b&&Math.abs(b.x-a.x)<=.5&&Math.abs(b.y-a.y)<=.5&&b.visible===a.visible)next[w.id]=b;else{next[w.id]=a;changed=true}
+   }
+   if(changed||Object.keys(old).length!==Object.keys(next).length)windowAnchors.value=next
   }
  }
 }
@@ -1671,11 +2241,10 @@ function frameLabel(f,span=f.forecast.elapsed_seconds){
 }
 const cellColourCss=(d,i)=>{const vals=values.value;return `#${(view.value!=='field'?mapCellColor(d,i):fieldColor(vals[i]??null)).getHexString()}`}
 // The value at the point over the run: depends on the point and the layer, not on the frame shown.
-const inspectSeries=computed(()=>{
- const i=selected.value;if(!inspecting.value||i===null)return []
+function seriesFor(i){
  const frames=visibleFrames.value,span=frames.at(-1)?.forecast.elapsed_seconds??0
  return frames.map(f=>{let v=null;try{v=layerValuesFor(f,layer.value)[i]??null}catch{v=null};return {value:v,label:frameLabel(f,span)}})
-})
+}
 // Layers whose values are classes, with their names (and colours, and what they mean where known).
 function categoriesOf(key){
  if(key==='clouds')return CLOUD_TYPES.map(t=>({label:t.label,color:t.color,note:CLOUD_FORMS[t.key]?`In the scene: ${CLOUD_FORMS[t.key].note}, at ${CLOUD_FORMS[t.key].level==='deep'?'all levels, from low to the top of the weather':`${CLOUD_FORMS[t.key].level} level`}.`:t.key==='none'?'No cloud over this point.':undefined}))
@@ -1685,10 +2254,10 @@ function categoriesOf(key){
 }
 const domainOf=d=>d.solar?'the disk':d.solarWind||d.dust?'the world':'the map'
 const ALSO_PRIORITY=['stp','helicity','temperature','rainfall','precip','pressure','humidity','cloud','terrain','surfacewater','discharge','saturation','current','oceansst','sst','surfacesalinity','seaice','bottomo2','ph','co2air','icethickness','coastlost','coastpopulation','cape','stormwind','surge']
-const inspectContent=computed(()=>{
- const i=selected.value,d=data.value,g=grid.value
- if(!inspecting.value||i===null||i>=g.nx*g.ny)return null
- const def=layerDef.value,key=layer.value,vals=values.value,series=inspectSeries.value,k=frameIndex.value
+function contentFor(i){
+ const d=data.value,g=grid.value
+ if(i===null||i>=g.nx*g.ny)return null
+ const def=layerDef.value,key=layer.value,vals=values.value,series=seriesFor(i),k=frameIndex.value
  const global=!!(d.dust||d.solarWind)
  const also=ALSO_PRIORITY.filter(a=>a!==key&&LAYERS.find(l=>l.key===a)?.needs(d)).slice(0,3).map(a=>{let v=null;try{v=layerValuesFor(d,a)[i]??null}catch{v=null};return {key:a,title:LAYERS.find(l=>l.key===a).title,unit:unitFor(a),value:v}})
  const u=d.forecast.fields.wind_east?.values[i],w=d.forecast.fields.wind_north?.values[i]
@@ -1699,8 +2268,22 @@ const inspectContent=computed(()=>{
  const x=i%g.nx,y=Math.floor(i/g.nx),near=[]
  for(let r=2;r>=-2;r--)for(let c=-2;c<=2;c++){const xx=x+c,yy=y+r;near.push(xx<0||yy<0||xx>=g.nx||yy>=g.ny?null:cellColourCss(d,yy*g.nx+xx))}
  const [lo,hi]=range.value,byValue=view.value==='field'&&key!=='clouds'
- return {content,wind,near,stops:byValue?[0,.2,.4,.6,.8,1].map(t=>`#${fieldColor(lo+t*(hi-lo)).getHexString()}`):null,typeKey:`${i}|${key}|${view.value}`}
+ let column=null;if(!global&&!d.solar){try{column=atmosphereColumn(d,i)}catch{column=null}}   // the air above the point, for the Atmosphere tab
+ return {content,wind,near,column,series,stops:byValue?[0,.2,.4,.6,.8,1].map(t=>`#${fieldColor(lo+t*(hi-lo)).getHexString()}`):null,typeKey:`${i}|${key}|${view.value}`}
+}
+// The content of every window, recomputed when the set of cells (or the data, layer, frame) changes, not when a window
+// is merely focused or moved.
+const windowCells=computed(()=>[...new Set(inspectWindows.value.map(w=>w.cell))].join(','))
+const cellViews=computed(()=>{const out={};for(const c of windowCells.value.split(',').filter(Boolean).map(Number))out[c]=contentFor(c);return out})
+// Windows with their content and stacking rank (z-index 9 and up, the focused one on top).
+const windowViews=computed(()=>{
+ const order=[...inspectWindows.value].sort((a,b)=>a.z-b.z).map(w=>w.id)
+ return inspectWindows.value.map(w=>({w,view:cellViews.value[w.cell]??null,z:9+order.indexOf(w.id)}))
 })
+const taskbarItems=computed(()=>{const g=grid.value;return windowViews.value.filter(v=>v.view).map(({w,view})=>({id:w.id,colour:w.colour,minimised:w.minimised,focused:w.id===focusedWindow.value,title:view.column?.cloud?view.column.cloud.label:view.content.title,detail:`${view.column?.cloud?`${Math.round(view.column.cloud.base)}–${Math.round(view.column.cloud.top)} m`:`${view.content.value} ${view.content.unit??''}`.trim()} · cell ${w.cell%g.nx}, ${Math.floor(w.cell/g.nx)}`}))})
+// The arrow from a hovered taskbar button to its cell, and a marker on the cells of minimised windows.
+const taskbarLink=computed(()=>{const h=taskbarHover.value;if(!h)return null;const w=inspectWindows.value.find(x=>x.id===h.id),a=windowAnchors.value[h.id];if(!w||!a?.visible)return null;const arrow=linkArrow(h.point,a,{bend:.35});return arrow?{...arrow,colour:w.colour,a}:null})
+const dockMarkers=computed(()=>inspectWindows.value.filter(w=>w.minimised&&windowAnchors.value[w.id]?.visible).map(w=>({id:w.id,colour:w.colour,...windowAnchors.value[w.id]})))
 // Free room for the inspector: the viewport, minus the fullscreen panels.
 const inspectBounds=computed(()=>{
  const {width,height}=viewportSize.value
@@ -1724,7 +2307,7 @@ watch(selected,(v,was)=>{nextTick(()=>{if(lastRender&&lastRender.selected!==stre
 // it (e.g. in an iframe) the stage still covers the whole window.
 const stage=ref(null),immersive=ref(false),hudControls=ref(true),hudStream=ref(true),hudHelp=ref(false),hudToast=ref('')
 const screenSize=ref({width:window.innerWidth,height:window.innerHeight})
-const hud=computed(()=>hudLayout({...screenSize.value,controls:hudControls.value,stream:hudStream.value,timeline:snapshots.value.length>1}))
+const hud=computed(()=>hudLayout({...screenSize.value,controls:hudControls.value,stream:hudStream.value,timeline:snapshots.value.length>1,taskbar:true}))
 const stageStyle=computed(()=>immersive.value?hudStyle(hud.value):null)
 const returning=ref(false)
 const stageClass=computed(()=>immersive.value?{immersive:true,'hud-no-controls':!hudControls.value,'hud-no-stream':!hudStream.value,'hud-timeline':snapshots.value.length>1,'hud-drawers':!hud.value.docked}:{'stage-return':returning.value})
@@ -1792,7 +2375,7 @@ function onKeydown(e){
 // Leaving the browser's fullscreen through the browser also leaves the stage; the end of one of our own exits instead
 // re-syncs, in case the user reopened the stage in the meantime.
 function onFullscreenChange(){
- if(document.fullscreenElement){if(!immersive.value)syncNative();return}
+ if(document.fullscreenElement){if(!immersive.value&&document.fullscreenElement===stage.value)syncNative();return}   // other elements (the Coupled Earth map) go fullscreen on their own
  if(ourExits>0){ourExits--;if(immersive.value)syncNative();return}
  if(immersive.value)exitImmersive()
 }
@@ -1858,12 +2441,12 @@ watch(loading,on=>{if(on)streamLog.value=appendEntries(streamLog.value,[{tag:'FE
 let sizeObserver=null
 onMounted(()=>{sizeObserver=new ResizeObserver(()=>{const r=host.value?.getBoundingClientRect();if(r)viewportSize.value={width:r.width,height:r.height}});if(host.value)sizeObserver.observe(host.value);window.addEventListener('keydown',onKeydown);window.addEventListener('resize',onWindowResize);document.addEventListener('fullscreenchange',onFullscreenChange);nextTick(()=>{if(!lastRender)recordRender(null)})})
 onBeforeUnmount(()=>{sizeObserver?.disconnect();window.removeEventListener('keydown',onKeydown);window.removeEventListener('resize',onWindowResize);document.removeEventListener('fullscreenchange',onFullscreenChange);clearTimeout(toastTimer);clearTimeout(returnTimer);document.documentElement.classList.remove('tf-immersive')})
-onMounted(()=>{try{scene=new THREE.Scene();scene.background=new THREE.Color('#09151d');scene.fog=new THREE.Fog('#09151d',65,110);camera=new THREE.PerspectiveCamera(42,1,.1,200);renderer=new THREE.WebGLRenderer({antialias:true});renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.setPixelRatio(Math.min(devicePixelRatio,2));host.value.appendChild(renderer.domElement);scene.add(new THREE.AmbientLight(0xd6efff,LIGHTS.ambient));sunLight=new THREE.DirectionalLight(0xffffff,LIGHTS.sun);sunLight.position.set(12,30,20);const sh=sunLight.shadow;sh.mapSize.set(2048,2048);Object.assign(sh.camera,{left:-26,right:26,top:26,bottom:-26,near:1,far:110});sh.bias=-.0004;sh.normalBias=.035;sh.radius=3;scene.add(sunLight);scene.add(sunLight.target);shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(90,90),new THREE.ShadowMaterial({opacity:.42}));shadowCatcher.rotation.x=-Math.PI/2;shadowCatcher.position.y=-.04;shadowCatcher.receiveShadow=true;shadowCatcher.visible=false;scene.add(shadowCatcher);scene.add(softFloor());scene.add(new THREE.HemisphereLight(0xdff3ff,0x0b1820,LIGHTS.sky));const rim=new THREE.DirectionalLight(0x7fe0ff,LIGHTS.rim);rim.position.set(-22,14,-26);scene.add(rim);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.maxPolarAngle=Math.PI/2.05;controls.minDistance=8;controls.maxDistance=85;reset();const el=renderer.domElement;el.addEventListener('pointermove',onPointerMove);el.addEventListener('pointerleave',onPointerLeave);el.addEventListener('pointerdown',onPointerDown);el.addEventListener('pointerup',onPointerUp);observer=new ResizeObserver(()=>{const {width,height}=host.value.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()});observer.observe(host.value);draw();const tick=now=>{frame=requestAnimationFrame(tick);controls.update();applyViewOffset(now??performance.now());animateSurface(now??performance.now());renderer.render(scene,camera);sampleTelemetry(now??performance.now())};tick()}catch(err){fallback.value=true;error.value='WebGL unavailable in this browser. Showing an interactive 2D field instead.'}})
+onMounted(()=>{try{scene=new THREE.Scene();scene.background=new THREE.Color('#09151d');scene.fog=new THREE.Fog('#09151d',65,110);camera=new THREE.PerspectiveCamera(42,1,.1,200);camera.layers.enable(LABEL_LAYER);camera.layers.enable(ROUTE_LAYER);renderer=new THREE.WebGLRenderer({antialias:true});renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.setPixelRatio(Math.min(devicePixelRatio,2));host.value.appendChild(renderer.domElement);scene.add(new THREE.AmbientLight(0xd6efff,LIGHTS.ambient));sunLight=new THREE.DirectionalLight(0xffffff,LIGHTS.sun);sunLight.position.set(12,30,20);const sh=sunLight.shadow;sh.mapSize.set(2048,2048);Object.assign(sh.camera,{left:-26,right:26,top:26,bottom:-26,near:1,far:110});sh.bias=-.0004;sh.normalBias=.035;sh.radius=3;scene.add(sunLight);scene.add(sunLight.target);shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(90,90),new THREE.ShadowMaterial({opacity:.42}));shadowCatcher.rotation.x=-Math.PI/2;shadowCatcher.position.y=-.04;shadowCatcher.receiveShadow=true;shadowCatcher.visible=false;scene.add(shadowCatcher);scene.add(softFloor());scene.add(new THREE.HemisphereLight(0xdff3ff,0x0b1820,LIGHTS.sky));const rim=new THREE.DirectionalLight(0x7fe0ff,LIGHTS.rim);rim.position.set(-22,14,-26);scene.add(rim);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.maxPolarAngle=Math.PI/2.05;controls.minDistance=8;controls.maxDistance=85;reset();const el=renderer.domElement;el.addEventListener('pointermove',onPointerMove);el.addEventListener('pointerleave',onPointerLeave);el.addEventListener('pointerdown',onPointerDown);el.addEventListener('pointerup',onPointerUp);observer=new ResizeObserver(()=>{const {width,height}=host.value.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()});observer.observe(host.value);draw();const tick=now=>{frame=requestAnimationFrame(tick);if(mode.value!=='observatory')return;controls.update();applyViewOffset(now??performance.now());animateSurface(now??performance.now());renderer.render(scene,camera);renderFlightInset();sampleTelemetry(now??performance.now())};tick()}catch(err){fallback.value=true;error.value='WebGL unavailable in this browser. Showing an interactive 2D field instead.'}})
 onBeforeUnmount(()=>{stop();cancelAnimationFrame(frame);observer?.disconnect();controls?.dispose();disposeGroup();scene?.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});renderer?.dispose()})
 </script>
 <template>
  <div class="shell">
-  <header><a class="brand" href="#"><span class="mark">T</span><span>TERRAFLUX<small>PHYSICS OBSERVATORY</small></span></a><nav class="mode-switch" aria-label="Workspace"><button :class="{selected:mode==='observatory'}" @click="mode='observatory'">Observatory</button><button :class="{selected:mode==='earth'}" title="The coupled climate (drivers, CO₂) and the coupled 3–10 day forecast (weather, wind, severe weather)" @click="openEarth(null)">Coupled Earth</button></nav><span class="status"><i></i> LOCAL WORKSPACE</span><label class="upload">↥ Open JSON<input type="file" accept=".json,application/json" @change="upload"></label></header>
+  <header><a class="brand" href="#"><span class="mark">T</span><span>TERRAFLUX<small>PHYSICS OBSERVATORY</small></span></a><nav class="mode-switch" aria-label="Workspace"><button :class="{selected:mode==='observatory'}" @click="mode='observatory'">Observatory</button><button :class="{selected:mode==='earth'}" title="The coupled climate (drivers, CO₂) and the coupled 3–10 day forecast (weather, wind, severe weather)" @click="openEarth(null)">Coupled Earth</button></nav><span class="status"><i></i> LOCAL WORKSPACE</span><label class="upload">↥ Open JSON<input type="file" accept=".json,application/json" @change="upload"></label><WorkspaceClock class="header-clock"/></header>
   <CoupledEarth v-if="earthOpened" v-show="mode==='earth'" :document="earthDocument" :goto="earthGoto"/>
   <main v-show="mode==='observatory'" ref="stage" tabindex="-1" :class="stageClass" :style="stageStyle"><aside class="control-panel" :class="{'hud-panel':immersive,'hud-collapsed':immersive&&!hudControls}" :inert="immersive&&!hudControls?true:null"><div v-if="immersive" class="hud-panel-head"><span class="stream-title">CONTROL DECK</span><span class="stream-status">{{availableLayerCount}} LAYERS</span><button class="hud-icon" title="Hide the control panel ( [ )" aria-label="Hide the control panel" @click="hudControls=false">[</button></div><div class="eyebrow">EXPERIMENT / 001</div><h1>Weather,<br>in perspective.</h1><p class="intro">Explore the fields behind the physics. Inspect temperature, wind and accumulated rainfall on a shared grid.</p>
    <section class="layer-groups"><div class="section-label">01 / FIELD LAYERS</div><label class="toggle layer-filter" title="Hide the layers (and groups) the loaded data cannot show."><input type="checkbox" v-model="onlyAvailable"> Only layers with data ({{availableLayerCount}} of {{LAYERS.length}})</label><details v-for="g in layerGroups" :key="g.id" class="layer-group" :open="openGroups.includes(g.id)" @toggle="onGroupToggle(g.id,$event)"><summary :title="g.tooltip"><span>{{g.title}}</span><small>{{g.available}}/{{g.layers.length}}{{g.active?' · ●':''}}</small></summary><button v-for="l in g.shown" :key="l.key" class="layer" :class="{active:layer===l.key}" :disabled="!l.available" :title="l.tooltip" @click="layer=l.key"><span>{{l.title}}<small>{{l.subtitle}}</small></span><span>{{layer===l.key?'●':'○'}}</span></button></details><template v-if="data.atmosphere"><label class="toggle"><input type="checkbox" v-model="cloudsEnabled"> Cloud overlay</label><label class="toggle"><input type="checkbox" v-model="systemsEnabled"> Weather-system markers</label><p class="hint">Synthetic pressure, clouds and front. Cloud height is schematic; these fields do not drive the local physics.</p></template><p v-if="data.coupled" class="hint">Coupled engine run: wind from the static pressure field, Coriolis and friction; density diagnosed from temperature and humidity feeds back into the wind; temperature and humidity are carried by the wind with configurable diffusion.<br>Diffusion T {{data.coupled.request.diffusion.temperature_m2_s}} · q {{data.coupled.request.diffusion.humidity_m2_s}} · momentum {{data.coupled.request.diffusion.momentum_m2_s}} m²/s · friction {{data.coupled.request.atmosphere.surface_friction_coefficient_s}} 1/s · Coriolis {{data.coupled.request.atmosphere.coriolis_mode}} · density {{data.coupled.request.density_mode}}<template v-if="data.coupled.columns"><br>Vertical columns: hydrostatic layers, convective adjustment and a lifted surface parcel give cloud base, equilibrium level and CAPE per cell. Diagnostic only; no surface fluxes resupply heat or moisture.</template></p><template v-if="data.clouds"><label class="toggle"><input type="checkbox" v-model="cloudVolumes"> Cloud volumes (base → top)</label><label class="toggle"><input type="checkbox" v-model="frontOverlay"> Front overlay (blue cold · red warm · purple stationary)</label><p class="hint">{{data.clouds.synthetic?'Synthetic mock in the documented cloud-formation format; illustration only.':'Engine diagnosis: fronts from the temperature gradient, advection and convergence; convection from the heated surface parcel; combined where frontal lifting releases it.'}}<br>Heating now {{data.clouds.heating.toFixed(1)}} K · lifting over {{(data.clouds.config.lifting_time_scale_s/3600).toFixed(0)}} h · warm slope 1:{{(1/data.clouds.config.warm_front_slope).toFixed(0)}} · cold slope 1:{{(1/data.clouds.config.cold_front_slope).toFixed(0)}}</p></template><label v-if="!data.dust&&!data.solar&&!data.solarWind" class="toggle"><input type="checkbox" v-model="vectors"> Wind direction vectors</label><label v-if="waveInfo" class="toggle" title="Waves on the open water, estimated from the wind (fetch-limited growth, depth and sea ice), drawn in 3D and animated in their direction and at their speed."><input type="checkbox" v-model="waveStyle.on"> Waves in 3D (estimated from the wind)</label><template v-if="data.terrain"><label class="toggle"><input type="checkbox" v-model="terrainEnabled"> Place fields on terrain</label><label class="toggle">Height scale {{exaggeration}}× <input aria-label="Terrain vertical exaggeration" type="range" min="1" max="5" step="0.5" v-model="exaggeration"></label><label class="toggle" title="Draw the land as land: meadow and forest, bare rock in strata on steep slopes, snow above the snow line, glacier and sea ice, water, with shadows from a low sun."><input type="checkbox" v-model="terrainStyle.realistic"> Realistic terrain (rock, snow, ice, water, shadows)</label><label v-if="terrainStyle.realistic" class="toggle" title="How strongly the colours of the selected data are laid over the realistic terrain.">Data colours over the terrain {{terrainStyle.dataMix}} % <input aria-label="Data colours over the terrain" type="range" min="0" max="100" step="5" v-model.number="terrainStyle.dataMix"></label><label v-if="data.terrainTemperature" class="toggle"><input type="checkbox" v-model="adjustedTemperature"> Terrain-adjusted temperature</label><p v-if="data.terrainTemperature" class="hint">Lapse rate {{data.terrainTemperature.lapse_rate_k_per_m*1000}} K/km · reference {{data.terrainTemperature.reference_elevation_m}} m<br>Diagnostic adjustment; no feedback into transport.</p><p class="hint">{{data.terrain.source_id}} · {{data.terrain.vertical_reference}}<br>Geometry is a display layer; lapse-rate adjustment is optional.</p></template></section>
@@ -1877,6 +2460,56 @@ onBeforeUnmount(()=>{stop();cancelAnimationFrame(frame);observer?.disconnect();c
     <label class="toggle"><input type="checkbox" v-model="severeLayers.motion"> Storm motion (animated arrows)</label>
     <label class="toggle"><input type="checkbox" v-model="severeLayers.labels"> Labels</label>
     <label class="toggle" title="The model's other clouds (ordinary thunderstorms, cumulus, layers) for context; off by default so that the storms stand out."><input type="checkbox" v-model="severeLayers.others" :disabled="!data.clouds"> Other clouds (the model's cloud types)</label>
+   </section>
+   <section v-if="view==='flight'&&stationToolsAvailable" class="map-layers"><div class="section-label">01b / FLIGHT WEATHER LAYERS</div><p class="hint">Flight categories on the ground; winds aloft as wind barbs at the winds-aloft (FB) levels, diagnosed from the engine's pressure and temperature fields. The aerodromes are fixed; click the map to select the nearest one. Plan a flight below the scene. Simulated weather: not for real flight planning.</p>
+    <div class="fw-presets" role="group" aria-label="Display"><button v-for="(label,key) in {layers:'Layered weather',winds:'Winds aloft',minimal:'Minimal'}" :key="key" :class="{on:flightLayers.preset===key}" @click="applyFlightPreset(key)">{{label}}</button></div>
+    <div class="section-label" style="margin-top:12px">WEATHER LAYERS (BY ALTITUDE)</div>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.symbols"> Weather symbols (☀ ☁ rain ⚡ snow fog) on the map</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.storms" :disabled="!data.clouds&&!data.precipitation"> <i class="fw-sw" :style="{background:LAYER_COLOURS.thunder}"></i> Thunderstorm columns (ground to cloud top)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.cloudSlabs" :disabled="!data.clouds"> <i class="fw-sw" :style="{background:LAYER_COLOURS.middle}"></i> Cloud layers, base to top (low · middle · high · CB)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.icing" :disabled="!data.clouds"> <i class="fw-sw" :style="{background:LAYER_COLOURS.icing}"></i> Icing (cloud between 0 and −20 °C)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.freezing"> <i class="fw-sw" :style="{background:LAYER_COLOURS.freezing}"></i> Freezing level (0 °C surface)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.turbulence" :disabled="!aloftField?.available"> <i class="fw-sw" :style="{background:LAYER_COLOURS.turbulence}"></i> Turbulence (wind shear ≥ 6 kt / 1 000 ft)</label>
+    <div class="section-label" style="margin-top:12px">WINDS ALOFT</div>
+    <label class="toggle">Barb layer <select v-model="flightLayers.level" :disabled="flightLayers.all||!aloftField?.available" aria-label="Winds aloft level"><option value="off">None</option><option v-for="l in ALL_LEVELS" :key="l.key" :value="l.key">{{l.surface?'Surface (10 m)':l.label}}</option></select></label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.all" :disabled="!aloftField?.available"> All levels stacked (3 000 ft to FL390)</label>
+    <label class="toggle">Barb density <select v-model.number="flightLayers.density" aria-label="Barb density"><option :value="0">Sparse</option><option :value="1">Normal</option><option :value="2">Dense</option></select></label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.mast" :disabled="!aloftField?.available"> Barb mast over the selected aerodrome (every level)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.sheets"> Level sheets</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.labels"> Level labels</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.category"> Flight category on the ground (VFR · MVFR · IFR · LIFR)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.clouds" :disabled="!data.clouds"> Cloud volumes over the whole map</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.routeClouds" :disabled="!data.clouds||flightLayers.clouds"> Clouds along the route (the build-ups flown through)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.station"> Aerodromes (windsock and runway)</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.borders"> Borders and cities</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.cards" :disabled="!flightLayers.station"> Weather cards over the aerodromes</label>
+    <label class="toggle"><input type="checkbox" v-model="flightLayers.route"> Planned route (coloured by head / tail wind)</label>
+    <p v-if="aloftNote" class="hint">{{aloftNote}}</p>
+   </section>
+   <section v-if="view==='vfr'&&stationToolsAvailable" class="map-layers"><div class="section-label">01b / VFR · GAFOR</div><p class="hint">GAFOR categories from visibility and the main cloud base (BKN/OVC); columns show the airspace usable clear of cloud with the ground in sight. Click the map to read a point. Simulated weather: not for flight planning.</p>
+    <label class="toggle"><input type="checkbox" v-model="vfrLayers.space"> VFR airspace (height = room below the cloud, colour = category)</label>
+    <label class="toggle"><input type="checkbox" v-model="vfrLayers.deck" :disabled="!data.clouds"> Main cloud deck (BKN/OVC)</label>
+    <label class="toggle"><input type="checkbox" v-model="vfrLayers.symbols"> Weather symbols</label>
+    <label class="toggle"><input type="checkbox" v-model="vfrLayers.areas" :disabled="!gaforAreas"> GAFOR areas</label>
+    <label class="toggle"><input type="checkbox" v-model="vfrLayers.labels"> Labels</label>
+    <label class="toggle"><input type="checkbox" v-model="vfrLayers.borders"> Borders and cities (Natural Earth, for orientation)</label>
+    <div class="section-label" style="margin-top:12px">GAFOR AREAS</div>
+    <p class="hint" v-if="!gaforAreas">No areas loaded. Load the official GAFOR area file (GeoJSON: code, name, reference altitude per area). No areas are built in.</p>
+    <p class="hint" v-else>{{gaforAreas.length}} areas from {{gaforAreaSource}}.</p>
+    <label class="upload vfr-upload">⇪ Load GAFOR areas (GeoJSON)<input type="file" accept=".json,.geojson,application/geo+json,application/json" @change="loadGaforAreas"></label>
+    <button v-if="gaforAreas" class="text-button" @click="clearGaforAreas">Remove the areas</button>
+    <p v-if="gaforAreaError" class="hint vfr-error">{{gaforAreaError}}</p>
+   </section>
+   <section v-if="view==='sail'&&stationToolsAvailable" class="map-layers"><div class="section-label">01b / SAILING WEATHER LAYERS</div><p class="hint">Surface wind as wind barbs over the sea coloured by Beaufort force or wave height; isobars, currents and the boat at the picked point. Waves are estimated from the wind. Simulated: not for navigation.</p>
+    <label class="toggle">Sea colour <select v-model="sailLayers.ground" aria-label="Sea colour"><option value="beaufort">Beaufort force</option><option value="waves" :disabled="!waveInfo">Wave height</option></select></label>
+    <label class="toggle"><input type="checkbox" v-model="sailLayers.barbs"> Surface wind barbs</label>
+    <label class="toggle">Barb density <select v-model.number="sailLayers.density" aria-label="Barb density"><option :value="0">Sparse</option><option :value="1">Normal</option><option :value="2">Dense</option></select></label>
+    <label class="toggle">Wind aloft <select v-model="sailLayers.aloft" :disabled="!aloftField?.available" aria-label="Wind aloft layer"><option value="off">Off</option><option v-for="l in FB_LEVELS" :key="l.key" :value="l.key">{{l.label}}</option></select></label>
+    <label class="toggle"><input type="checkbox" v-model="sailLayers.isobars" :disabled="!data.coupled"> Isobars</label>
+    <label class="toggle"><input type="checkbox" v-model="sailLayers.currents" :disabled="!data.ocean"> Ocean currents</label>
+    <label class="toggle"><input type="checkbox" v-model="waveStyle.on" :disabled="!waveInfo"> Waves in 3D (estimated from the wind)</label>
+    <label class="toggle"><input type="checkbox" v-model="sailLayers.clouds" :disabled="!data.clouds"> Cloud volumes</label>
+    <label class="toggle"><input type="checkbox" v-model="sailLayers.boat"> The boat</label>
    </section>
    <section v-if="view==='map'" class="map-layers"><div class="section-label">01b / WEATHER MAP LAYERS</div><p class="hint">Switch layers on and off to compose the map. Engine or labelled mock output only; no rendering of external map tiles yet.</p>
     <label class="toggle">Base field <select v-model="mapLayers.base"><option value="temperature">Air temperature</option><option value="pressure">Surface pressure</option><option v-if="data.terrain" value="terrain">Terrain (hillshade)</option><option value="none">None (dark)</option></select></label>
@@ -2087,7 +2720,7 @@ onBeforeUnmount(()=>{stop();cancelAnimationFrame(frame);observer?.disconnect();c
     <div class="comparison-switch"><button :disabled="coupledReport.errors.length>0" @click="downloadCoupledRequest">⇩ Download request JSON</button><button v-if="data.coupled" @click="useLoadedCoupledSettings">Use loaded run's settings</button><button @click="resetCoupledForm">Reset to example</button></div>
     <p v-if="coupledNote" class="hint">{{coupledNote}}</p>
    </details></section>
-  </aside><article><div class="scene-head"><div><span class="eyebrow">FIELD EXPLORER</span><h2>{{WIND_LAYER_KEYS.includes(layer)?WIND_TITLES[layer]:layer==='dustinflux'?'Cosmic dust entering the atmosphere (this hour)':layer==='dustdaily'?'Cosmic dust entering the atmosphere (daily mean)':layer==='sunbrightness'?'Photosphere brightness temperature':layer==='suncontrast'?'Contrast to the quiet Sun':layer==='temperature'?(adjustedTemperature?'Terrain-adjusted temperature':'Air temperature'):layer==='wind'?'Wind speed':layer==='terrain'?'Terrain elevation':layer==='slope'?'Terrain slope':layer==='aspect'?'Downhill aspect':layer==='water'?'Surface water depth':layer==='soil'?'Soil water storage':layer==='cloud'?'Cloud cover':layer==='pressure'?'Sea-level pressure':layer==='humidity'?'Relative humidity':layer==='density'?'Air density':layer==='moisture'?'Specific humidity':layer==='cape'?'Convective available potential energy':layer==='cloudbase'?'Cloud base (lifting condensation level)':layer==='cloudtop'?'Equilibrium level':layer==='clouds'?'Cloud formation · fronts and convection':layer==='precip'?'Precipitation rate at the ground':layer==='accum'?'Precipitation accumulated over the snapshot interval':layer==='stormwind'?'Tropical cyclone wind field':layer==='mpi'?'Maximum potential intensity':layer==='gpi'?'Genesis potential index':layer==='surge'?'Storm surge estimate':layer==='stp'?'Significant tornado parameter':layer==='helicity'?'Storm-relative helicity':layer==='lifting'?'Orographic lifting (up-slope positive)':layer==='blocked'?'Froude blocking of the cross-barrier flow':layer==='foehn'?'Foehn warming on the lee':layer==='coldpool'?'Cold-air pool deficit':layer==='oroprecip'?'Orographic precipitation rate':layer==='valley'?'Valley depth':layer==='discharge'?'River discharge':layer==='surfacewater'?'Surface and floodplain water':layer==='saturation'?'Soil saturation':layer==='watertable'?'Water-table depth below ground':layer==='snowpack'?'Snowpack water equivalent':layer==='erosion'?'Cumulative erosion':layer==='deposition'?'Cumulative deposition':layer==='stability'?'Slope factor of safety':layer==='floodclass'?'Flood hazard class':layer==='current'?'Ocean current speed':layer==='surfacesalinity'?'Surface salinity':layer==='salinity'?'Upper-ocean layer salinity':layer==='sst'?'Upper-ocean layer temperature':layer==='thermocline'?'Thermocline depth (layer thickness)':layer==='freshwater'?'Surface freshwater fraction':layer==='sinking'?'Deep-water formation rate':layer==='oceansst'?'Sea-surface temperature (top layer)':layer==='mld'?'Ocean mixed-layer depth':layer==='netheat'?'Net air–sea heat flux (into the ocean)':layer==='latent'?'Latent heat flux (evaporative cooling)':layer==='evaporation'?'Evaporation from the sea':layer==='searain'?'Rain on sea and land':layer==='coastalstore'?'Coastal runoff store':layer==='icethickness'?'Greenland ice thickness':layer==='icesmb'?'Greenland surface mass balance':layer==='icemelt'?'Greenland surface melt':layer==='seaice'?'Sea-ice concentration':layer==='seaicethick'?'Sea-ice thickness':layer==='oxygen'?'Surface dissolved-oxygen capacity':layer==='coastlost'?'Land lost to the sea':layer==='coastyear'?'Year the land is lost':layer==='coaststorm'?'Design-storm flood depth':layer==='coastinundation'?'Permanent inundation':layer==='coastfrequency'?'Today\'s 100-year flood: now every … years':layer==='coastsetup'?'Wind setup of the design storm':layer==='coastsubsidence'?'Land subsidence':layer==='coastpopulation'?'Population density':layer==='co2air'?'CO₂ in the air (boundary layer)':layer==='co2flux'?'Air–sea CO₂ flux (into the sea)':layer==='ph'?'Surface pH':layer==='omega'?'Surface aragonite saturation Ω':layer==='omegabottom'?'Bottom-water aragonite saturation Ω':layer==='bottomo2'?'Bottom-water oxygen':layer==='habitat'?'Habitat class of the water column':layer==='habitable'?'Habitable share of the water column':layer==='production'?'Plankton net production':layer==='nitrate'?'Surface nitrate':'Rainfall accumulation'}}</h2></div><div class="view-switch"><button :class="{selected:view==='field'}" @click="view='field'">Field explorer</button><button :class="{selected:view==='map'}" :disabled="!data.coupled" @click="view='map'">Weather map</button><button :class="{selected:view==='severe'}" :disabled="!data.severe&&!data.storms" @click="view='severe'" title="Supercells, tornado watches and hurricanes as the severe-convection and storm-system models computed them, animated.">Storm watch</button><button :class="{selected:view==='water'}" :disabled="!data.hydrology" @click="view='water'">Catchment</button><button :class="{selected:view==='hazards'}" :disabled="!data.hydrology" @click="view='hazards'">Hazards</button><button :class="{selected:view==='ocean'}" :disabled="!data.ocean" @click="view='ocean'">Ocean streams</button><button :class="{selected:view==='polar'}" :disabled="!data.polar" @click="view='polar'">Polar melt</button><button :class="{selected:view==='coast'}" :disabled="!data.coast" @click="view='coast'" title="Sea-level rise on the coast: land lost, storm floods, defences, rivers and islands.">Sea level &amp; coasts</button><button :class="{selected:view==='carbon'}" :disabled="!data.carbon" @click="view='carbon'" title="CO₂ in the air and the sea: uptake, acidification, oxygen and the dead zones where sea life cannot live.">Carbon &amp; ocean life</button><button :class="{selected:view==='solar'}" :disabled="!data.solar" @click="view='solar'" title="The sunspot cycle with its minima, maxima and forecast, and what it does to the UV, the ozone, the flares and the climate.">Sun &amp; solar cycle</button><button :class="{selected:view==='dust'}" :disabled="!data.dust" @click="view='dust'" title="Cosmic dust and extraterrestrial water entering the Earth every day.">Cosmic dust</button><button :class="{selected:view==='solarwind'}" :disabled="!data.solarWind" @click="view='solarwind'" title="The solar wind at the magnetosphere's polar caps: aurora, ions escaping to space, cosmic radiation and solar protons, and their global effects.">Solar wind &amp; poles</button></div><div class="scene-actions"><button class="reset" @click="reset" :title="immersive?'Reset the camera (R)':'Reset the camera'">↺ Reset view</button><template v-if="immersive"><button class="reset hud-toggle" :class="{selected:hudControls}" :aria-pressed="hudControls" title="Show or hide the control panel ( [ )" @click="togglePanel('controls')">◧ Controls</button><button class="reset hud-toggle" :class="{selected:hudStream}" :aria-pressed="hudStream" title="Show or hide the data stream ( ] )" @click="togglePanel('stream')">Stream ◨</button></template><button class="reset fullscreen-toggle" :title="immersive?'Return to the page (F or Esc)':'Fullscreen scene with the controls and a live data stream (F)'" @click="toggleImmersive"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="immersive?'M5 1v4H1M15 5h-4V1M11 15v-4h4M1 11h4v4':'M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4'"/></svg>{{immersive?'Exit':'Fullscreen'}} <kbd>{{immersive?'Esc':'F'}}</kbd></button></div></div><div class="viewport" ref="host" aria-label="Interactive 3D weather grid"><div v-if="fallback" class="fallback-grid" :style="{gridTemplateColumns:`repeat(${grid.nx},1fr)`}"><button v-for="(value,i) in values" :key="i" :aria-label="`Cell ${i}: ${value===null?'no data':value.toFixed(2)} ${unit}`" :style="{gridRow:grid.ny-Math.floor(i/grid.nx),gridColumn:i%grid.nx+1,background:view!=='field'?mapCellStyles[i]:value===null?'#283b49':layer==='clouds'?CLOUD_TYPES[value].color:`hsl(${hue(value)} ${layer==='cloud'?15:70}% ${layer==='cloud'?18+value*.72:50}%)`}" @click="openInspector(i,$event)"></button></div><svg v-if="fallback && view==='dust' && data.dust && dustLayers.sources" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Meteoroid sources"><text v-for="pnt in data.dust.points" :key="pnt.name" :x="(pnt.longitude_deg+180)/360*100" :y="(90-pnt.latitude_deg)/180*100" font-size="4" text-anchor="middle" :fill="pnt.name==='apex'?'#ffd166':'#e8f4ff'">{{SOURCE_SYMBOLS[pnt.name]??'•'}}</text><text :x="(data.dust.subsolar.longitude_deg+180)/360*100" :y="(90-data.dust.subsolar.latitude_deg)/180*100" font-size="4" text-anchor="middle" fill="#ffb347">☀</text></svg><svg v-if="fallback && view==='solar' && data.solar" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Solar flares"><template v-for="(fl,k) in data.solar.flares" :key="'sf'+k"><text v-if="data.solar.regions[fl.region]" :x="(regionPosition(data.solar.regions[fl.region]).x/solarBlock.disk.extent_radii+1)*50" :y="(1-regionPosition(data.solar.regions[fl.region]).y/solarBlock.disk.extent_radii)*50" font-size="3.5" text-anchor="middle" :fill="R_COLORS[fl.r_scale]">⚡</text></template></svg><svg v-if="fallback && data.atmosphere" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Synthetic cloud and weather-system overlay"><template v-if="cloudsEnabled"><ellipse v-for="(c,i) in data.atmosphere.cloud" :key="'cloud'+i" v-show="i%3===0 && c>.35" :cx="((i%grid.nx)+.5)/grid.nx*100" :cy="(1-(Math.floor(i/grid.nx)+.5)/grid.ny)*100" :rx="2.1" :ry="1.7" fill="#e9f5ff" :opacity="c*.32"/></template><template v-if="systemsEnabled"><template v-for="(s,i) in data.atmosphere.systems" :key="i"><polyline v-if="s.kind==='cold_front'" :points="s.points.map(([u,v])=>`${u*100},${(1-v)*100}`).join(' ')" fill="none" stroke="#85ccff" stroke-width=".7" stroke-dasharray="2 1"/><text v-else :x="s.u*100" :y="(1-s.v)*100" :fill="s.kind==='low'?'#ffb39c':'#c5e9ff'" font-size="7" font-weight="bold" text-anchor="middle">{{s.kind==='low'?'L':'H'}}</text></template></template></svg><svg v-if="fallback && view==='map'" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Weather map overlays"><template v-for="level in isobarLines" :key="level.level_pa"><polyline v-for="(line,li) in level.lines" :key="li" :points="line.map(([u,v])=>`${u*100},${(1-v)*100}`).join(' ')" fill="none" :stroke="Math.round(level.level_hpa)%(mapLayers.isobarIntervalHpa*2)===0?'#f3f7f9':'#a9bcc6'" :stroke-width="Math.round(level.level_hpa)%(mapLayers.isobarIntervalHpa*2)===0?.5:.3"/><text v-if="Math.round(level.level_hpa)%(mapLayers.isobarIntervalHpa*2)===0&&level.lines[0]" :x="level.lines[0][0][0]*100" :y="(1-level.lines[0][0][1])*100" font-size="2.6" fill="#f3f7f9">{{Math.round(level.level_hpa)}}</text></template><template v-if="mapLayers.fronts&&data.clouds"><template v-for="(t,i) in data.clouds.frontType" :key="'f'+i"><rect v-if="t!=='none'" :x="(i%grid.nx)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+1)/grid.ny)*100" :width="100/grid.nx" :height="100/grid.ny" :fill="FRONT_COLORS[t]" opacity=".5"/></template></template><template v-if="mapLayers.symbols&&data.precipitation"><template v-for="(t,i) in data.precipitation.type" :key="'p'+i"><text v-if="t!=='none'&&(i%grid.nx)%symbolStride===0&&Math.floor(i/grid.nx)%symbolStride===0" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.3)/grid.ny)*100" font-size="2.8" text-anchor="middle" :fill="data.precipitation.phase[i]==='solid'?'#ffffff':'#bfe0ff'">{{precipitationTypeInfo(t).symbol}}</text></template></template><template v-if="mapLayers.storms&&data.storms"><template v-for="s in data.storms.list" :key="'st'+s.id"><polyline v-if="s.track.length>1" :points="s.track.map(([e,n])=>`${(e-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100},${(1-(n-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100}`).join(' ')" fill="none" stroke="#ffffff" stroke-width=".4" opacity=".7"/><circle :cx="(s.east_m-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100" :cy="(1-(s.north_m-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100" :r="Math.max(1.5,s.radius_max_wind_m/(grid.nx*grid.spacing_east_m)*100)" fill="none" :stroke="categoryInfo(s.category).color" stroke-width=".8"/><text :x="(s.east_m-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100" :y="(1-(s.north_m-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100-2.5" font-size="3" text-anchor="middle" :fill="categoryInfo(s.category).color">{{categoryInfo(s.category).short}}</text></template><text v-for="(e,i) in visibleEvents.filter(e=>['landfall','merger','genesis'].includes(e.kind))" :key="'ev'+i" :x="(e.east_m-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100" :y="(1-(e.north_m-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100+1" font-size="3" text-anchor="middle" :fill="e.kind==='landfall'?'#ff5c5c':'#ffffff'">{{e.kind==='landfall'?'✖':e.kind==='merger'?'⊕':'✦'}}</text></template><template v-if="data.orography"><template v-for="(b,i) in data.orography.foehn" :key="'fo'+i"><text v-if="mapLayers.foehn&&b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.4)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#ff8c42">F</text></template><template v-for="(b,i) in data.orography.coldPoolFlag" :key="'cp'+i"><text v-if="mapLayers.coldPools&&b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.4)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#dff3ff">❄</text></template></template><template v-if="mapLayers.tornado&&data.severe"><template v-for="(b,i) in data.severe.possible" :key="'t'+i"><text v-if="b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.5)/grid.ny)*100" font-size="3.2" text-anchor="middle">🌪</text></template></template><template v-if="mapLayers.hazards&&data.precipitation"><template v-for="(b,i) in data.precipitation.lightning" :key="'h'+i"><text v-if="b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.7)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#ffd166">{{data.precipitation.hail[i]>0?'⚡◆':'⚡'}}</text></template></template></svg><svg v-if="fallback && view==='field' && data.clouds && frontOverlay" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Front overlay"><template v-for="(t,i) in data.clouds.frontType" :key="i"><rect v-if="t!=='none'" :x="(i%grid.nx)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+1)/grid.ny)*100" :width="100/grid.nx" :height="100/grid.ny" :fill="FRONT_COLORS[t]" opacity=".55"/></template><template v-for="(s,i) in data.clouds.thunderstorm" :key="'s'+i"><text v-if="s" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.3)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#ffd166">⚡</text></template></svg><svg v-if="fallback && data.surfaceWater?.outlets?.length" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Configured surface outlet locations"><circle v-for="(o,i) in data.surfaceWater.outlets" :key="i" :cx="(o.x+.5)/grid.nx*100" :cy="(1-(o.y+.5)/grid.ny)*100" r="1.6" fill="#ffa15c" stroke="#fff2e6" stroke-width=".4"/></svg><div class="scene-note">{{view==='severe'?'STORM WATCH · ENGINE OUTPUT · NORTH −Z / EAST +X':view==='solarwind'&&data.solarWind?(fallback?'2D FALLBACK / NORTH UP':windLayers.globe?'SUN +X · NORTH UP · GLOBE IN A SUN-FIXED FRAME':'NORTH −Z / EAST +X · WORLD MAP'):view==='dust'&&data.dust?(fallback?'2D FALLBACK / NORTH UP':'NORTH −Z / EAST +X · WORLD MAP'):view==='solar'&&data.solar?(fallback?'2D FALLBACK / SOLAR NORTH UP':'SOLAR NORTH −Z / WEST LIMB +X'):fallback?'2D FALLBACK / NORTH UP':'NORTH −Z / EAST +X'}}<br><span>{{view==='severe'?'Watches, supercells, funnels and hurricanes as the severe-convection and storm-system models computed them · rotation sped up':view==='solarwind'&&data.solarWind?(windLayers.globe&&!fallback?`Earth radius 6 units; beyond it distances are compressed (r^0.45): magnetopause ${windMetrics.standoff.toFixed(1)} R_E`:'Equirectangular 4° grid, 180° W to 180° E')+' · colour: '+WIND_UNITS[windKey]:view==='dust'&&data.dust?'Equirectangular 5° grid, 180° W to 180° E · height and colour: dust influx':view==='solar'&&data.solar?'The visible hemisphere as seen from the Earth (orthographic) · colour: photosphere':fallback?'Color encodes field value · select a cell':data.terrain&&(terrainEnabled||layer==='terrain')?'Height: relative terrain · color: selected field':'Height encodes field value · flat reference surface'}}</span></div><div v-if="view==='carbon'&&carbonKey" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="carbonKey.sea"><i :style="{background:carbonKey.sea.css}"></i>{{carbonKey.sea.label}}</span><template v-if="carbonLayers.base==='habitat'"><span v-for="h in HABITAT_CLASSES" :key="h.key"><i :style="{background:h.color}"></i>{{h.label}}</span></template><span v-if="carbonKey.air"><i :style="{background:carbonKey.air.css}"></i>{{carbonKey.air.label}}</span><span v-if="carbonLayers.dead"><i style="background:transparent;border:2px solid #ff3b30"></i>dead zone (hypoxic bottom water)</span><span v-if="carbonLayers.corrosive"><i style="background:transparent;border:2px solid #ff4fd8"></i>corrosive water (Ω &lt; 1)</span><span v-if="carbonLayers.anoxic">☠ anoxic column</span></div><div v-else-if="view==='solar'&&data.solar" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="solarLayers.base==='contrast'"><i :style="{background:`linear-gradient(90deg,${contrastColor(-40)},${contrastColor(0)},${contrastColor(4)})`}"></i>spot −40 % · quiet Sun · facula +4 %</span><template v-else-if="solarLayers.base==='cycle'"><span><i style="background:#6fa8ff"></i>groups of the previous cycle</span><span><i style="background:#ffb347"></i>groups of the cycle in progress</span><span><i style="background:#9fe870"></i>groups of the next cycle</span></template><span v-else><i :style="{background:`linear-gradient(90deg,${brightnessColor(4800)},${brightnessColor(5500)},${brightnessColor(6200)})`}"></i>4800 · 5500 · 6200 K (limb → centre)</span><span v-if="solarLayers.flares"><i :style="{background:R_COLORS[1]}"></i>M flare (R1–R2) <i :style="{background:R_COLORS[3]}"></i>X flare (R3+)</span><span>{{data.solar.regions.length}} groups · {{data.solar.flares.length}} flares ≥ M1 this month</span></div><div v-else-if="view==='solarwind'&&data.solarWind" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="windKey!=='windregion'"><i :style="{background:`linear-gradient(90deg,${windColor(windKey,windRange[0],windRange[0],windRange[1])},${windColor(windKey,windRange[0]+.25*(windRange[1]-windRange[0]),windRange[0],windRange[1])},${windColor(windKey,windRange[0]+.6*(windRange[1]-windRange[0]),windRange[0],windRange[1])},${windColor(windKey,windRange[1],windRange[0],windRange[1])})`}"></i>{{formatWind(windRange[0],2)}} … {{formatWind(windRange[1],2)}} {{WIND_UNITS[windKey]}}</span><template v-else><span v-for="r in REGIONS" :key="r.key"><i :style="{background:r.color}"></i>{{r.label}}</span></template><span v-if="windLayers.ovals&&!fallback"><b style="color:#ff9f5a">—</b> polar-cap edge · <b style="color:#58e07a">—</b> oval edge</span><span v-if="windLayers.globe&&windLayers.field&&!fallback"><b style="color:#7fb8ff">—</b> closed · <b style="color:#ffa65a">—</b> open field lines</span><span v-if="windLayers.night">darker: night side</span></div><div v-else-if="view==='dust'&&data.dust" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span><i :style="{background:`linear-gradient(90deg,${dustRampColor(0,0,1)},${dustRampColor(.5,0,1)},${dustRampColor(1,0,1)})`}"></i>{{formatNumber(dustRange[0],3)}} … {{formatNumber(dustRange[1],3)}} µg/m²/day</span><span v-if="dustLayers.night&&dustLayers.base==='hour'">darker: night side</span><span>green tint: land</span><span v-if="dustLayers.sources">☄ apex · ◐ helion · ◑ antihelion · △▽ toroidal · ☀ Sun</span></div><div v-else-if="view==='severe'" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><template v-if="severeBase(data,severeLayers.base)==='risk'"><span v-for="r in ['low','moderate','significant']" :key="r"><i :style="{background:RISK_COLORS[r]}"></i>tornado risk {{r}}</span></template><span v-else-if="SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base))?.range"><i :style="{background:`linear-gradient(90deg,${severeColour(severeBase(data,severeLayers.base),SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).range[0])},${severeColour(severeBase(data,severeLayers.base),SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).range[1])})`}"></i>{{SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).label}} {{SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).range.join('–')}} {{SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).unit??''}}</span><span v-if="data.severe"><i style="background:transparent;border:2px solid #ff3b30"></i>tornado watch</span><span v-if="data.severe&&data.clouds">☁ supercell (turning) · 🌪 tornado possible</span><span v-if="data.storms">◎ hurricane: ring = core, colour = category</span><span>➔ storm motion</span></div><div v-else-if="view==='map'" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="mapLayers.base!=='none'"><i :style="{background:mapLayers.base==='temperature'?'linear-gradient(90deg,hsl(223 55% 30%),hsl(11 55% 42%))':'linear-gradient(90deg,hsl(260 35% 26%),hsl(140 35% 44%))'}"></i>{{mapLayers.base==='temperature'?`Temperature ${(temperatureRange[0]-273.15).toFixed(0)}–${(temperatureRange[1]-273.15).toFixed(0)} °C`:`Pressure ${(pressureRange[0]/100).toFixed(0)}–${(pressureRange[1]/100).toFixed(0)} hPa`}}</span><span v-if="mapLayers.isobars">━ isobars {{mapLayers.isobarIntervalHpa}} hPa (bright = {{mapLayers.isobarIntervalHpa*2}} hPa)</span><template v-if="mapLayers.precipitation&&data.precipitation"><span v-for="r in [0.5,3,15,40]" :key="r"><i :style="{background:rateColor(r)}"></i>{{r}} mm/h</span></template><template v-if="mapLayers.clouds&&data.clouds"><span v-for="t in CLOUD_TYPES.slice(1)" :key="t.key"><i :style="{background:t.color}"></i>{{t.abbreviation}}</span></template><span v-if="mapLayers.fronts&&data.clouds"><i style="background:#4da3ff"></i>cold <i style="background:#ff6b6b"></i>warm <i style="background:#c792ea"></i>stationary</span><template v-if="(mapLayers.storms||mapLayers.stormWind)&&data.storms"><span v-for="c in CATEGORIES" :key="c.key"><i :style="{background:c.color}"></i>{{c.short}} {{c.label}}</span></template><span v-if="mapLayers.surge&&data.storms"><i style="background:#00e5ff"></i>storm surge</span><template v-if="mapLayers.tornado&&data.severe"><span><i style="background:#ffe066"></i>STP low <i style="background:#ff7f50"></i>moderate <i style="background:#c724b1"></i>significant</span></template><template v-if="data.orography"><span v-if="mapLayers.lifting"><i style="background:#3da5ff"></i>up-slope <i style="background:#ff8c42"></i>descent</span><span v-if="mapLayers.coldPools"><i style="background:#9ad7ff"></i>cold pool ❄</span><span v-if="mapLayers.foehn">F foehn</span><span v-if="mapLayers.blocking"><i style="background:#f0e68c"></i>blocked flow</span></template></div><div v-else-if="layer==='clouds'" class="cloud-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-for="t in CLOUD_TYPES" :key="t.key"><i :style="{background:t.color}"></i>{{t.abbreviation}} {{t.label}}</span></div><div v-else class="legend" v-wobbly="'key'" title="Drag to move · double-click to put back"><span>{{range[0].toFixed(1)}} {{unit}}<small>← {{legendWords.less}}</small></span><div :style="layer==='aspect'?{background:'linear-gradient(90deg,red,yellow,lime,cyan,blue,magenta,red)'}:['rainfall','water','soil'].includes(layer)?{background:'linear-gradient(90deg,#2675cc,#26ccb2)'}:{}"></div><span>{{range[1].toFixed(1)}} {{unit}}<small>{{legendWords.more}} →</small></span></div><div v-if="layer==='aspect'" class="aspect-key">0° N · 90° E · 180° S · 270° W · gray = flat</div><div v-if="waveNote&&!fallback" class="wave-note" :class="{second:reliefInfo}" title="The engine has no wave model: heights, periods and directions are estimated from the wind with standard growth laws. Waves are drawn enlarged; their direction is kept, longer and higher waves are drawn longer and higher, and the crests move in proportion to their real speed.">WAVES UP TO {{waveNote.highest.toFixed(1)}} M ({{waveNote.state.toUpperCase()}}) · FROM THE WIND · DRAWN ENLARGED, CRESTS MOVING IN PROPORTION TO THEIR REAL SPEED</div><div v-if="reliefInfo&&!fallback" class="relief-note" :title="reliefInfo.sqrt?'Heights grow with the square root of the elevation, so that metres of lowland stay visible next to hills.':'Mountains drawn at true scale would be nearly flat at this map size, so heights are stretched by this factor.'">{{reliefInfo.sqrt?'HEIGHTS √-SCALED TO SHOW THE LOWLAND':`HEIGHTS ×${reliefInfo.factor>=10?Math.round(reliefInfo.factor):reliefInfo.factor.toFixed(1)} (VERTICAL EXAGGERATION)`}}<template v-if="reliefInfo.realistic"> · SNOW LINE ≈ {{Math.round(reliefInfo.snowline/50)*50}} M</template></div><div class="gestures">{{fallback?'CLICK A POINT TO HAVE IT EXPLAINED':'HOVER TO LIGHT UP A POINT · CLICK TO HAVE IT EXPLAINED · DRAG TO ORBIT · SCROLL TO ZOOM'}}</div><div v-if="hoverInfo&&hoverAt&&!fallback&&!(inspecting&&hoverCell===selected)" class="hover-tip" :class="{flip:hoverAt.x>viewportSize.width-260}" :style="{left:`${hoverAt.x}px`,top:`${hoverAt.y}px`}" aria-hidden="true"><b>{{hoverInfo.value}}</b><em>{{hoverInfo.unit}}</em><span>{{hoverInfo.short}}</span><small>click to have it explained</small></div><InspectOverlay v-if="inspectContent&&inspectAnchor" :content="inspectContent.content" :type-key="inspectContent.typeKey" :anchor="inspectAnchor" :bounds="inspectBounds" :series="inspectSeries" :series-index="frameIndex" :wind="inspectContent.wind" :neighbourhood="inspectContent.near" :scale-stops="inspectContent.stops" :unit="unit" @close="closeInspector"/></div><div v-if="snapshots.length>1" class="timeline"><div class="playback"><button @click="seek(frameIndex-1)" :disabled="frameIndex===0" aria-label="Previous frame">‹</button><button @click="togglePlayback">{{playing?'Pause':'Play'}}</button><button @click="seek(frameIndex+1)" :disabled="frameIndex===snapshots.length-1" aria-label="Next frame">›</button><span>Frame {{frameIndex+1}} / {{snapshots.length}} · {{playbackLabel}}</span></div><input aria-label="Timeline frame" type="range" min="0" :max="snapshots.length-1" :value="frameIndex" @input="seek($event.target.value)"><p>{{data.solarWind?`Snapshots every ${windBlock.storm.frame_every_hours} h of a synthetic storm · colour scale fixed over the storm · Sun-fixed frame: the Earth turns beneath the magnetosphere`:data.dust?`Hourly snapshots over one day · colour scale fixed over the day · total influx is a scenario (estimates 5–300 t/day)`:data.orography?`Engine orography · ${data.orography.foehnCells} foehn cells · ${data.orography.poolCells} cold pools · surface ${(data.orography.tendency*3600).toFixed(2)} K/h`:data.storms?`${data.storms.synthetic?'Synthetic mock':'Engine'} storms · ${data.storms.list.length} active · events so far: ${visibleEvents.map(e=>e.kind).join(', ')||'none'}`+(data.severe?` · tornado possible in ${data.severe.possibleCells} cells`:''):data.precipitation?`${data.precipitation.synthetic?'Synthetic mock':'Engine'} outcomes · ${data.precipitation.precipitating} precipitating cells · ${data.precipitation.lightningCells} thunderstorms · ${data.precipitation.hailCells} hail · ${data.precipitation.snowCells} snow · max ${data.precipitation.maxRate.toFixed(1)} mm/h`:data.clouds?`${data.clouds.synthetic?'Synthetic mock':'Engine'} cloud snapshots · heating ${data.clouds.heating.toFixed(1)} K · ${data.clouds.cloudy} cloudy cells · ${data.clouds.storms} thunderstorm cells · ${data.clouds.fronts} frontal cells`:data.coupled?`Coupled engine snapshots · fixed color scale · pressure static · scalar stability number ${data.coupled.stability.toFixed(2)} · supersaturated cells ${data.coupled.supersaturated}`:data.atmosphere?'Synthetic regional snapshots · fixed color scale · no coupling to local engine physics':'Discrete solver snapshots · fixed color scale · rainfall accumulates from the start · unavailable at time zero'}}</p></div><p v-if="layer==='rainfall' && data.rain" class="rain-interval">Accumulation interval: {{data.rain.period_start_utc.replace('T',' ').replace('Z',' UTC')}} → {{data.rain.valid_time_utc.replace('T',' ').replace('Z',' UTC')}}</p><p v-if="['water','soil'].includes(layer) && data.surfaceWater" class="rain-interval">Surface {{data.surfaceWater.stored_volume_m3.toFixed(2)}} m³ · Soil {{data.surfaceWater.soil_volume_m3.toFixed(2)}} m³ · Rain input {{data.surfaceWater.cumulative_rainfall_volume_m3.toFixed(2)}} m³ · Evaporated {{data.surfaceWater.evaporated_volume_m3.toFixed(2)}} m³ · Drained {{data.surfaceWater.drained_volume_m3.toFixed(2)}} m³ · Discharged {{data.surfaceWater.discharged_volume_m3.toFixed(2)}} m³ · Balance error {{data.surfaceWater.balance_error_m3.toExponential(2)}} m³<br>{{data.surfaceWater.boundary==='configured_outlets'?'Configured surface outlets':'Closed boundaries'}} · unknown rainfall cells are impermeable masks · prototype routing<br>Step {{data.surfaceWater.parameters.timestep_seconds}} s · Infiltration {{(data.surfaceWater.parameters.infiltration_rate_m_s*3600000).toFixed(2)}} mm/h · Evaporation {{(data.surfaceWater.parameters.evaporation_rate_m_s*3600000).toFixed(2)}} mm/h · Drainage {{(data.surfaceWater.parameters.drainage_rate_m_s*3600000).toFixed(2)}} mm/h<span v-if="data.surfaceWater.soil_capacity_m!==null"> · soil capacity {{data.surfaceWater.soil_capacity_m*1000}} mm</span></p><section v-if="view==='severe'&&bulletin" class="comparison outlet-report storm-report"><div class="section-label">STORM WATCH · {{time}}</div>
+  </aside><article><div class="scene-head"><div><span class="eyebrow">{{view==='flight'&&stationToolsAvailable?'FLIGHT WEATHER':view==='sail'&&stationToolsAvailable?'SAILING WEATHER':'FIELD EXPLORER'}}</span><h2>{{view==='flight'&&stationToolsAvailable?'Flight categories and winds aloft':view==='sail'&&stationToolsAvailable?'Wind, sea and currents for sailing':(WIND_LAYER_KEYS.includes(layer)?WIND_TITLES[layer]:layer==='dustinflux'?'Cosmic dust entering the atmosphere (this hour)':layer==='dustdaily'?'Cosmic dust entering the atmosphere (daily mean)':layer==='sunbrightness'?'Photosphere brightness temperature':layer==='suncontrast'?'Contrast to the quiet Sun':layer==='temperature'?(adjustedTemperature?'Terrain-adjusted temperature':'Air temperature'):layer==='wind'?'Wind speed':layer==='terrain'?'Terrain elevation':layer==='slope'?'Terrain slope':layer==='aspect'?'Downhill aspect':layer==='water'?'Surface water depth':layer==='soil'?'Soil water storage':layer==='cloud'?'Cloud cover':layer==='pressure'?'Sea-level pressure':layer==='humidity'?'Relative humidity':layer==='density'?'Air density':layer==='moisture'?'Specific humidity':layer==='cape'?'Convective available potential energy':layer==='cloudbase'?'Cloud base (lifting condensation level)':layer==='cloudtop'?'Equilibrium level':layer==='clouds'?'Cloud formation · fronts and convection':layer==='precip'?'Precipitation rate at the ground':layer==='accum'?'Precipitation accumulated over the snapshot interval':layer==='stormwind'?'Tropical cyclone wind field':layer==='mpi'?'Maximum potential intensity':layer==='gpi'?'Genesis potential index':layer==='surge'?'Storm surge estimate':layer==='stp'?'Significant tornado parameter':layer==='helicity'?'Storm-relative helicity':layer==='lifting'?'Orographic lifting (up-slope positive)':layer==='blocked'?'Froude blocking of the cross-barrier flow':layer==='foehn'?'Foehn warming on the lee':layer==='coldpool'?'Cold-air pool deficit':layer==='oroprecip'?'Orographic precipitation rate':layer==='valley'?'Valley depth':layer==='discharge'?'River discharge':layer==='surfacewater'?'Surface and floodplain water':layer==='saturation'?'Soil saturation':layer==='watertable'?'Water-table depth below ground':layer==='snowpack'?'Snowpack water equivalent':layer==='erosion'?'Cumulative erosion':layer==='deposition'?'Cumulative deposition':layer==='stability'?'Slope factor of safety':layer==='floodclass'?'Flood hazard class':layer==='current'?'Ocean current speed':layer==='surfacesalinity'?'Surface salinity':layer==='salinity'?'Upper-ocean layer salinity':layer==='sst'?'Upper-ocean layer temperature':layer==='thermocline'?'Thermocline depth (layer thickness)':layer==='freshwater'?'Surface freshwater fraction':layer==='sinking'?'Deep-water formation rate':layer==='oceansst'?'Sea-surface temperature (top layer)':layer==='mld'?'Ocean mixed-layer depth':layer==='netheat'?'Net air–sea heat flux (into the ocean)':layer==='latent'?'Latent heat flux (evaporative cooling)':layer==='evaporation'?'Evaporation from the sea':layer==='searain'?'Rain on sea and land':layer==='coastalstore'?'Coastal runoff store':layer==='icethickness'?'Greenland ice thickness':layer==='icesmb'?'Greenland surface mass balance':layer==='icemelt'?'Greenland surface melt':layer==='seaice'?'Sea-ice concentration':layer==='seaicethick'?'Sea-ice thickness':layer==='oxygen'?'Surface dissolved-oxygen capacity':layer==='coastlost'?'Land lost to the sea':layer==='coastyear'?'Year the land is lost':layer==='coaststorm'?'Design-storm flood depth':layer==='coastinundation'?'Permanent inundation':layer==='coastfrequency'?'Today\'s 100-year flood: now every … years':layer==='coastsetup'?'Wind setup of the design storm':layer==='coastsubsidence'?'Land subsidence':layer==='coastpopulation'?'Population density':layer==='co2air'?'CO₂ in the air (boundary layer)':layer==='co2flux'?'Air–sea CO₂ flux (into the sea)':layer==='ph'?'Surface pH':layer==='omega'?'Surface aragonite saturation Ω':layer==='omegabottom'?'Bottom-water aragonite saturation Ω':layer==='bottomo2'?'Bottom-water oxygen':layer==='habitat'?'Habitat class of the water column':layer==='habitable'?'Habitable share of the water column':layer==='production'?'Plankton net production':layer==='nitrate'?'Surface nitrate':'Rainfall accumulation')}}</h2></div><div class="view-switch"><button :class="{selected:view==='field'}" @click="view='field'">Field explorer</button><button :class="{selected:view==='map'}" :disabled="!data.coupled" @click="view='map'">Weather map</button><button :class="{selected:view==='severe'}" :disabled="!data.severe&&!data.storms" @click="view='severe'" title="Supercells, tornado watches and hurricanes as the severe-convection and storm-system models computed them, animated.">Storm watch</button><button :class="{selected:view==='flight'}" :disabled="!stationToolsAvailable" @click="view='flight'" title="Flight weather for pilots: flight categories, winds aloft as wind barbs at every level, and a METAR-style report with runway wind, icing and hazards at the picked point. Simulated from the engine run.">Flight weather</button><button :class="{selected:view==='sail'}" :disabled="!stationToolsAvailable" @click="view='sail'" title="Sailing weather: Beaufort force, surface wind barbs, waves, currents and isobars, and a marine report with apparent wind, sea state and hazards at the picked point. Simulated from the engine run.">Sailing weather</button><button :class="{selected:view==='vfr'}" :disabled="!stationToolsAvailable" @click="view='vfr'" title="VFR view with the GAFOR categories Charlie, Oscar, Delta, Mike and X-ray (visibility and main cloud base), the airspace usable clear of cloud with the ground in sight, and the GAFOR areas from an official area file.">VFR · GAFOR</button><button :class="{selected:view==='water'}" :disabled="!data.hydrology" @click="view='water'">Catchment</button><button :class="{selected:view==='hazards'}" :disabled="!data.hydrology" @click="view='hazards'">Hazards</button><button :class="{selected:view==='ocean'}" :disabled="!data.ocean" @click="view='ocean'">Ocean streams</button><button :class="{selected:view==='polar'}" :disabled="!data.polar" @click="view='polar'">Polar melt</button><button :class="{selected:view==='coast'}" :disabled="!data.coast" @click="view='coast'" title="Sea-level rise on the coast: land lost, storm floods, defences, rivers and islands.">Sea level &amp; coasts</button><button :class="{selected:view==='carbon'}" :disabled="!data.carbon" @click="view='carbon'" title="CO₂ in the air and the sea: uptake, acidification, oxygen and the dead zones where sea life cannot live.">Carbon &amp; ocean life</button><button :class="{selected:view==='solar'}" :disabled="!data.solar" @click="view='solar'" title="The sunspot cycle with its minima, maxima and forecast, and what it does to the UV, the ozone, the flares and the climate.">Sun &amp; solar cycle</button><button :class="{selected:view==='dust'}" :disabled="!data.dust" @click="view='dust'" title="Cosmic dust and extraterrestrial water entering the Earth every day.">Cosmic dust</button><button :class="{selected:view==='solarwind'}" :disabled="!data.solarWind" @click="view='solarwind'" title="The solar wind at the magnetosphere's polar caps: aurora, ions escaping to space, cosmic radiation and solar protons, and their global effects.">Solar wind &amp; poles</button></div><div class="scene-actions"><button class="reset" @click="reset" :title="immersive?'Reset the camera (R)':'Reset the camera'">↺ Reset view</button><template v-if="immersive"><button class="reset hud-toggle" :class="{selected:hudControls}" :aria-pressed="hudControls" title="Show or hide the control panel ( [ )" @click="togglePanel('controls')">◧ Controls</button><button class="reset hud-toggle" :class="{selected:hudStream}" :aria-pressed="hudStream" title="Show or hide the data stream ( ] )" @click="togglePanel('stream')">Stream ◨</button></template><button class="reset fullscreen-toggle" :title="immersive?'Return to the page (F or Esc)':'Fullscreen scene with the controls and a live data stream (F)'" @click="toggleImmersive"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="immersive?'M5 1v4H1M15 5h-4V1M11 15v-4h4M1 11h4v4':'M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4'"/></svg>{{immersive?'Exit':'Fullscreen'}} <kbd>{{immersive?'Esc':'F'}}</kbd></button><WorkspaceClock v-if="immersive" class="hud-clock"/></div></div><div class="viewport" ref="host" aria-label="Interactive 3D weather grid"><div v-if="fallback" class="fallback-grid" :style="{gridTemplateColumns:`repeat(${grid.nx},1fr)`}"><button v-for="(value,i) in values" :key="i" :aria-label="`Cell ${i}: ${value===null?'no data':value.toFixed(2)} ${unit}`" :style="{gridRow:grid.ny-Math.floor(i/grid.nx),gridColumn:i%grid.nx+1,background:view!=='field'?mapCellStyles[i]:value===null?'#283b49':layer==='clouds'?CLOUD_TYPES[value].color:`hsl(${hue(value)} ${layer==='cloud'?15:70}% ${layer==='cloud'?18+value*.72:50}%)`}" @click="openInspector(i,$event)"></button></div><svg v-if="fallback && view==='dust' && data.dust && dustLayers.sources" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Meteoroid sources"><text v-for="pnt in data.dust.points" :key="pnt.name" :x="(pnt.longitude_deg+180)/360*100" :y="(90-pnt.latitude_deg)/180*100" font-size="4" text-anchor="middle" :fill="pnt.name==='apex'?'#ffd166':'#e8f4ff'">{{SOURCE_SYMBOLS[pnt.name]??'•'}}</text><text :x="(data.dust.subsolar.longitude_deg+180)/360*100" :y="(90-data.dust.subsolar.latitude_deg)/180*100" font-size="4" text-anchor="middle" fill="#ffb347">☀</text></svg><svg v-if="fallback && view==='solar' && data.solar" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Solar flares"><template v-for="(fl,k) in data.solar.flares" :key="'sf'+k"><text v-if="data.solar.regions[fl.region]" :x="(regionPosition(data.solar.regions[fl.region]).x/solarBlock.disk.extent_radii+1)*50" :y="(1-regionPosition(data.solar.regions[fl.region]).y/solarBlock.disk.extent_radii)*50" font-size="3.5" text-anchor="middle" :fill="R_COLORS[fl.r_scale]">⚡</text></template></svg><svg v-if="fallback && data.atmosphere" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Synthetic cloud and weather-system overlay"><template v-if="cloudsEnabled"><ellipse v-for="(c,i) in data.atmosphere.cloud" :key="'cloud'+i" v-show="i%3===0 && c>.35" :cx="((i%grid.nx)+.5)/grid.nx*100" :cy="(1-(Math.floor(i/grid.nx)+.5)/grid.ny)*100" :rx="2.1" :ry="1.7" fill="#e9f5ff" :opacity="c*.32"/></template><template v-if="systemsEnabled"><template v-for="(s,i) in data.atmosphere.systems" :key="i"><polyline v-if="s.kind==='cold_front'" :points="s.points.map(([u,v])=>`${u*100},${(1-v)*100}`).join(' ')" fill="none" stroke="#85ccff" stroke-width=".7" stroke-dasharray="2 1"/><text v-else :x="s.u*100" :y="(1-s.v)*100" :fill="s.kind==='low'?'#ffb39c':'#c5e9ff'" font-size="7" font-weight="bold" text-anchor="middle">{{s.kind==='low'?'L':'H'}}</text></template></template></svg><svg v-if="fallback && view==='map'" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Weather map overlays"><template v-for="level in isobarLines" :key="level.level_pa"><polyline v-for="(line,li) in level.lines" :key="li" :points="line.map(([u,v])=>`${u*100},${(1-v)*100}`).join(' ')" fill="none" :stroke="Math.round(level.level_hpa)%(mapLayers.isobarIntervalHpa*2)===0?'#f3f7f9':'#a9bcc6'" :stroke-width="Math.round(level.level_hpa)%(mapLayers.isobarIntervalHpa*2)===0?.5:.3"/><text v-if="Math.round(level.level_hpa)%(mapLayers.isobarIntervalHpa*2)===0&&level.lines[0]" :x="level.lines[0][0][0]*100" :y="(1-level.lines[0][0][1])*100" font-size="2.6" fill="#f3f7f9">{{Math.round(level.level_hpa)}}</text></template><template v-if="mapLayers.fronts&&data.clouds"><template v-for="(t,i) in data.clouds.frontType" :key="'f'+i"><rect v-if="t!=='none'" :x="(i%grid.nx)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+1)/grid.ny)*100" :width="100/grid.nx" :height="100/grid.ny" :fill="FRONT_COLORS[t]" opacity=".5"/></template></template><template v-if="mapLayers.symbols&&data.precipitation"><template v-for="(t,i) in data.precipitation.type" :key="'p'+i"><text v-if="t!=='none'&&(i%grid.nx)%symbolStride===0&&Math.floor(i/grid.nx)%symbolStride===0" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.3)/grid.ny)*100" font-size="2.8" text-anchor="middle" :fill="data.precipitation.phase[i]==='solid'?'#ffffff':'#bfe0ff'">{{precipitationTypeInfo(t).symbol}}</text></template></template><template v-if="mapLayers.storms&&data.storms"><template v-for="s in data.storms.list" :key="'st'+s.id"><polyline v-if="s.track.length>1" :points="s.track.map(([e,n])=>`${(e-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100},${(1-(n-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100}`).join(' ')" fill="none" stroke="#ffffff" stroke-width=".4" opacity=".7"/><circle :cx="(s.east_m-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100" :cy="(1-(s.north_m-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100" :r="Math.max(1.5,s.radius_max_wind_m/(grid.nx*grid.spacing_east_m)*100)" fill="none" :stroke="categoryInfo(s.category).color" stroke-width=".8"/><text :x="(s.east_m-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100" :y="(1-(s.north_m-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100-2.5" font-size="3" text-anchor="middle" :fill="categoryInfo(s.category).color">{{categoryInfo(s.category).short}}</text></template><text v-for="(e,i) in visibleEvents.filter(e=>['landfall','merger','genesis'].includes(e.kind))" :key="'ev'+i" :x="(e.east_m-grid.origin_east_m)/(grid.nx*grid.spacing_east_m)*100" :y="(1-(e.north_m-grid.origin_north_m)/(grid.ny*grid.spacing_north_m))*100+1" font-size="3" text-anchor="middle" :fill="e.kind==='landfall'?'#ff5c5c':'#ffffff'">{{e.kind==='landfall'?'✖':e.kind==='merger'?'⊕':'✦'}}</text></template><template v-if="data.orography"><template v-for="(b,i) in data.orography.foehn" :key="'fo'+i"><text v-if="mapLayers.foehn&&b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.4)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#ff8c42">F</text></template><template v-for="(b,i) in data.orography.coldPoolFlag" :key="'cp'+i"><text v-if="mapLayers.coldPools&&b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.4)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#dff3ff">❄</text></template></template><template v-if="mapLayers.tornado&&data.severe"><template v-for="(b,i) in data.severe.possible" :key="'t'+i"><text v-if="b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.5)/grid.ny)*100" font-size="3.2" text-anchor="middle">🌪</text></template></template><template v-if="mapLayers.hazards&&data.precipitation"><template v-for="(b,i) in data.precipitation.lightning" :key="'h'+i"><text v-if="b" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.7)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#ffd166">{{data.precipitation.hail[i]>0?'⚡◆':'⚡'}}</text></template></template></svg><svg v-if="fallback && view==='field' && data.clouds && frontOverlay" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Front overlay"><template v-for="(t,i) in data.clouds.frontType" :key="i"><rect v-if="t!=='none'" :x="(i%grid.nx)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+1)/grid.ny)*100" :width="100/grid.nx" :height="100/grid.ny" :fill="FRONT_COLORS[t]" opacity=".55"/></template><template v-for="(s,i) in data.clouds.thunderstorm" :key="'s'+i"><text v-if="s" :x="((i%grid.nx)+.5)/grid.nx*100" :y="(1-(Math.floor(i/grid.nx)+.3)/grid.ny)*100" font-size="3" text-anchor="middle" fill="#ffd166">⚡</text></template></svg><svg v-if="fallback && data.surfaceWater?.outlets?.length" class="systems-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Configured surface outlet locations"><circle v-for="(o,i) in data.surfaceWater.outlets" :key="i" :cx="(o.x+.5)/grid.nx*100" :cy="(1-(o.y+.5)/grid.ny)*100" r="1.6" fill="#ffa15c" stroke="#fff2e6" stroke-width=".4"/></svg><div class="scene-note">{{view==='vfr'&&stationToolsAvailable?'VFR · GAFOR · SIMULATED · NORTH −Z / EAST +X':view==='flight'&&stationToolsAvailable?'FLIGHT WEATHER · SIMULATED · NORTH −Z / EAST +X':view==='sail'&&stationToolsAvailable?'SAILING WEATHER · SIMULATED · NORTH −Z / EAST +X':view==='severe'?'STORM WATCH · ENGINE OUTPUT · NORTH −Z / EAST +X':view==='solarwind'&&data.solarWind?(fallback?'2D FALLBACK / NORTH UP':windLayers.globe?'SUN +X · NORTH UP · GLOBE IN A SUN-FIXED FRAME':'NORTH −Z / EAST +X · WORLD MAP'):view==='dust'&&data.dust?(fallback?'2D FALLBACK / NORTH UP':'NORTH −Z / EAST +X · WORLD MAP'):view==='solar'&&data.solar?(fallback?'2D FALLBACK / SOLAR NORTH UP':'SOLAR NORTH −Z / WEST LIMB +X'):fallback?'2D FALLBACK / NORTH UP':'NORTH −Z / EAST +X'}}<br><span>{{view==='vfr'&&stationToolsAvailable?'Ground and columns: GAFOR category · column: airspace from 500 ft above ground to the clear-of-cloud limit (12 km = 6 units)':view==='flight'&&stationToolsAvailable?(aloftField?.available?`${flightLayers.all?'Wind barbs at every winds-aloft level · ':flightLayers.level!=='off'?`Wind barbs at ${ALL_LEVELS.find(l=>l.key===flightLayers.level)?.label??''} · `:''}Weather layers at their altitudes (12 km = 6 units) · ground: flight category`:'Ground: flight category · no winds aloft in this run (no pressure field)'):view==='sail'&&stationToolsAvailable?`Surface wind barbs · sea: ${sailLayers.ground==='waves'&&waveInfo?'wave height':'Beaufort force'}`:view==='severe'?'Watches, supercells, funnels and hurricanes as the severe-convection and storm-system models computed them · rotation sped up':view==='solarwind'&&data.solarWind?(windLayers.globe&&!fallback?`Earth radius 6 units; beyond it distances are compressed (r^0.45): magnetopause ${windMetrics.standoff.toFixed(1)} R_E`:'Equirectangular 4° grid, 180° W to 180° E')+' · colour: '+WIND_UNITS[windKey]:view==='dust'&&data.dust?'Equirectangular 5° grid, 180° W to 180° E · height and colour: dust influx':view==='solar'&&data.solar?'The visible hemisphere as seen from the Earth (orthographic) · colour: photosphere':fallback?'Color encodes field value · select a cell':data.terrain&&(terrainEnabled||layer==='terrain')?'Height: relative terrain · color: selected field':'Height encodes field value · flat reference surface'}}</span></div><div v-if="view==='carbon'&&carbonKey" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="carbonKey.sea"><i :style="{background:carbonKey.sea.css}"></i>{{carbonKey.sea.label}}</span><template v-if="carbonLayers.base==='habitat'"><span v-for="h in HABITAT_CLASSES" :key="h.key"><i :style="{background:h.color}"></i>{{h.label}}</span></template><span v-if="carbonKey.air"><i :style="{background:carbonKey.air.css}"></i>{{carbonKey.air.label}}</span><span v-if="carbonLayers.dead"><i style="background:transparent;border:2px solid #ff3b30"></i>dead zone (hypoxic bottom water)</span><span v-if="carbonLayers.corrosive"><i style="background:transparent;border:2px solid #ff4fd8"></i>corrosive water (Ω &lt; 1)</span><span v-if="carbonLayers.anoxic">☠ anoxic column</span></div><div v-else-if="view==='solar'&&data.solar" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="solarLayers.base==='contrast'"><i :style="{background:`linear-gradient(90deg,${contrastColor(-40)},${contrastColor(0)},${contrastColor(4)})`}"></i>spot −40 % · quiet Sun · facula +4 %</span><template v-else-if="solarLayers.base==='cycle'"><span><i style="background:#6fa8ff"></i>groups of the previous cycle</span><span><i style="background:#ffb347"></i>groups of the cycle in progress</span><span><i style="background:#9fe870"></i>groups of the next cycle</span></template><span v-else><i :style="{background:`linear-gradient(90deg,${brightnessColor(4800)},${brightnessColor(5500)},${brightnessColor(6200)})`}"></i>4800 · 5500 · 6200 K (limb → centre)</span><span v-if="solarLayers.flares"><i :style="{background:R_COLORS[1]}"></i>M flare (R1–R2) <i :style="{background:R_COLORS[3]}"></i>X flare (R3+)</span><span>{{data.solar.regions.length}} groups · {{data.solar.flares.length}} flares ≥ M1 this month</span></div><div v-else-if="view==='solarwind'&&data.solarWind" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="windKey!=='windregion'"><i :style="{background:`linear-gradient(90deg,${windColor(windKey,windRange[0],windRange[0],windRange[1])},${windColor(windKey,windRange[0]+.25*(windRange[1]-windRange[0]),windRange[0],windRange[1])},${windColor(windKey,windRange[0]+.6*(windRange[1]-windRange[0]),windRange[0],windRange[1])},${windColor(windKey,windRange[1],windRange[0],windRange[1])})`}"></i>{{formatWind(windRange[0],2)}} … {{formatWind(windRange[1],2)}} {{WIND_UNITS[windKey]}}</span><template v-else><span v-for="r in REGIONS" :key="r.key"><i :style="{background:r.color}"></i>{{r.label}}</span></template><span v-if="windLayers.ovals&&!fallback"><b style="color:#ff9f5a">—</b> polar-cap edge · <b style="color:#58e07a">—</b> oval edge</span><span v-if="windLayers.globe&&windLayers.field&&!fallback"><b style="color:#7fb8ff">—</b> closed · <b style="color:#ffa65a">—</b> open field lines</span><span v-if="windLayers.night">darker: night side</span></div><div v-else-if="view==='dust'&&data.dust" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span><i :style="{background:`linear-gradient(90deg,${dustRampColor(0,0,1)},${dustRampColor(.5,0,1)},${dustRampColor(1,0,1)})`}"></i>{{formatNumber(dustRange[0],3)}} … {{formatNumber(dustRange[1],3)}} µg/m²/day</span><span v-if="dustLayers.night&&dustLayers.base==='hour'">darker: night side</span><span>green tint: land</span><span v-if="dustLayers.sources">☄ apex · ◐ helion · ◑ antihelion · △▽ toroidal · ☀ Sun</span></div><div v-else-if="view==='vfr'&&stationToolsAvailable" class="cloud-key map-key fw-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><b class="fw-key-title">GAFOR · VFR CATEGORY</b><span v-for="c in GAFOR_CATEGORIES" :key="c.key"><i :style="{background:c.colour}"></i><b>{{c.key}}</b>&nbsp;{{c.name}} · {{c.key==='X'?'vis < 1.5 km or base < 500 ft':`vis ≥ ${c.minVisibilityM>=10000?'10 km':c.minVisibilityM>=1000?`${c.minVisibilityM/1000} km`:`${c.minVisibilityM} m`}, base ≥ ${c.minBaseFt.toLocaleString('en-US')} ft`}}</span><span><i style="background:#b9c6cf"></i>main cloud deck (BKN/OVC)</span><span class="fw-key-note">column height = VFR room below cloud</span></div><div v-else-if="view==='flight'&&stationToolsAvailable" class="cloud-key map-key fw-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><b class="fw-key-title">LAYERS, TOP TO BOTTOM</b><span v-if="flightLayers.storms"><i :style="{background:LAYER_COLOURS.thunder}"></i>thunderstorm column</span><span v-if="flightLayers.turbulence"><i :style="{background:LAYER_COLOURS.turbulence}"></i>turbulence (shear)</span><span v-if="flightLayers.cloudSlabs"><i :style="{background:`linear-gradient(90deg,${LAYER_COLOURS.high},${LAYER_COLOURS.middle},${LAYER_COLOURS.low},${LAYER_COLOURS.cb})`}"></i>cloud: high · middle · low · CB</span><span v-if="flightLayers.icing"><i :style="{background:LAYER_COLOURS.icing}"></i>icing (0 to −20 °C in cloud)</span><span v-if="flightLayers.freezing"><i :style="{background:LAYER_COLOURS.freezing}"></i>freezing level (0 °C)</span><span class="fw-key-cats"><template v-for="c in ['VFR','MVFR','IFR','LIFR']" :key="c"><i :style="{background:FLIGHT_CATEGORIES[c].colour}"></i>{{c}} </template> ground</span><span v-if="flightLayers.symbols" class="fw-key-icons"><WeatherIcon v-for="k in ['clear','partly','cloudy','rain','showers','thunder','snow','fog']" :key="k" :symbol="k" :size="22"/></span><span><i style="background:linear-gradient(90deg,#cfe9f5,#7fd1ff,#ffd166,#ff8c42,#ff4d8d)"></i>barbs &lt;20 · 20–50 · 50–80 · 80–120 · ≥120 kt</span><span>▲ pennant 50 kt · ― barb 10 kt · ╴ half 5 kt</span></div><div v-else-if="view==='sail'&&stationToolsAvailable" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="sailLayers.ground==='beaufort'||!waveInfo"><i :style="{background:`linear-gradient(90deg,${BEAUFORT_COLOURS.join(',')})`}"></i>Beaufort force 0 → 12</span><span v-else><i style="background:linear-gradient(90deg,hsl(205,60%,22%),hsl(100,60%,34%),hsl(0,60%,47%))"></i>wave height 0 → 6 m</span><span>▲ pennant 50 kt · ― barb 10 kt · ╴ half 5 kt</span><span v-if="data.ocean&&sailLayers.currents"><i style="background:#7fe0ff"></i>ocean current</span></div><div v-else-if="view==='severe'" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><template v-if="severeBase(data,severeLayers.base)==='risk'"><span v-for="r in ['low','moderate','significant']" :key="r"><i :style="{background:RISK_COLORS[r]}"></i>tornado risk {{r}}</span></template><span v-else-if="SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base))?.range"><i :style="{background:`linear-gradient(90deg,${severeColour(severeBase(data,severeLayers.base),SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).range[0])},${severeColour(severeBase(data,severeLayers.base),SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).range[1])})`}"></i>{{SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).label}} {{SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).range.join('–')}} {{SEVERE_BASES.find(b=>b.key===severeBase(data,severeLayers.base)).unit??''}}</span><span v-if="data.severe"><i style="background:transparent;border:2px solid #ff3b30"></i>tornado watch</span><span v-if="data.severe&&data.clouds">☁ supercell (turning) · 🌪 tornado possible</span><span v-if="data.storms">◎ hurricane: ring = core, colour = category</span><span>➔ storm motion</span></div><div v-else-if="view==='map'" class="cloud-key map-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-if="mapLayers.base!=='none'"><i :style="{background:mapLayers.base==='temperature'?'linear-gradient(90deg,hsl(223 55% 30%),hsl(11 55% 42%))':'linear-gradient(90deg,hsl(260 35% 26%),hsl(140 35% 44%))'}"></i>{{mapLayers.base==='temperature'?`Temperature ${(temperatureRange[0]-273.15).toFixed(0)}–${(temperatureRange[1]-273.15).toFixed(0)} °C`:`Pressure ${(pressureRange[0]/100).toFixed(0)}–${(pressureRange[1]/100).toFixed(0)} hPa`}}</span><span v-if="mapLayers.isobars">━ isobars {{mapLayers.isobarIntervalHpa}} hPa (bright = {{mapLayers.isobarIntervalHpa*2}} hPa)</span><template v-if="mapLayers.precipitation&&data.precipitation"><span v-for="r in [0.5,3,15,40]" :key="r"><i :style="{background:rateColor(r)}"></i>{{r}} mm/h</span></template><template v-if="mapLayers.clouds&&data.clouds"><span v-for="t in CLOUD_TYPES.slice(1)" :key="t.key"><i :style="{background:t.color}"></i>{{t.abbreviation}}</span></template><span v-if="mapLayers.fronts&&data.clouds"><i style="background:#4da3ff"></i>cold <i style="background:#ff6b6b"></i>warm <i style="background:#c792ea"></i>stationary</span><template v-if="(mapLayers.storms||mapLayers.stormWind)&&data.storms"><span v-for="c in CATEGORIES" :key="c.key"><i :style="{background:c.color}"></i>{{c.short}} {{c.label}}</span></template><span v-if="mapLayers.surge&&data.storms"><i style="background:#00e5ff"></i>storm surge</span><template v-if="mapLayers.tornado&&data.severe"><span><i style="background:#ffe066"></i>STP low <i style="background:#ff7f50"></i>moderate <i style="background:#c724b1"></i>significant</span></template><template v-if="data.orography"><span v-if="mapLayers.lifting"><i style="background:#3da5ff"></i>up-slope <i style="background:#ff8c42"></i>descent</span><span v-if="mapLayers.coldPools"><i style="background:#9ad7ff"></i>cold pool ❄</span><span v-if="mapLayers.foehn">F foehn</span><span v-if="mapLayers.blocking"><i style="background:#f0e68c"></i>blocked flow</span></template></div><div v-else-if="layer==='clouds'" class="cloud-key" v-wobbly="'key'" title="Drag to move · double-click to put back"><span v-for="t in CLOUD_TYPES" :key="t.key"><i :style="{background:t.color}"></i>{{t.abbreviation}} {{t.label}}</span></div><div v-else class="legend" v-wobbly="'key'" title="Drag to move · double-click to put back"><span>{{range[0].toFixed(1)}} {{unit}}<small>← {{legendWords.less}}</small></span><div :style="layer==='aspect'?{background:'linear-gradient(90deg,red,yellow,lime,cyan,blue,magenta,red)'}:['rainfall','water','soil'].includes(layer)?{background:'linear-gradient(90deg,#2675cc,#26ccb2)'}:{}"></div><span>{{range[1].toFixed(1)}} {{unit}}<small>{{legendWords.more}} →</small></span></div><div v-if="layer==='aspect'" class="aspect-key">0° N · 90° E · 180° S · 270° W · gray = flat</div><div v-if="waveNote&&!fallback" class="wave-note" :class="{second:reliefInfo}" title="The engine has no wave model: heights, periods and directions are estimated from the wind with standard growth laws. Waves are drawn enlarged; their direction is kept, longer and higher waves are drawn longer and higher, and the crests move in proportion to their real speed.">WAVES UP TO {{waveNote.highest.toFixed(1)}} M ({{waveNote.state.toUpperCase()}}) · FROM THE WIND · DRAWN ENLARGED, CRESTS MOVING IN PROPORTION TO THEIR REAL SPEED</div><div v-if="reliefInfo&&!fallback" class="relief-note" :title="reliefInfo.sqrt?'Heights grow with the square root of the elevation, so that metres of lowland stay visible next to hills.':'Mountains drawn at true scale would be nearly flat at this map size, so heights are stretched by this factor.'">{{reliefInfo.sqrt?'HEIGHTS √-SCALED TO SHOW THE LOWLAND':`HEIGHTS ×${reliefInfo.factor>=10?Math.round(reliefInfo.factor):reliefInfo.factor.toFixed(1)} (VERTICAL EXAGGERATION)`}}<template v-if="reliefInfo.realistic"> · SNOW LINE ≈ {{Math.round(reliefInfo.snowline/50)*50}} M</template></div><div class="gestures">{{vfrOn?'CLICK THE MAP TO READ A POINT · DRAG TO ORBIT · SCROLL TO ZOOM':flightOn&&pickingWaypoints?'CLICK THE MAP TO ADD A WAYPOINT BEFORE THE DESTINATION · DRAG TO ORBIT · SCROLL TO ZOOM':flightOn?'CLICK NEAR AN AERODROME TO SELECT IT · DRAG TO ORBIT · SCROLL TO ZOOM':sailOn?'CLICK THE MAP TO READ A POINT (THE BOAT STAYS) · DRAG TO ORBIT · SCROLL TO ZOOM':fallback?'CLICK A POINT TO HAVE IT EXPLAINED':'HOVER TO LIGHT UP A POINT · CLICK TO HAVE IT EXPLAINED · DRAG TO ORBIT · SCROLL TO ZOOM'}}</div><button v-if="flightOn&&flightPlanData?.ok&&!fly.open&&!fallback" class="fly-launch" title="Fly the planned route: an aircraft on the path and a chase or cockpit view of the clouds, build-ups and winds it meets, the weather stepping with the flight time" @click="openFly">✈ Fly the route in 3D</button><FlyOverlay v-if="flyState&&!fallback" :plan="flightPlanData" :state="flyState" :rect="flyRect" :playing="fly.playing" :speed="fly.speed" :mode="fly.mode" :frame-label="stationFrameLabels[frameIndex]??''" :northern-hemisphere="northernGrid" @toggle-play="flyTogglePlay" @restart="flyPatch({hours:0,playing:true})" @scrub="h=>flyPatch({hours:h})" @speed="v=>flyPatch({speed:v})" @mode="m=>flyPatch({mode:m})" @close="closeFly"/><div v-if="hoverInfo&&hoverAt&&!fallback&&!stationView&&!(inspecting&&hoverCell===selected)" class="hover-tip" :class="{flip:hoverAt.x>viewportSize.width-260}" :style="{left:`${hoverAt.x}px`,top:`${hoverAt.y}px`}" aria-hidden="true"><b>{{hoverInfo.value}}</b><em>{{hoverInfo.unit}}</em><span>{{hoverInfo.short}}</span><small>click to have it explained</small></div><template v-for="v in windowViews" :key="v.w.id"><InspectOverlay v-if="v.view&&windowAnchors[v.w.id]" :content="v.view.content" :type-key="v.view.typeKey" :anchor="windowAnchors[v.w.id]" :bounds="inspectBounds" :series="v.view.series" :series-index="frameIndex" :wind="v.view.wind" :neighbourhood="v.view.near" :scale-stops="v.view.stops" :unit="unit" :column="v.view.column" :colour="v.w.colour" :z="v.z" :focused="v.w.id===focusedWindow" :minimised="v.w.minimised" :dock="dockPoints[v.w.id]??null" :avoid="()=>avoidFor(v.w.id)" @rect="r=>{windowRects[v.w.id]=r}" @close="closeCellWindow(v.w.id)" @minimise="minimiseCellWindow(v.w.id)" @focus="focusCellWindow(v.w.id)"/></template><svg v-if="dockMarkers.length||taskbarLink" class="ws-links" aria-hidden="true"><circle v-for="m in dockMarkers" :key="m.id" class="ws-marker" :cx="m.x" :cy="m.y" r="5" :style="{stroke:m.colour}"/><template v-if="taskbarLink"><path class="ws-link" :d="taskbarLink.path" :style="{stroke:taskbarLink.colour}"/><polygon :points="taskbarLink.head" :style="{fill:taskbarLink.colour}"/><circle class="ws-marker on" :cx="taskbarLink.a.x" :cy="taskbarLink.a.y" r="6" :style="{stroke:taskbarLink.colour}"/></template></svg><Taskbar v-if="immersive||inspectWindows.length" :items="taskbarItems" @activate="activateWindow" @close="closeCellWindow" @hover="onTaskbarHover" @minimise-all="minimiseAllWindows" @close-all="closeAllWindows"/></div><div v-if="snapshots.length>1" class="timeline"><div class="playback"><button @click="seek(frameIndex-1)" :disabled="frameIndex===0" aria-label="Previous frame">‹</button><button @click="togglePlayback">{{playing?'Pause':'Play'}}</button><button @click="seek(frameIndex+1)" :disabled="frameIndex===snapshots.length-1" aria-label="Next frame">›</button><span>Frame {{frameIndex+1}} / {{snapshots.length}} · {{playbackLabel}}</span></div><input aria-label="Timeline frame" type="range" min="0" :max="snapshots.length-1" :value="frameIndex" @input="seek($event.target.value)"><p>{{data.solarWind?`Snapshots every ${windBlock.storm.frame_every_hours} h of a synthetic storm · colour scale fixed over the storm · Sun-fixed frame: the Earth turns beneath the magnetosphere`:data.dust?`Hourly snapshots over one day · colour scale fixed over the day · total influx is a scenario (estimates 5–300 t/day)`:data.orography?`Engine orography · ${data.orography.foehnCells} foehn cells · ${data.orography.poolCells} cold pools · surface ${(data.orography.tendency*3600).toFixed(2)} K/h`:data.storms?`${data.storms.synthetic?'Synthetic mock':'Engine'} storms · ${data.storms.list.length} active · events so far: ${visibleEvents.map(e=>e.kind).join(', ')||'none'}`+(data.severe?` · tornado possible in ${data.severe.possibleCells} cells`:''):data.precipitation?`${data.precipitation.synthetic?'Synthetic mock':'Engine'} outcomes · ${data.precipitation.precipitating} precipitating cells · ${data.precipitation.lightningCells} thunderstorms · ${data.precipitation.hailCells} hail · ${data.precipitation.snowCells} snow · max ${data.precipitation.maxRate.toFixed(1)} mm/h`:data.clouds?`${data.clouds.synthetic?'Synthetic mock':'Engine'} cloud snapshots · heating ${data.clouds.heating.toFixed(1)} K · ${data.clouds.cloudy} cloudy cells · ${data.clouds.storms} thunderstorm cells · ${data.clouds.fronts} frontal cells`:data.coupled?`Coupled engine snapshots · fixed color scale · pressure static · scalar stability number ${data.coupled.stability.toFixed(2)} · supersaturated cells ${data.coupled.supersaturated}`:data.atmosphere?'Synthetic regional snapshots · fixed color scale · no coupling to local engine physics':'Discrete solver snapshots · fixed color scale · rainfall accumulates from the start · unavailable at time zero'}}</p></div><p v-if="layer==='rainfall' && data.rain" class="rain-interval">Accumulation interval: {{data.rain.period_start_utc.replace('T',' ').replace('Z',' UTC')}} → {{data.rain.valid_time_utc.replace('T',' ').replace('Z',' UTC')}}</p><p v-if="['water','soil'].includes(layer) && data.surfaceWater" class="rain-interval">Surface {{data.surfaceWater.stored_volume_m3.toFixed(2)}} m³ · Soil {{data.surfaceWater.soil_volume_m3.toFixed(2)}} m³ · Rain input {{data.surfaceWater.cumulative_rainfall_volume_m3.toFixed(2)}} m³ · Evaporated {{data.surfaceWater.evaporated_volume_m3.toFixed(2)}} m³ · Drained {{data.surfaceWater.drained_volume_m3.toFixed(2)}} m³ · Discharged {{data.surfaceWater.discharged_volume_m3.toFixed(2)}} m³ · Balance error {{data.surfaceWater.balance_error_m3.toExponential(2)}} m³<br>{{data.surfaceWater.boundary==='configured_outlets'?'Configured surface outlets':'Closed boundaries'}} · unknown rainfall cells are impermeable masks · prototype routing<br>Step {{data.surfaceWater.parameters.timestep_seconds}} s · Infiltration {{(data.surfaceWater.parameters.infiltration_rate_m_s*3600000).toFixed(2)}} mm/h · Evaporation {{(data.surfaceWater.parameters.evaporation_rate_m_s*3600000).toFixed(2)}} mm/h · Drainage {{(data.surfaceWater.parameters.drainage_rate_m_s*3600000).toFixed(2)}} mm/h<span v-if="data.surfaceWater.soil_capacity_m!==null"> · soil capacity {{data.surfaceWater.soil_capacity_m*1000}} mm</span></p><VfrReport v-if="vfrOn" :shares="vfrShares" :picked="vfrPicked" :picked-series="vfrPickedSeries" :frame-labels="stationFrameLabels" :frame-index="frameIndex" :area-table="gaforAreaTable" :area-source="gaforAreaSource" :time="time" :cloud-modelled="!!data.clouds" @seek="seek"/><FlightPlan v-if="flightOn&&airports.length>=2" :plan="flightPlanData" :airports="airports" :settings="planView" :frame-labels="stationFrameLabels" :frame-times="frameTimes" :rules="planRules" :return-data="returnData" :return-index="returnIndex" :windows="planWindows" :northern-hemisphere="northernGrid" :flying="fly.open" :bounds="planBounds" :picking="pickingWaypoints" @settings="updatePlan" @seek="seek" @select-airport="selectAirport" @fly="openFly" @picking="v=>{pickingWaypoints=v}"/><FlightWeather v-if="flightData" :report="flightData" :aloft="flightAloft" :aloft-note="aloftNote" :strongest="flightStrongest" :shares="flightShares" :airports="airportReports" :selected-id="selectedAirport?.id??null" :series="flightSeries" :series-index="frameIndex" :frame-labels="stationFrameLabels" :northern-hemisphere="northernGrid" @select-airport="selectAirport" @settings="p=>updateStationSettings('flight',p)" @seek="seek"/><SailingWeather v-if="sailData" :report="sailData" :forecast="sailForecast" :aloft="sailAloft" :probe="sailProbeData" :probe-series="sailProbeSeries" :boat-moved="boatCell!==null" :series="sailSeries" :series-index="frameIndex" :frame-labels="stationFrameLabels" :northern-hemisphere="northernGrid" @move-boat="moveBoatToProbe" @steer-here="steerToProbe" @clear-point="selected=null" @reset-boat="boatCell=null" @settings="p=>updateStationSettings('sail',p)" @seek="seek"/><section v-if="view==='severe'&&bulletin" class="comparison outlet-report storm-report"><div class="section-label">STORM WATCH · {{time}}</div>
    <p v-if="bulletin.tornado&&bulletin.tornado.cells" class="bulletin alert"><b>TORNADO WATCH</b> for {{bulletin.tornado.cells}} cells ({{Math.round(bulletin.tornado.areaKm2).toLocaleString()}} km²) in {{bulletin.tornado.regions.length}} area{{bulletin.tornado.regions.length===1?'':'s'}}: a tornado is possible in {{bulletin.tornado.possibleCells}} cells, the Significant Tornado Parameter reaches {{bulletin.tornado.maxStp.toFixed(1)}} ({{bulletin.tornado.maxStp>=3?'significant: EF2+ tornadoes possible':bulletin.tornado.maxStp>=1?'moderate':'low'}}), storm-relative helicity up to {{Math.max(...bulletin.tornado.regions.map(r=>r.maxHelicity)).toFixed(0)}} m²/s², the cap is broken in {{bulletin.tornado.capBrokenCells}} cells.</p>
    <p v-else-if="bulletin.tornado" class="bulletin">No tornado watch: {{noWatchReason(data.severe)}} Highest tornado parameter {{bulletin.tornado.maxStp.toFixed(2)}}.</p>
    <p v-if="bulletin.hurricanes.length" class="bulletin" :class="{alert:bulletin.hurricanes.some(h=>!['tropical_depression','tropical_storm'].includes(h.category))}"><b>HURRICANE{{bulletin.hurricanes.length===1?'':'S'}}</b>: {{bulletin.hurricanes.map(h=>`#${h.id} ${categoryInfo(h.category).label} with ${h.max_wind_m_s.toFixed(0)} m/s and ${(h.central_pressure_pa/100).toFixed(0)} hPa${h.over_land?' over land':' at sea'}`).join('; ')}}.</p>

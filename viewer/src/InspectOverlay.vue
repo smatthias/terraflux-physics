@@ -3,10 +3,15 @@
 // it in sentences. It springs open from its point and wobbles like jelly while it is dragged (wobbly.js). The sentences type themselves out; values are gaps that fill in as the typing reaches them, and the
 // graphics of a section draw themselves once its text is typed. A tether line keeps pointing at the data point while the
 // camera moves. Drag the title bar to move the window; the traffic lights close, minimise and enlarge it.
+// Where the data has a vertical column (cloud formation or column diagnostics), the window opens on an Atmosphere tab
+// (AtmosphereColumn.vue): the air above the point in 3D with the cloud and how it builds up; the second tab explains
+// the value as before.
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { typePlan, typedParts, lineStart, lineEnd, typingRate } from './typewriter.js'
 import { compass8, formatNumber } from './explain.js'
 import { createWobble, popFrom, matrixCss } from './wobbly.js'
+import AtmosphereColumn from './AtmosphereColumn.vue'
+import { linkArrow, edgePoint, placeWindow } from './workspace.js'
 
 const props = defineProps({
   content: { type: Object, required: true },
@@ -19,8 +24,17 @@ const props = defineProps({
   neighbourhood: { type: Array, default: () => [] },  // 5 x 5 CSS colours (null: outside / no data), row 0 = north
   scaleStops: { type: Array, default: null },         // CSS colours of the colour scale, low to high
   unit: { type: String, default: '' },
+  column: { type: Object, default: null },            // the atmosphere above the point (atmosphereColumn.js), or null
+  // The workspace: the window's colour (its arrow, its marker, its taskbar button), stacking, focus, and whether it is
+  // minimised to the taskbar (dock: where its button is, in the same pixels as the anchor).
+  colour: { type: String, default: '#ffd166' },
+  z: { type: Number, default: 9 },
+  focused: { type: Boolean, default: true },
+  minimised: { type: Boolean, default: false },
+  dock: { type: Object, default: null },
+  avoid: { type: Function, default: () => [] },       // where the other open windows are ([{ x, y, w, h }]): a window goes beside them
 })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'minimise', 'focus', 'rect'])
 const uid = `io${Math.random().toString(36).slice(2, 8)}`
 
 // ---- Typing ----------------------------------------------------------------------------------------------------------
@@ -45,15 +59,16 @@ const drawn = lines => revealed.value >= Math.max(...lines.map(lineEnd))
 
 // ---- Placement, dragging, traffic lights -------------------------------------------------------------------------------
 const win = ref(null), pos = ref({ x: 0, y: 0 }), size = ref({ w: 360, h: 320 })
-const dragged = ref(false), minimised = ref(false), expanded = ref(false)
-const width = computed(() => (expanded.value ? 460 : 360))
+const dragged = ref(false), rolled = ref(false), expanded = ref(false)   // rolled: folded up to its title bar (double-click)
+// Tabs: the atmosphere above the point (the default where the data has one) and the explanation of the value.
+const tab = ref(props.column ? 'atmosphere' : 'explain')
+const width = computed(() => Math.max(280, Math.min(expanded.value ? 480 : tab.value === 'atmosphere' && props.column ? 440 : 360, props.bounds.right - props.bounds.left - 16)))
+function showTab(t) { if (tab.value === t) return; tab.value = t; if (t === 'explain') retype(); nextTick(place) }
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 function place() {
   if (dragged.value || !props.anchor) return
-  const b = props.bounds, a = props.anchor, w = width.value, h = Math.min(size.value.h, b.bottom - b.top)
-  let x = a.x + 40
-  if (x + w > b.right - 8) x = a.x - 40 - w
-  pos.value = { x: clamp(x, b.left + 8, Math.max(b.left + 8, b.right - w - 8)), y: clamp(a.y - Math.min(140, h / 2), b.top + 8, Math.max(b.top + 8, b.bottom - h - 8)) }
+  const b = props.bounds, h = Math.min(size.value.h, b.bottom - b.top)
+  pos.value = placeWindow({ anchor: props.anchor, bounds: b, w: width.value, h, avoid: props.avoid() })
 }
 // Dragging: anywhere on the window except its controls and scrollbar; it becomes a drag after 4 px, so a click still
 // clicks. The wobble is applied straight to the element's transform every frame, without re-rendering the window.
@@ -67,7 +82,8 @@ function wobbleTick(now) {
 }
 const wobbleRun = () => { if (wobbly && !wobbleFrame) wobbleFrame = requestAnimationFrame(wobbleTick) }
 function startDrag(e) {
-  if (e.button !== 0 || e.target.closest('button, a, input, select, .mac-lights')) return
+  if (!props.focused) emit('focus')
+  if (e.button !== 0 || e.target.closest('button, a, input, select, .mac-lights, .atmo-canvas, .atmo-steps li')) return
   const body = e.target.closest('.mac-body')
   if (body && e.clientX > body.getBoundingClientRect().left + body.clientWidth) return   // the scrollbar
   drag = { x: e.clientX, y: e.clientY, offset: [e.clientX - pos.value.x, e.clientY - pos.value.y], moving: false }
@@ -100,14 +116,20 @@ function popOpen() {
 }
 const maxHeight = computed(() => Math.max(160, props.bounds.bottom - props.bounds.top - 16))
 
-// The tether from the data point to the nearest point of the window's edge.
+// The arrow from the window's nearest edge to its data point, in the window's colour.
 const tether = computed(() => {
   const a = props.anchor
-  if (!a?.visible) return null
-  const x0 = pos.value.x, y0 = pos.value.y, x1 = x0 + width.value, y1 = y0 + (minimised.value ? 34 : size.value.h)
-  const ex = clamp(a.x, x0, x1), ey = clamp(a.y, y0, y1)
-  if (Math.hypot(ex - a.x, ey - a.y) < 6) return null
-  return { ax: a.x, ay: a.y, ex, ey, mx: (a.x + ex) / 2, my: Math.min(a.y, ey) - 18 }
+  if (!a?.visible || props.minimised) return null
+  const from = edgePoint({ x: pos.value.x, y: pos.value.y, w: width.value, h: rolled.value ? 34 : size.value.h }, a)
+  if (from.inside) return null
+  return linkArrow(from, a)
+})
+// Minimising flies the window to its taskbar button: it shrinks about its top-left corner (the wobble's origin), so that
+// corner moves onto the button.
+const dockShift = computed(() => {
+  const d = props.dock
+  if (!props.minimised || !d) return {}
+  return { '--dock-dx': `${(d.x - pos.value.x).toFixed(0)}px`, '--dock-dy': `${(d.y - pos.value.y).toFixed(0)}px` }
 })
 
 let observer = null
@@ -118,9 +140,20 @@ onMounted(() => {
   if (win.value) { observer.observe(win.value); size.value = { w: win.value.offsetWidth, h: win.value.offsetHeight } }
   place(); retype(); nextTick(popOpen)
 })
-onBeforeUnmount(() => { cancelAnimationFrame(raf); cancelAnimationFrame(wobbleFrame); observer?.disconnect(); endDrag() })
-watch(() => props.typeKey, () => { dragged.value = dragged.value && !!drag; minimised.value = false; nextTick(() => { place(); popOpen() }); retype() })
+onBeforeUnmount(() => { clearTimeout(replace); cancelAnimationFrame(raf); cancelAnimationFrame(wobbleFrame); observer?.disconnect(); endDrag() })
+watch(() => props.typeKey, () => { dragged.value = dragged.value && !!drag; rolled.value = false; tab.value = props.column ? 'atmosphere' : 'explain'; nextTick(() => { place(); popOpen() }); retype() })
+watch(() => !!props.column, has => { if (!has) tab.value = 'explain' })
 watch(expanded, () => nextTick(place))
+// Report where the window is, so that the next one can go beside it.
+watch(() => [pos.value.x, pos.value.y, width.value, size.value.h, rolled.value], () => emit('rect', { x: pos.value.x, y: pos.value.y, w: width.value, h: rolled.value ? 34 : size.value.h }), { immediate: true })
+// The free area changed (fullscreen on or off, a panel opened): place the window again, or keep a moved one inside.
+// Several windows: the focused one first, the others after it in stacking order, each beside those already placed.
+let replace = 0
+watch(() => [props.bounds.left, props.bounds.top, props.bounds.right, props.bounds.bottom].join(), () => {
+  if (!dragged.value) { clearTimeout(replace); replace = setTimeout(place, props.focused ? 0 : 60 + Math.max(0, 20 - props.z) * 50); return }
+  const b = props.bounds
+  pos.value = { x: clamp(pos.value.x, b.left - width.value + 80, b.right - 80), y: clamp(pos.value.y, b.top, b.bottom - 40) }
+})
 
 // ---- Graphics ----------------------------------------------------------------------------------------------------------
 const dist = computed(() => {
@@ -153,22 +186,31 @@ const delay = k => `${(Math.abs((k % 5) - 2) + Math.abs(Math.floor(k / 5) - 2)) 
 </script>
 
 <template>
-  <svg class="mac-tether" aria-hidden="true">
-    <path v-if="tether" :d="`M${tether.ax},${tether.ay} Q${tether.mx},${tether.my} ${tether.ex},${tether.ey}`"/>
-    <circle v-if="anchor?.visible" class="mac-tether-dot" :cx="anchor.x" :cy="anchor.y" r="5"/>
-    <circle v-if="anchor?.visible" class="mac-tether-pulse" :cx="anchor.x" :cy="anchor.y" r="5"/>
+  <svg class="mac-tether" :class="{ unfocused: !focused }" :style="{ zIndex: z - 1, '--accent': colour }" aria-hidden="true">
+    <template v-if="tether"><path class="mac-arrow" :d="tether.path"/><polygon class="mac-arrow-head" :points="tether.head"/></template>
+    <template v-if="anchor?.visible && !minimised">
+      <circle class="mac-tether-dot" :cx="anchor.x" :cy="anchor.y" r="5"/>
+      <circle v-if="focused" class="mac-tether-pulse" :cx="anchor.x" :cy="anchor.y" r="5"/>
+    </template>
   </svg>
-  <div ref="win" class="mac-window" :class="{ minimised, expanded, typing }" @pointerdown="startDrag" role="dialog" :aria-label="`${content.title}: ${content.value} ${content.unit}`"
-       :style="{ left: `${pos.x}px`, top: `${pos.y}px`, width: `${width}px`, maxHeight: `${maxHeight}px` }">
-    <div class="mac-titlebar" @dblclick="e => { if (!e.target.closest('.mac-lights')) minimised = !minimised }">
+  <div ref="win" class="mac-window" :class="{ rolled, expanded, typing, unfocused: !focused, 'to-dock': minimised }" @pointerdown="startDrag" role="dialog" :aria-label="`${content.title}: ${content.value} ${content.unit}`"
+       :style="{ left: `${pos.x}px`, top: `${pos.y}px`, width: `${width}px`, maxHeight: `${maxHeight}px`, zIndex: z, '--accent': colour, ...dockShift }" :aria-hidden="minimised ? 'true' : null" :inert="minimised ? true : null">
+    <div class="mac-titlebar" @dblclick="e => { if (!e.target.closest('.mac-lights')) rolled = !rolled }">
       <div class="mac-lights">
         <button class="mac-light close" aria-label="Close" title="Close (Esc)" @click="emit('close')"><svg viewBox="0 0 10 10"><path d="M3 3l4 4M7 3l-4 4"/></svg></button>
-        <button class="mac-light min" :aria-label="minimised ? 'Expand' : 'Minimise'" :title="minimised ? 'Expand' : 'Minimise'" @click="minimised = !minimised"><svg viewBox="0 0 10 10"><path d="M2.5 5h5"/></svg></button>
+        <button class="mac-light min" aria-label="Minimise to the taskbar" title="Minimise to the taskbar" @click="emit('minimise')"><svg viewBox="0 0 10 10"><path d="M2.5 5h5"/></svg></button>
         <button class="mac-light zoom" :aria-label="expanded ? 'Smaller' : 'Larger'" :title="expanded ? 'Smaller' : 'Larger'" @click="expanded = !expanded"><svg viewBox="0 0 10 10"><path d="M5 2.5v5M2.5 5h5"/></svg></button>
       </div>
-      <div class="mac-title">{{ content.title }}</div>
+      <div class="mac-title"><i class="mac-accent" :style="{ background: colour }"></i>{{ content.title }}</div>
     </div>
-    <div v-show="!minimised" class="mac-body" :style="{ maxHeight: `${maxHeight - 34}px` }" @click="finish">
+    <div v-if="column && !rolled" class="mac-tabs" role="tablist">
+      <button role="tab" :aria-selected="tab === 'atmosphere'" :class="{ on: tab === 'atmosphere' }" @click="showTab('atmosphere')">Atmosphere</button>
+      <button role="tab" :aria-selected="tab === 'explain'" :class="{ on: tab === 'explain' }" @click="showTab('explain')">{{ content.title.length > 26 ? 'This value' : content.title }}</button>
+    </div>
+    <div v-if="column && tab === 'atmosphere'" v-show="!rolled" class="mac-body atmo-body" :style="{ maxHeight: `${maxHeight - 68}px` }">
+      <AtmosphereColumn :column="column" :column-key="typeKey" :paused="minimised || rolled" :idle="!focused" />
+    </div>
+    <div v-else v-show="!rolled" class="mac-body" :style="{ maxHeight: `${maxHeight - (column ? 68 : 34)}px` }" @click="finish">
       <div class="mac-hero">
         <span class="mac-value"><template v-for="(t, j) in hero" :key="j"><span>{{ parts(t).shown }}</span><span class="ghost" :class="{ gap: !parts(t).done }">{{ parts(t).ghost }}</span></template></span>
         <span class="mac-unit" :class="{ on: revealed >= hero[0]?.end }">{{ content.unit }}</span>

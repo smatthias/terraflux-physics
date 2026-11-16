@@ -78,6 +78,17 @@ export function sampleLinear(field, stride, k, nx, ny, fx, fy, wrapX = false) {
   return top + (bottom - top) * ty
 }
 
+// The vertex colours of an existing surface for new per-cell colours (rgb triples), sampled bilinearly at the
+// vertices' cell coordinates like the surface itself: recolouring without rebuilding the geometry.
+export function surfaceColours(geometry, colors, nx, ny, wrapX = false, out = null) {
+  const uv = geometry.attributes.uv, n = uv.count, result = out ?? new Float32Array(n * 3)
+  for (let k = 0; k < n; k++) {
+    const fx = uv.getX(k) * nx - 0.5, fy = uv.getY(k) * ny - 0.5
+    for (let j = 0; j < 3; j++) result[k * 3 + j] = sampleLinear(colors, 3, j, nx, ny, fx, fy, wrapX)
+  }
+  return result
+}
+
 // The grid cell under a surface uv (u across x, v across y, both 0..1 over the whole domain).
 export function cellAtUv(u, v, nx, ny) {
   const x = clampIndex(Math.floor(u * nx), nx), y = clampIndex(Math.floor(v * ny), ny)

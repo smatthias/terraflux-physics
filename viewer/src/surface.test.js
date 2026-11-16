@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
-import { surfaceSubdivisions, latticeAxis, centreHeights, noise2, ridged, cavityOcclusion, sampleCubic, sampleLinear, cellAtUv, planeSurface, globeSurface, surfaceSkirt, surfaceMaterial, skirtMaterial } from './surface.js'
+import { surfaceSubdivisions, latticeAxis, centreHeights, noise2, ridged, cavityOcclusion, sampleCubic, sampleLinear, cellAtUv, planeSurface, globeSurface, surfaceSkirt, surfaceMaterial, skirtMaterial, surfaceColours } from './surface.js'
 
 const field = (nx, ny, f) => Float32Array.from({ length: nx * ny }, (_, i) => f(i % nx, Math.floor(i / nx)))
 const colours = n => Float32Array.from({ length: n * 3 }, (_, k) => (k % 3) / 2)
@@ -178,4 +178,16 @@ test('terrain attributes reach the geometry and the terrain shader compiles its 
   assert.ok(sideShader.fragmentShader.includes('float band = fract(vSidePos.y * uSkirtStrata'))
   assert.equal(skirtMaterial().defines.TF_TERRAIN, undefined, 'without terrain the sides stay plain')
   assert.equal(skirtMaterial({ terrain: true }).defines.STANDARD, '')
+})
+
+test('recolouring an existing surface gives the colours it would have been built with', () => {
+  const nx = 5, ny = 4, n = nx * ny
+  const heights = Float32Array.from({ length: n }, (_, i) => (i % 3) * 0.2)
+  const a = Float32Array.from({ length: n * 3 }, (_, i) => (i % 7) / 7), b = Float32Array.from({ length: n * 3 }, (_, i) => ((i * 5) % 11) / 11)
+  const built = planeSurface({ nx, ny, dx: 1, dz: 1, heights, colors: b, values: null, s: 3 })
+  const other = planeSurface({ nx, ny, dx: 1, dz: 1, heights, colors: a, values: null, s: 3 })
+  const again = surfaceColours(other, b, nx, ny)
+  const ref = built.attributes.color.array
+  assert.equal(again.length, ref.length)
+  for (let k = 0; k < ref.length; k++) assert.ok(Math.abs(again[k] - ref[k]) < 1e-5, `vertex component ${k}`)
 })
