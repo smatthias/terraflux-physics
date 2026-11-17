@@ -1,0 +1,24 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {jobStore} from './job-store.mjs';
+import {validateProject} from '../shared/project.mjs';
+import {exportJobBackup,validateJobBackup} from '../shared/job-backup.mjs';
+const base=validateProject({schemaVersion:1,units:'m',name:'Source',room:{width:6,depth:4,height:3}});
+const project=validateProject({...base,room:{...base.room,furniture:[{id:'a',name:'Cabinet',type:'cabinet',width:.9,height:1.2,depth:.5,thickness:.018,shelves:1,x:0,z:0,rotation:0}]}});
+const pricing={currency:'EUR',sheetRates:{oak:10000,birch:20000,white:30000},handleUnitCents:250,labourHourlyCents:6000,labourMinutesPerPanel:5,markupBps:1000};
+test('quote status events preserve snapshot content and validate histories on restore',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'terratec-quote-status-'));t.after(()=>rm(directory,{recursive:true,force:true}));const store=jobStore(directory);
+ const job=await store.create({name:'Quotes',project}),quoted=await store.quote(job.id,{revision:1,expectedRevision:1,expectedQuoteCount:0,pricing,details:{customer:'Snapshot'}}),quote=quoted.revisions[0].quotes[0];
+ const input={revision:1,expectedRevision:1,quoteId:quote.id,expectedEvent:0,status:'accepted',actor:'Matthias',note:'Local record'};
+ await assert.rejects(()=>store.quoteStatus(job.id,input),/transition/);
+ const sent=await store.quoteStatus(job.id,{...input,status:'sent'});assert.equal(sent.revisions[0].quotes[0].lifecycle.status,'sent');
+ await assert.rejects(()=>store.quoteStatus(job.id,{...input,status:'sent'}),/changed/);
+ const accepted=await store.quoteStatus(job.id,{...input,expectedEvent:1});assert.deepEqual(accepted.revisions[0].quotes[0].costing,quote.costing);assert.deepEqual(accepted.revisions[0].quotes[0].details,quote.details);
+ await assert.rejects(()=>store.quoteStatus(job.id,{...input,expectedEvent:2,status:'declined'}),/transition/);
+ assert.deepEqual(await validateJobBackup(JSON.parse(await exportJobBackup(accepted))),accepted);
+ const changed=structuredClone(accepted);changed.revisions[0].quotes[0].lifecycle.events[0].status='accepted';await assert.rejects(async()=>validateJobBackup(JSON.parse(await exportJobBackup(changed))),/transition/);
+ assert.equal((await jobStore(directory).read(job.id)).revisions[0].quotes[0].lifecycle.events.length,2);
+});

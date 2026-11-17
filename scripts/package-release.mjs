@@ -1,0 +1,25 @@
+import {cp, mkdir, rm, writeFile, access} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {execFileSync} from 'node:child_process';
+
+const root=resolve(import.meta.dirname,'..');
+const name=`terratec-${process.platform}-${process.arch}`;
+const output=resolve(root,'release',name);
+if(process.platform==='win32') throw new Error('Release packaging currently supports Linux/macOS tar archives only.');
+await access(resolve(root,'dist/index.html'));
+await access(resolve(root,'build/terratec-core'));
+await rm(output,{recursive:true,force:true});
+await mkdir(resolve(output,'build'),{recursive:true});
+for(const dir of ['server','shared','dist']) await cp(resolve(root,dir),resolve(output,dir),{recursive:true,filter:source=>!source.endsWith('.test.mjs')&&!source.includes('/.vite')});
+await cp(resolve(root,'build/terratec-core'),resolve(output,'build/terratec-core'));
+for(const file of ['LICENSE','README.md']) await cp(resolve(root,file),resolve(output,file));
+await writeFile(resolve(output,'package.json'),JSON.stringify({name:'terratec-release',private:true,type:'module',engines:{node:'>=22.12.0'},scripts:{start:'node start.mjs'}},null,2)+'\n');
+await writeFile(resolve(output,'start.mjs'),`import {makeServer} from './server/index.mjs';
+import {fileURLToPath} from 'node:url';
+const port=Number(process.env.PORT || 3001);
+if(!Number.isInteger(port)||port<1||port>65535) throw new Error('PORT must be an integer from 1 to 65535');
+makeServer({dataDir:process.env.TERRATEC_DATA_DIR,staticDir:fileURLToPath(new URL('./dist/',import.meta.url))}).listen(port,'127.0.0.1',()=>console.log('TerraTec: http://127.0.0.1:'+port));
+`);
+await writeFile(resolve(output,'INSTALL.txt'),`Requires Node.js >=22.12.0 and a compatible ${process.platform}/${process.arch} system.\nExtract this archive, then run: node /path/to/${name}/start.mjs\nOpen http://127.0.0.1:3001\nOptional: PORT and TERRATEC_DATA_DIR environment variables. Default data: data/ beside start.mjs.\nNo npm install, Vite or compiler required. Back up data/ before upgrading; use TERRATEC_DATA_DIR outside this folder to retain data across upgrades.\nNative binary is built for the runner platform; cross-platform installers are not included.\n`);
+execFileSync('tar',['-czf',resolve(root,'release',name+'.tar.gz'),'-C',resolve(root,'release'),name]);
+console.log(`Packaged release/${name}.tar.gz`);

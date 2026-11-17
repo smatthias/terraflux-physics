@@ -64,41 +64,96 @@ export function windsockMarker({ fromDeg = 0, kt = 0, runwayDeg = 360, colour = 
   return group
 }
 
-// Sailing boat on its heading, the sail sheeted to leeward of the apparent wind, a masthead wind arrow (pointing into
-// the apparent wind, like a Windex) and a ring in the warning colour. awa: apparent wind angle, signed (positive: from
-// starboard); awdFrom: apparent wind direction (from, true); hs, tp: the sea (for the bobbing); size: scene units.
-export function boatMarker({ headingDeg = 0, awa = 45, awdFrom = 45, colour = '#3ddc84', hs = 0, tp = 0, size = 1.4 } = {}) {
+// Sailing boat on its heading with its sail plan and trim (sailTrim.js): the mainsail reefed to its hoist (the reefed
+// part bundled on the boom) or a storm trysail, the headsail by kind (genoa overlapping the mast, jib, storm jib, a
+// gennaker from a bowsprit, or goose-winged on a dead run), each sheeted to leeward at its angle, the hull heeled to
+// leeward; a masthead wind arrow (pointing into the apparent wind, like a Windex) and a ring in the warning colour.
+// awa: apparent wind angle, signed (positive: from starboard); awdFrom: apparent wind direction (from, true); sails: a
+// sailPlan (or null: full main and genoa sheeted by sheetAngle); hs, tp: the sea (for the bobbing); size: scene units.
+// userData.set({ headingDeg, boomDeg, jibDeg, heelDeg, luffing }) re-poses it for an animation (a tack, a gybe, a
+// passage): angles signed, positive to starboard.
+export function boatMarker({ headingDeg = 0, awa = 45, awdFrom = 45, colour = '#3ddc84', hs = 0, tp = 0, size = 1.4, sails = null, showRing = true } = {}) {
   const group = new THREE.Group(); group.name = 'sailing-station'
-  group.add(ring(size * 0.62, colour))
+  if (showRing) group.add(ring(size * 0.62, colour))
   const boat = new THREE.Group(); boat.name = 'boat'; boat.rotation.y = headingYaw(headingDeg); group.add(boat)
+  const heel = new THREE.Group(); heel.name = 'heel'; boat.add(heel)
   // Hull: a pointed outline extruded upward; the bow along -z.
   const L = size * 0.62, W = size * 0.2, shape = new THREE.Shape()
   shape.moveTo(0, L / 2); shape.quadraticCurveTo(W / 2, L * 0.18, W / 2, -L * 0.2); shape.lineTo(W * 0.42, -L / 2); shape.lineTo(-W * 0.42, -L / 2); shape.lineTo(-W / 2, -L * 0.2); shape.quadraticCurveTo(-W / 2, L * 0.18, 0, L / 2)
   const hullGeometry = new THREE.ExtrudeGeometry(shape, { depth: size * 0.07, bevelEnabled: false }); hullGeometry.rotateX(-Math.PI / 2)
-  const hull = new THREE.Mesh(hullGeometry, new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.45 })); hull.castShadow = true; hull.name = 'hull'; boat.add(hull)
+  const hull = new THREE.Mesh(hullGeometry, new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.45 })); hull.castShadow = true; hull.name = 'hull'; heel.add(hull)
   const deck = new THREE.Mesh(new THREE.BoxGeometry(W * 0.5, size * 0.012, L * 0.35), new THREE.MeshStandardMaterial({ color: 0x9c7a54, roughness: 0.8 }))
-  deck.position.set(0, size * 0.075, L * 0.08); boat.add(deck)
+  deck.position.set(0, size * 0.075, L * 0.08); heel.add(deck)
   // Mast a third of the way aft of the bow.
-  const mastZ = -L * 0.12, mastHeight = size * 0.85
+  const mastZ = -L * 0.12, mastHeight = size * 0.85, deckY = size * 0.07
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.008, size * 0.011, mastHeight, 8), new THREE.MeshStandardMaterial({ color: 0xc9d1d6, metalness: 0.4, roughness: 0.4 }))
-  mast.position.set(0, size * 0.07 + mastHeight / 2, mastZ); mast.castShadow = true; boat.add(mast)
-  // Mainsail: a triangle from the tack (mast foot) to the head (mast top) and the clew (boom end), swung to leeward.
-  // Facing the bow (-z), starboard is +x. Wind over starboard (awa > 0) puts the sail to port (-x): the clew, built
-  // aft along +z, turns by a yaw whose sine has the sign of the side it goes to.
-  const sheet = sheetAngle(awa), side = awa >= 0 ? -1 : 1
-  const sailPivot = new THREE.Group(); sailPivot.name = 'sail'; sailPivot.position.set(0, size * 0.1, mastZ); sailPivot.rotation.y = side * rad(sheet)
-  const boom = L * 0.55, sailGeometry = new THREE.BufferGeometry()
-  sailGeometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, mastHeight * 0.92, 0, 0, 0, boom], 3)); sailGeometry.computeVertexNormals()
-  const sail = new THREE.Mesh(sailGeometry, new THREE.MeshStandardMaterial({ color: 0xfbfbf6, side: THREE.DoubleSide, roughness: 0.7, transparent: true, opacity: 0.95 }))
-  sail.castShadow = true; sailPivot.add(sail); boat.add(sailPivot)
+  mast.position.set(0, deckY + mastHeight / 2, mastZ); mast.castShadow = true; heel.add(mast)
+  const sailMaterial = c => new THREE.MeshStandardMaterial({ color: c, side: THREE.DoubleSide, roughness: 0.7, transparent: true, opacity: 0.95 })
+  // A sail as a cambered triangle: tack at the origin, head up the luff (0, h, 0), clew aft along +z at `foot`; the
+  // belly bulges to +x (flipped by the pivot's side).
+  const sailMesh = (h, foot, c, { camber = 0.1, headAft = 0 } = {}) => {
+    const rows = 6, cols = 4, pos = [], idx = []
+    for (let r = 0; r <= rows; r++) for (let k = 0; k <= cols; k++) {
+      const v = r / rows, u = k / cols, width = foot * (1 - v) + headAft * v
+      pos.push(Math.sin(Math.PI * u) * camber * width * (1 - 0.6 * v), h * v, width * u)
+    }
+    for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) { const a = r * (cols + 1) + k, b = a + cols + 1; idx.push(a, b, a + 1, a + 1, b, b + 1) }
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geometry.setIndex(idx); geometry.computeVertexNormals()
+    const mesh = new THREE.Mesh(geometry, sailMaterial(c)); mesh.castShadow = true; return mesh
+  }
+  // The sail plan: given, or the default full main and genoa sheeted by sheetAngle.
+  const lee = awa >= 0 ? -1 : 1
+  const plan = sails ?? { main: { kind: 'main', hoist: 1, reef: 0 }, headsail: { kind: 'genoa', furl: 0 }, boomDeg: sheetAngle(awa), jibDeg: Math.min(40, sheetAngle(awa)), lee, heelDeg: 0, gooseWing: false, luffing: false }
+  const side = plan.lee ?? lee
+  // Mainsail (or trysail) on the boom pivot at the mast foot.
+  const boomLength = L * 0.55, sailPivot = new THREE.Group(); sailPivot.name = 'sail'; sailPivot.position.set(0, deckY + size * 0.03, mastZ)
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.008, size * 0.008, boomLength, 6), new THREE.MeshStandardMaterial({ color: 0xb8c2c8, metalness: 0.3 }))
+  boom.rotation.x = Math.PI / 2; boom.position.z = boomLength / 2; sailPivot.add(boom)
+  if (plan.main.kind === 'main') {
+    const hoist = plan.main.hoist ?? 1, main = sailMesh(mastHeight * 0.9 * hoist, boomLength, 0xfbfbf6, { camber: 0.12, headAft: boomLength * 0.08 })
+    main.name = 'mainsail'; sailPivot.add(main)
+    if (plan.main.reef) { const bundle = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.02, size * 0.02, boomLength * 0.95, 8), sailMaterial(0xe8e8e0)); bundle.rotation.x = Math.PI / 2; bundle.position.set(0, size * 0.02, boomLength / 2); bundle.name = 'reef-bundle'; sailPivot.add(bundle) }
+  } else if (plan.main.kind === 'trysail') {
+    const trysail = sailMesh(mastHeight * 0.42, boomLength * 0.55, 0xff8a3d, { camber: 0.08 }); trysail.position.y = mastHeight * 0.08; trysail.name = 'trysail'; sailPivot.add(trysail)
+  }
+  heel.add(sailPivot)
+  // Headsail on its pivot at the stemhead (the gennaker's at the end of a bowsprit).
+  const hk = plan.headsail.kind, jibPivot = new THREE.Group(); jibPivot.name = 'headsail'
+  const bowZ = -L / 2, sprit = hk === 'gennaker' ? L * 0.16 : 0
+  jibPivot.position.set(0, deckY, bowZ - sprit)
+  if (sprit) { const bs = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.006, size * 0.006, sprit, 6), new THREE.MeshStandardMaterial({ color: 0x888888 })); bs.rotation.x = Math.PI / 2; bs.position.set(0, deckY, bowZ - sprit / 2); heel.add(bs) }
+  const forestay = mastHeight * 0.86, furl = plan.headsail.furl ?? 0
+  const spec = { genoa: [forestay, L * 0.62 * (1 - furl * 0.8), 0xf4f4ee, 0.1], jib: [forestay * (1 - furl * 0.35), L * 0.4 * (1 - furl * 0.5), 0xf4f4ee, 0.08], storm: [forestay * 0.42, L * 0.2, 0xff8a3d, 0.05], gennaker: [mastHeight * 0.95, L * 0.95, 0x3b8bff, 0.32] }[hk]
+  if (spec) { const head = sailMesh(spec[0], spec[1], spec[2], { camber: spec[3] }); head.name = hk === 'gennaker' ? 'gennaker' : 'jib'; jibPivot.add(head) }
+  heel.add(jibPivot)
   // Masthead arrow pointing into the apparent wind (world frame: it does not turn with the hull).
   const arrowDir = bearingVector(awdFrom), arrow = new THREE.ArrowHelper(new THREE.Vector3(arrowDir[0], 0, arrowDir[1]), new THREE.Vector3(0, 0, 0), size * 0.3, 0x7fe0ff, size * 0.1, size * 0.06)
   arrow.name = 'apparent-wind'
-  const top = new THREE.Vector3(0, size * 0.07 + mastHeight, mastZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y)
+  const top = new THREE.Vector3(0, deckY + mastHeight, mastZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y)
   arrow.position.copy(top).addScaledVector(new THREE.Vector3(arrowDir[0], 0, arrowDir[1]), -size * 0.15); group.add(arrow)
-  // Riding the sea: heave with the wave period, a little roll and pitch with the height.
+  // Pose: sheet angles (positive to starboard; a headsail poled out to windward when goose-winged) and heel.
+  const pose = { boomDeg: plan.boomDeg * side, jibDeg: (plan.gooseWing ? -1 : 1) * plan.jibDeg * side, heelDeg: (plan.heelDeg ?? 0) * side, luffing: !!plan.luffing }
+  const apply = () => {
+    sailPivot.rotation.y = rad(pose.boomDeg); jibPivot.rotation.y = rad(pose.jibDeg)
+    // Belly to leeward: the sail meshes bulge to +x, so mirror them on the port side.
+    for (const m of [...sailPivot.children, ...jibPivot.children]) if (m.geometry?.type === 'BufferGeometry') m.scale.x = (m === jibPivot.children[0] ? pose.jibDeg : pose.boomDeg) >= 0 ? 1 : -1
+    heel.rotation.z = -rad(pose.heelDeg)
+  }
+  apply()
+  // Riding the sea: heave with the wave period, a little roll and pitch with the height; a luffing sail shivers.
   const heave = Math.min(size * 0.05, 0.02 + 0.015 * hs), period = tp > 0 ? Math.max(2.5, Math.min(8, tp * 0.6)) : 4, roll = rad(Math.min(12, 2 + 2.5 * hs))
-  group.userData = { kind: 'sailing', sheetDeg: sheet, leeward: side < 0 ? 'port' : 'starboard', headingDeg, update: time => { const w = 2 * Math.PI * time / period; boat.position.y = heave * Math.sin(w); boat.rotation.z = roll * Math.sin(w + 0.9); boat.rotation.x = roll * 0.5 * Math.sin(w + 2.1) } }
+  group.userData = {
+    kind: 'sailing', sheetDeg: plan.boomDeg, leeward: side < 0 ? 'port' : 'starboard', headingDeg, sails: plan, pose,
+    set(state) {
+      if (state.headingDeg !== undefined) boat.rotation.y = headingYaw(state.headingDeg)
+      for (const k of ['boomDeg', 'jibDeg', 'heelDeg', 'luffing']) if (state[k] !== undefined) pose[k] = state[k]
+      apply()
+    },
+    update: time => {
+      const w = 2 * Math.PI * time / period; boat.position.y = heave * Math.sin(w); boat.rotation.z = roll * Math.sin(w + 0.9); boat.rotation.x = roll * 0.5 * Math.sin(w + 2.1)
+      if (pose.luffing) { sailPivot.rotation.y = rad(pose.boomDeg + 6 * Math.sin(time * 23)); jibPivot.rotation.y = rad(pose.jibDeg + 9 * Math.sin(time * 29 + 1)) }
+    },
+  }
   return group
 }
 

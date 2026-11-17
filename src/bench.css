@@ -1,0 +1,25 @@
+/* Workshop benches (Workbench.vue, DrillingBench.vue, CuttingBench.vue); loaded with bench-scene.js. */
+.workbench{position:absolute;inset:0;z-index:20;background:#22302d}.workbench .bench-canvas{position:absolute;inset:0}
+.workbench .bench-note{position:absolute;top:70px;left:14px;z-index:2;margin:0;padding:6px 10px;border-radius:6px;background:#f2f3ebe6;font-size:11px}
+.workbench h2{margin:0 0 2px;font-size:18px}.workbench fieldset{margin:8px 0;padding:8px;border:1px solid #becabe;border-radius:6px}
+.workbench legend{font-size:11px;font-weight:700}.workbench label{margin:6px 0;font-size:11px}
+.workbench .bench-choices{display:flex;flex-wrap:wrap;gap:3px}.workbench .bench-choices button{font-size:11px;padding:4px 7px}
+.workbench .bench-choices button[aria-pressed=true],.workbench .bench-choices button[aria-checked=true]{background:#263e3c;color:#f2f3eb}
+.workbench .bench-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.workbench .bench-row input,.workbench .bench-row select{width:100%;min-width:0;padding:5px}
+.workbench .bench-drill{width:100%;margin:8px 0;padding:10px}.workbench .bench-problem{color:#8d2b19;font-weight:700;margin:4px 0}
+.workbench .bench-holes{list-style:none;margin:4px 0;padding:0}.workbench .bench-holes li{display:flex;gap:4px;border-bottom:1px solid #dde3d9}
+.workbench .bench-holes button{border:0;font-size:11px;padding:4px;text-align:left}.workbench .bench-holes button:first-child{flex:1}
+
+.workbench .bench-row.two{grid-template-columns:1fr 1fr}.cutting-bench .bench-holes li span{flex:1;font-size:11px;padding:4px}
+.workbench .tool-chest{font-size:12px}
+.workbench .tool-chest details{margin:4px 0}.workbench .tool-chest summary{cursor:pointer;font-weight:700;padding:4px 0}
+.workbench .tool-chest ul{list-style:none;margin:2px 0 6px;padding:0}
+.workbench .tool-chest button{width:100%;text-align:left;border:0;border-radius:4px;padding:5px 7px;font-size:12px;display:flex;flex-direction:column}
+.workbench .tool-chest button small{font-size:10px;color:#60746a}.workbench .tool-chest button[aria-pressed=true]{background:#263e3c;color:#f2f3eb}.workbench .tool-chest button[aria-pressed=true] small{color:#cfd8cc}
+.workbench .tool-chest button.reference{opacity:.6;font-style:italic}
+.workbench .tool-in-hand{margin:8px 0;padding:8px;border-radius:6px;background:#e2ebde}.workbench .tool-in-hand small{display:block;margin-top:3px;color:#60746a}
+.bench-desk .bench-panel{padding:0;background:transparent;border:0;overflow:visible}
+.bench-layers ol{list-style:none;margin:6px 0;padding:0}.bench-layers li{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #dde3d9}
+.bench-layers li.hidden .layer-name{opacity:.5}.bench-layers .layer-name{flex:1}.bench-layers small{color:#60746a}
+.bench-layers .swatch{display:inline-block;width:10px;height:10px;border:1px solid #0003;border-radius:2px}
+.bench-layers .layer-show{display:flex;align-items:center;gap:3px;margin:0;text-transform:none}.bench-layers .layer-show input{width:auto;margin:0}

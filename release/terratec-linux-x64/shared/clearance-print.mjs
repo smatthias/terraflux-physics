@@ -1,0 +1,20 @@
+import {clearanceSnapshot} from './clearance-export.mjs';
+import {exportPlanSvg,escapeXml as escape} from './plan-svg.mjs';
+import {bounds} from './geometry.mjs';
+export function clearancePrint(project,options,generatedAt){
+ const snapshot=clearanceSnapshot(project,options,generatedAt),{room,review,settings}=snapshot;
+ const affected=room.furniture.filter(item=>review.issues.some(issue=>issue.cabinetId===item.id));
+ const references=new Map(affected.map((item,i)=>[item.id,'C'+(i+1)]));
+ const box=bounds(room.outline),radius=Math.max(box.width,box.depth)*.022;
+ const markers=affected.map(item=>`<g data-cabinet-ref="${references.get(item.id)}"><circle cx="${item.x}" cy="${item.z}" r="${radius}" fill="#8d2b19"/><text x="${item.x}" y="${item.z}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="${radius*.95}" fill="white">${references.get(item.id)}</text><title>${escape(item.name)}</title></g>`).join('');
+ const plan=exportPlanSvg({...project,room}).replace(/<\?xml[^>]*>\s*/,'').replace('</svg>',markers+'</svg>');
+ const note=`<p class="notice">${escape(snapshot.scope)} Plan scaled to fit; not to scale. Markers C1, C2… identify affected cabinets; issue numbers I1, I2… refer to the register. Nearby markers may overlap.</p>`;
+ const header=`<p class="project">${escape(snapshot.project.name)}</p><p>Snapshot ${escape(snapshot.generatedAt)} · units m · ${review.issues.length} issues · ${review.affectedCount} of ${review.cabinetCount} cabinets affected</p>`;
+ const pages=[`<h1>Clearance handoff</h1>${header}<p>Minimum wall gap ${settings.minWall.toFixed(3)} m · door access depth ${settings.doorDepth.toFixed(3)} m · cabinet front service depth ${settings.serviceDepth.toFixed(3)} m · preview enforcement ${settings.enforce?'on':'off'}</p><div class="plan">${plan}</div>${note}`];
+ for(let start=0;start<review.issues.length;start+=6){
+  const rows=review.issues.slice(start,start+6).map((issue,i)=>`<tr><td>I${start+i+1}</td><td>${references.get(issue.cabinetId)} · ${escape(issue.cabinetName)}<small>ID: ${escape(issue.cabinetId)}</small></td><td>${escape(issue.code)}<small>${escape(issue.wall??'')}${issue.openingId?' · opening '+escape(issue.openingId):''}${issue.otherCabinetId?' · cabinet '+escape(issue.otherCabinetId):''}</small></td><td>${escape(issue.message)}</td></tr>`).join('');
+  pages.push(`<h2>Clearance issue register</h2>${header}<table><thead><tr><th>Issue</th><th>Cabinet marker / identity</th><th>Check / location</th><th>Finding</th></tr></thead><tbody>${rows}</tbody></table>${note}`);
+ }
+ if(!review.issues.length)pages.push(`<h2>Clearance issue register</h2>${header}<p>No clearance issues under the exported planning settings.</p>${note}`);
+ return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escape(snapshot.project.name)} · Clearance handoff</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{margin:0;background:#e7e9e5;color:#172f2c;font:12px Arial,sans-serif}.page{background:white;width:273mm;min-height:180mm;margin:8mm auto;padding:6mm;break-after:page}.page:last-child{break-after:auto}h1,h2{margin:0 0 4mm}.project{font-weight:bold;font-size:16px;overflow-wrap:anywhere}p{margin:3mm 0}.plan svg{display:block;width:100%;height:105mm}.notice{font-size:10px;line-height:1.4;border-top:1px solid #bbc9c3;padding-top:3mm}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #b7c6bf;text-align:left;padding:3mm;overflow-wrap:anywhere;vertical-align:top}th:first-child{width:8%}th:nth-child(2){width:30%}th:nth-child(3){width:25%}small{display:block;margin-top:2mm;font-size:10px}footer{margin-top:4mm;font-size:10px}@media print{body{background:white}.page{margin:0;padding:0;min-height:0}}@media screen and (max-width:1050px){.page{width:100%;margin:0;padding:4mm}}</style></head><body>${pages.map((page,i)=>`<section class="page">${page}<footer>TerraTec · Clearance handoff · ${i+1} / ${pages.length}</footer></section>`).join('')}</body></html>`;
+}

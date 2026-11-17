@@ -1,0 +1,28 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {jobStore} from './job-store.mjs';
+import {validateProject} from '../shared/project.mjs';
+import {exportJobBackup,validateJobBackup} from '../shared/job-backup.mjs';
+const base=validateProject({schemaVersion:1,units:'m',name:'Source',room:{width:6,depth:4,height:3}});
+const project=validateProject({...base,room:{...base.room,furniture:[{id:'a',name:'Cabinet',type:'cabinet',width:.9,height:1.2,depth:.5,thickness:.018,shelves:1,x:0,z:0,rotation:0}]}});
+const pricing={currency:'EUR',sheetRates:{oak:10000,birch:20000,white:30000},handleUnitCents:250,labourHourlyCents:6000,labourMinutesPerPanel:5,markupBps:1000};
+test('quote snapshots persist against exact revisions and backup verifies all derived amounts',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'terratec-quotes-'));t.after(()=>rm(directory,{recursive:true,force:true}));const store=jobStore(directory);
+  const job=await store.create({name:'Quote job',project}),request={revision:1,expectedRevision:1,expectedQuoteCount:0,pricing,details:{customer:'Customer',reference:'Q-1',notes:'Estimate'}};
+  const quoted=await store.quote(job.id,request);assert.equal(quoted.revisions[0].quotes.length,1);assert.equal(quoted.revisions[0].quotes[0].details.reference,'Q-1');assert.deepEqual(quoted.revisions[0].manifest,job.revisions[0].manifest);
+  await assert.rejects(()=>store.quote(job.id,request),/changed/);
+  await assert.rejects(()=>store.quote(job.id,{...request,expectedQuoteCount:1,details:{customer:'x'.repeat(121)}}),/customer/);
+  const revised=await store.revise(job.id,{expectedRevision:1,project:{...project,name:'New model'}});assert.equal(revised.revisions[1].quotes,undefined);
+  const again=await store.quote(job.id,{...request,expectedRevision:2,expectedQuoteCount:1,pricing:{...pricing,handleUnitCents:300}});
+  assert.deepEqual(again.revisions[0].quotes[0],quoted.revisions[0].quotes[0]);assert.equal(again.revisions[0].quotes.length,2);
+  assert.deepEqual(await validateJobBackup(JSON.parse(await exportJobBackup(again))),again);
+  const altered=structuredClone(again);altered.revisions[0].quotes[0].costing.totalCents++;
+  await assert.rejects(async()=>validateJobBackup(JSON.parse(await exportJobBackup(altered))),/quote/);
+  const restored=await store.restore(JSON.parse(await exportJobBackup(again)));assert.deepEqual(restored.revisions[0].quotes,again.revisions[0].quotes);
+  assert.equal((await jobStore(directory).read(job.id)).revisions[0].quotes.length,2);
+  const register=await store.quotes();assert.equal(register.length,4);assert.equal(register.filter(q=>q.jobId===job.id).length,2);assert.equal(register[0].currency,'EUR');
+  const blocked=await store.create({name:'Empty',project:base});await assert.rejects(()=>store.quote(blocked.id,request),/blockers/);
+});

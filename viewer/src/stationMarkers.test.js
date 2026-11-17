@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import * as THREE from 'three'
 import { windsockMarker, boatMarker, aircraftMarker, headingYaw, bearingVector, sockDroop, sheetAngle } from './stationMarkers.js'
+import { sailPlan } from './sailTrim.js'
+import { BOATS } from './polars.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const app = readFileSync(join(here, 'App.vue'), 'utf8')
@@ -101,4 +103,45 @@ test('App.vue sailing view: a click reads a point and leaves the boat where it i
     "CLICK THE MAP TO READ A POINT (THE BOAT STAYS)", ':return-data="returnData"', ':windows="planWindows"', ':rules="planRules"'])
     assert.ok(app.includes(needle), `App.vue: ${needle}`)
   assert.ok(!/sailCell=computed\(\(\)=>[^\n]*selected/.test(app), 'the boat does not follow the selection')
+})
+
+test('the boat carries its sail plan: reefs, headsail kinds, storm sails, heel to leeward, and poses for a turn', () => {
+  const B = BOATS.cruiser40, plan = (aws, awa, tws = aws, twa = awa) => sailPlan({ tws, twa, aws, awa }, B)
+  const reefed = boatMarker({ headingDeg: 0, awa: 30, awdFrom: 30, sails: plan(24, 30) })
+  assert.ok(byName(reefed, 'mainsail') && byName(reefed, 'reef-bundle'), 'a reefed main with the reef bundled on the boom')
+  assert.ok(byName(reefed, 'jib')); assert.equal(byName(reefed, 'gennaker'), null)
+  // Heeled to leeward: wind over starboard, the masthead to port (-x at heading 0).
+  const top = world(byName(reefed, 'heel'), [0, 1, 0]), base = world(byName(reefed, 'heel'), [0, 0, 0]); assert.ok(top.x < base.x - 0.05, 'heeled to port')
+  const full = boatMarker({ headingDeg: 0, awa: 30, sails: plan(10, 30) }); assert.equal(byName(full, 'reef-bundle'), null)
+  const main = byName(full, 'mainsail'), mainR = byName(reefed, 'mainsail'); main.geometry.computeBoundingBox(); mainR.geometry.computeBoundingBox()
+  assert.ok(mainR.geometry.boundingBox.max.y < main.geometry.boundingBox.max.y * 0.9, 'the reefed main is lower')
+  assert.ok(byName(boatMarker({ awa: 120, sails: plan(8, 120, 12, 140) }), 'gennaker'), 'the gennaker off the wind')
+  const gale = boatMarker({ awa: 40, sails: plan(36, 40, 34, 50) }); assert.ok(byName(gale, 'trysail')); assert.equal(byName(gale, 'mainsail'), null)
+  const bare = boatMarker({ awa: 40, sails: plan(50, 40, 50, 50) }); assert.equal(byName(bare, 'trysail') ?? byName(bare, 'mainsail') ?? byName(bare, 'jib'), null, 'bare poles')
+  // A pose: the boom across to starboard, heeled to starboard, on a new heading.
+  reefed.userData.set({ headingDeg: 90, boomDeg: 30, jibDeg: 20, heelDeg: 15 })
+  const sail = byName(reefed, 'sail'), clew = flat(world(sail, [0, 0, 0]), world(sail, [0, 0, 1])), [sx, sz] = bearingVector(90 + 90)
+  assert.ok(clew.x * sx + clew.y * sz > 0.4, 'the boom to starboard of a boat heading east (towards the south)')
+  const t2 = world(byName(reefed, 'heel'), [0, 1, 0]), b2 = world(byName(reefed, 'heel'), [0, 0, 0]); assert.ok(t2.z > b2.z + 0.05, 'heeled to starboard: the masthead to the south')
+  for (const t of [0, 0.3, 1]) reefed.userData.update(t)
+})
+
+test('App.vue: route weather for flights; sails, turns, route planning and the sail-through for sailing', () => {
+  for (const needle of ['routeWeather(flightPlanData.value,visibleFrames.value)', ':route-weather="flightRouteWeather"', 'drawWeatherIcon(canvas.getContext(\'2d\'),st.symbol',
+    'sailPlanOf({tws:r.wind.kt,twa:r.boat.twa,aws:r.boat.aws,awa:r.boat.awa}', 'simulateManoeuvre({conditions:{twdFrom:r.wind.fromDeg', 'stationBoat.userData.set(turnState.value)', 'sails:sailTrimNow.value',
+    'sailRoute({frames:visibleFrames.value,startIndex:sailDepartureIndex()', 'departureScan({frames,indices:[indices[k]]', 'sailStateAt(sailRouteData.value,sailFly.value.hours)', 'renderFlightInset();renderSailInset();',
+    "ribbon.name='sail-route'", '<SailTrim v-if="sailData?.available&&sailTrimNow"', '<SailPlan v-if="sailData?.available"', '<SailOverlay v-if="sailFlyState&&!fallback"', '@route-here="routeToProbe"',
+    'if(i!==null&&sailOn.value&&sailPicking.value){addSailWaypointAt(i);return}', 'countrySea.value', 'async function loadBalticSailingExample(){', 'polar:(tws,twa)=>polarSpeed(b,tws,twa)'])
+    assert.ok(app.includes(needle), `App.vue: ${needle}`)
+})
+
+test('App.vue: currents in the sailing view; every panel control acts on the view shown', () => {
+  for (const needle of ['currentModel(visibleFrames.value,{sea:sailSea.value,tables:currentTables.value.map(x=>x.table),settings:currentSettings.value})', 'currentAt:currentModelNow.value?currentAtCell:null',
+    'currents:currentModelNow.value,settings:sailRouteOptions.value', "sailLayers.value.ground==='current'&&currentModelNow.value", "gem.name='current-station'", '01c / CURRENTS', '@change="loadCurrentTable"',
+    "await loadCurrentExample('baltic-straits-example.csv'", '@click="selectLayer(l.key)"', 'if(groundFromField.value)return fieldColor(values.value[i]??null)', 'watch(fieldGround,()=>draw(),{deep:true})',
+    'v-model="mapLayers.relief"', ':disabled="!runHas.fronts"', 'barbStrides[d]===barbStrides[flightLayers.density]', ":disabled=\"!sailRouteData?.ok\"",
+    "const noneNow=k=>frameHas.value[k]?'':' · none at this time'", 'for(const [v,get] of Object.entries(OWN_GROUND))watch(get,', 'const dustScales=computed(', 'Labels of the GAFOR areas', 'Chart window (charts below)',
+    "if(import.meta.env.MODE!=='production')window.__terrafluxScene=()=>scene", "if(import.meta.env.MODE!=='production'&&window.__terrafluxPauseRender)return;renderer.render(scene,camera)"])
+    assert.ok(app.includes(needle), `App.vue: ${needle}`)
+  assert.ok(!app.includes('@click="layer=l.key"'), 'a field layer picked in another view acts on that view')
 })

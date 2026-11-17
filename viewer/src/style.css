@@ -838,3 +838,121 @@ main.immersive .fly-launch{left:calc(var(--hud-left) + var(--hud-gap) + 16px);bo
 .fp-window-strip button.now{opacity:1;box-shadow:0 0 0 2px #fff;z-index:1}
 .fp-window-strip button:hover{opacity:1}
 @media(max-width:1100px){.fp-legs2,.fp-windows{grid-template-columns:1fr}}
+/* ---- Weather strips along a route (WxStrip.vue), flight route weather (RouteWeather.vue) ---- */
+.wxs{margin:8px 0 12px;font-size:10.5px}
+.wxs-row{display:flex;align-items:stretch;gap:8px;min-height:16px;margin-bottom:2px}
+.wxs-row.tall{min-height:36px}
+.wxs-label{flex:0 0 112px;color:#8fb4c2;font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;display:flex;align-items:center;justify-content:flex-end;text-align:right}
+.wxs-track{position:relative;flex:1 1 auto;background:rgba(9,21,29,.6);border-radius:2px;min-width:0}
+.wxs-band{position:absolute;top:0;bottom:0;border:none;padding:0;border-radius:0;cursor:pointer;overflow:hidden;font-size:9px;color:#09151d;font-weight:700;white-space:nowrap;text-align:center}
+.wxs-band:hover{filter:brightness(1.25);outline:1px solid #fff;z-index:1}
+.wxs-band span{display:inline-block;padding:0 3px;line-height:16px}
+.wxs-mark{position:absolute;top:50%;transform:translate(-50%,-50%);pointer-events:none;display:flex;align-items:center;justify-content:center}
+.wxs-mark b{font-family:var(--hud-mono);font-size:9.5px;color:#e8f6ff;text-shadow:0 0 3px #061118}
+.wxs-axis{min-height:14px}.wxs-axis .wxs-track{background:none}
+.wxs-tick{position:absolute;top:0;transform:translateX(-50%);font-family:var(--hud-mono);font-size:9px;color:#7f9aa6;white-space:nowrap}
+.wxs-tick:first-child{transform:none}.wxs-tick:last-child{transform:translateX(-100%)}
+.wxs-cursor{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;box-shadow:0 0 4px #7fe0ff;pointer-events:none}
+.rw{margin-top:14px}
+.rw-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.rw-worst{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#c9d7de}
+.rw-cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:14px;margin-top:6px}
+@media(max-width:1100px){.rw-cols{grid-template-columns:1fr}}
+.rw-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.rw-table th,.rw-table td{padding:4px 6px;text-align:left;border-bottom:1px solid rgba(127,224,255,.07);vertical-align:middle}
+.rw-table thead th{font-size:8.5px;letter-spacing:1px;color:#7f9aa6;font-weight:600;text-transform:uppercase}
+.rw-table tbody tr{cursor:pointer}.rw-table tbody tr:hover{background:rgba(127,224,255,.05)}
+.rw-table tbody th{font-family:var(--hud-mono);font-weight:600;color:#cfe0e8;white-space:nowrap}
+.rw-table small{display:block;font-size:10px;color:#8aa3ae;font-weight:400}
+.rw-table td{color:#dce8ec}
+.rw-words{min-width:200px}
+.rw-gamet{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:6px 0 0;font-size:11.5px}
+.rw-gamet dt{font-family:var(--hud-mono);font-weight:700;font-size:10.5px;color:#8fb4c2;white-space:nowrap}
+.rw-gamet dd{margin:0;color:#dce8ec}
+.rw-gamet .nil{color:#6f8a96}.rw-gamet dt.caution,.rw-gamet dd.caution{color:#ffd166}.rw-gamet dt.warning,.rw-gamet dd.warning{color:#ff9f43}.rw-gamet dt.severe,.rw-gamet dd.severe{color:#ff6b6b}
+/* ---- Sail-through (SailOverlay.vue) ---- */
+.fly-left b.small{font-size:12px;font-weight:600}
+.sail-fly-slow{display:flex;align-items:center;gap:4px;color:#cfeaf3}
+.sail-fly-strip{position:relative;height:14px;margin:5px 0 3px;background:rgba(4,12,18,.45);border-radius:3px;cursor:pointer;overflow:hidden}
+.sail-fly-strip i{position:absolute;top:3px;bottom:3px;opacity:.85}
+.sail-fly-strip b{position:absolute;top:0;transform:translateX(-50%);font-size:9px;line-height:14px;color:#fff;text-shadow:0 0 3px #000;font-weight:800}
+.sail-fly-strip b.tack{color:#ffb3b3}.sail-fly-strip b.gybe{color:#b3d4ff}
+.sail-fly-now{position:absolute;top:0;bottom:0;width:2px;background:#ffd166;box-shadow:0 0 4px #ffd166}
+/* ---- Sails and trim (SailTrim.vue) ---- */
+.st-boat{display:flex;flex-direction:column;gap:6px;align-items:flex-end;font-size:11px;color:#9fb6c0}
+.st-boat select{background:#0d1c25;border:1px solid #2f4553;color:#e6f0f4;border-radius:3px;padding:4px 6px;font-size:12px}
+.st-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.st-turn{grid-column:span 2}
+@media(max-width:900px){.st-turn{grid-column:auto}}
+.st-svg{width:100%;height:auto;display:block}
+.st-top .st-svg{max-width:300px;margin:0 auto}
+.st-n{fill:#8fb4c2;font-size:11px;text-anchor:middle;font-weight:700}
+.st-hull{fill:#5b6f7c;stroke:#b9cad3;stroke-width:1.2}
+.st-sail{fill:rgba(255,246,216,.25);stroke:#fff6d8;stroke-width:3}
+.st-sail.gennaker{stroke:#5aa0ff;fill:rgba(59,139,255,.25)}
+.st-sail.storm{stroke:#ff8a3d;fill:rgba(255,138,61,.25)}
+.st-sail.luff{stroke-dasharray:3 3;animation:st-flog .25s linear infinite}
+@keyframes st-flog{to{stroke-dashoffset:6}}
+@media (prefers-reduced-motion:reduce){.st-sail.luff{animation:none}}
+.st-sail2{fill:rgba(250,250,244,.85);stroke:#c8cdc6;stroke-width:1}
+.st-sail2.gennaker{fill:rgba(59,139,255,.75);stroke:#9cc3ff}
+.st-sail2.storm{fill:rgba(255,138,61,.85)}
+.st-reef{stroke:#3b5868;stroke-width:1.4;stroke-dasharray:4 3}
+.st-label{fill:#9fb6c0;font-size:9.5px}
+.st-legend{font-size:10.5px;color:#9fb6c0;margin:6px 0 0}
+.st-legend .tw{color:#6fa8ff}.st-legend .aw{color:#7fe0ff}
+.st-trim{margin:6px 0 8px;padding-left:16px;font-size:11.5px;color:#dce8ec;line-height:1.45}
+.st-ring{fill:none;stroke:#1f3542}
+.st-ringlabel{fill:#5f7a86;font-size:8.5px}
+.st-curve{fill:none;stroke:#4f7487;stroke-width:1}
+.st-curve.now{stroke:#ffd166;stroke-width:2.4}
+.st-vmg{stroke:#7fe0ff;stroke-width:1;stroke-dasharray:3 3}
+.st-now{fill:#3ddc84;stroke:#09151d;stroke-width:1.5}
+.st-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.st-actions button{background:transparent;border:1px solid #425561;color:#c9d7de;border-radius:4px;padding:6px 12px;font-size:12px}
+.st-actions button.primary{background:linear-gradient(180deg,#1f5e8c,#174a6e);border-color:#7fe0ff;color:#eafaff;font-weight:600}
+.st-actions button:disabled{opacity:.5}
+.st-actions label{font-size:11px;color:#9fb6c0;display:flex;gap:4px;align-items:center}
+.st-actions select{background:#0d1c25;border:1px solid #2f4553;color:#e6f0f4;border-radius:3px;padding:3px 5px;font-size:11px}
+.st-turn-head{font-size:12px;color:#dce8ec;margin:4px 0 8px}
+.st-turn-grid{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:12px;align-items:start}
+.st-track{background:#0a1b27;border:1px solid #1f3542;border-radius:5px}
+.st-trackline{fill:none;stroke:#ffd166;stroke-width:1.6}
+.st-ghost{fill:rgba(238,243,245,.8);stroke:#09151d;stroke-width:.6}
+.st-ghost.luff{fill:rgba(255,107,107,.8)}
+.st-chart{background:#0a1b27;border:1px solid #1f3542;border-radius:4px;margin-bottom:6px}
+.st-speed{fill:none;stroke:#3ddc84;stroke-width:1.8}
+.st-headingline{fill:none;stroke:#7fe0ff;stroke-width:1.8}
+.st-cursor{stroke:#ffd166;stroke-width:1.5}
+/* ---- Sailing route planning (SailPlan.vue) ---- */
+.sp-busy{font-size:11px;color:#ffd166;animation:fly-pulse 1s ease-in-out infinite alternate}
+.sp-start{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:#c9d7de}
+.sp-start input{background:#0d1c25;border:1px solid #2f4553;color:#e6f0f4;border-radius:3px;padding:4px 6px;font-size:12px}
+.sp-start button,.sp-scan{background:linear-gradient(180deg,#1f5e8c,#174a6e);border:1px solid #7fe0ff;color:#eafaff;border-radius:4px;padding:5px 12px;font-size:12px;font-weight:600}
+.sp-scan:disabled{opacity:.7}
+.sp-weather{margin:14px 0}
+.sp-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:10px;color:#9fb6c0;margin:2px 0 10px 120px}
+.sp-legend i{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:4px}
+.sp-pos{display:inline-block;color:#09151d;font-size:10.5px;font-weight:700;border-radius:3px;padding:1px 6px}
+.sp-scan-list{display:flex;flex-direction:column;gap:2px;margin:8px 0}
+.sp-scan-row{display:grid;grid-template-columns:92px minmax(40px,1fr) 44px;align-items:center;gap:8px;background:transparent;border:1px solid transparent;border-radius:3px;padding:2px 6px;font-size:11px;color:#dce8ec;text-align:left}
+.sp-scan-row:hover{border-color:#425561}
+.sp-scan-row i{display:block;height:9px;border-radius:2px;min-width:2px}
+.sp-scan-row b{font-family:var(--hud-mono);font-weight:600}
+.sp-scan-row small{color:#8aa3ae;font-size:10px;grid-column:2/-1;margin-top:-2px}
+.sp-scan-row.now{border-color:#7fe0ff;background:rgba(127,224,255,.07)}
+.sp-scan-row.best span::before{content:'★ ';color:#ffd166}
+.sp-scan-row.fail{opacity:.5}
+.fp-summary b.good{color:#3ddc84}
+small.warn{color:#ffb15c}
+/* ---- Current tables (sailing view, 01c) ---- */
+.current-tables .current-pos{width:150px;background:#0d1c25;border:1px solid #2b3e49;color:#dce8e9;border-radius:4px;padding:3px 6px;font-size:11px}
+.current-tables .current-upload{display:inline-block;margin:14px 5px 6px;padding:8px 12px;font-size:11px}
+.current-examples{display:flex;flex-direction:column;gap:6px;margin:6px 5px}
+.current-list{list-style:none;padding:0;margin:10px 5px 0;display:flex;flex-direction:column;gap:8px;font-size:11px;color:#c9d7de}
+.current-list li{border-left:3px solid #ffd166;padding-left:8px}
+.current-list small{display:block;color:#8fa7b2;font-size:10px}
+.current-list small.warn{color:#ffb15c}
+.current-badge{margin-left:6px;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:#09151d;background:#ffb15c;border-radius:3px;padding:0 4px}
+.wx-source{display:block;color:#8fa7b2;font-size:10px}
+.field-ground-legend{left:50%;right:auto;bottom:46px;transform:translateX(-50%);background:rgba(9,21,29,.72);padding:5px 10px;border-radius:5px}
