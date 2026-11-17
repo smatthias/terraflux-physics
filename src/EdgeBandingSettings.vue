@@ -1,0 +1,9 @@
+<script setup>
+import {computed} from 'vue';
+import {edgeBandingNote} from '../shared/edge-banding.mjs';
+const props=defineProps({draft:{type:Object,required:true},applied:{type:Object,required:true}}),emit=defineEmits(['update']);
+const note=computed(()=>edgeBandingNote(props.applied));
+function toggle(enabled){const next={...props.draft};if(enabled)next.edgeBanding={thicknessMm:1,fronts:true,shelves:true};else delete next.edgeBanding;emit('update',next);}
+function set(key,value){emit('update',{...props.draft,edgeBanding:{...props.draft.edgeBanding,[key]:value}});}
+</script>
+<template><section aria-label="Edge-banding planning"><h3>Edge-banding planning</h3><label class="snap-toggle"><input type="checkbox" :checked="!!draft.edgeBanding" aria-label="Enable cabinet edge banding" @change="toggle($event.target.checked)">Enable cabinet edge banding</label><template v-if="draft.edgeBanding"><label>Edge band thickness mm<input :value="draft.edgeBanding.thicknessMm" type="number" min="0" max="5" step="0.1" @input="set('thicknessMm',$event.target.value===''?NaN:Number($event.target.value))"></label><label class="snap-toggle"><input :checked="draft.edgeBanding.fronts" type="checkbox" aria-label="Band all front panel edges" @change="set('fronts',$event.target.checked)">Band all front panel edges</label><label class="snap-toggle"><input :checked="draft.edgeBanding.shelves" type="checkbox" aria-label="Band shelf front edges" @change="set('shelves',$event.target.checked)">Band shelf front edges</label></template><p data-testid="edge-banding-summary">{{ note }}</p><p class="hint">Design spans stay unchanged. Finished panel length includes shelf engagement. Core-cut dimensions add shelf engagement, then subtract selected band thicknesses. Blank dimensions add existing length/width allowances. Band lengths exclude trim and waste. Apply cabinet to commit.</p></section></template>

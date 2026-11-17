@@ -1,0 +1,31 @@
+{
+  "name": "terratec",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "api": "node server/index.mjs",
+    "build": "vite build",
+    "test": "node --test server/*.test.mjs src/*.test.mjs shared/*.test.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "test:browser:production": "node scripts/browser-smoke.mjs --production",
+    "test:release": "npm run build && npm run check:bundle && npm run test:browser:production",
+    "package:release": "node scripts/package-release.mjs",
+    "test:package": "node scripts/package-smoke.mjs",
+    "check:storage": "node server/storage-check.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0",
+    "vue": "3.5.45"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.10",
+    "playwright": "1.65.0",
+    "vite": "8.3.6"
+  }
+}

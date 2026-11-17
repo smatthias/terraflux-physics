@@ -1,0 +1,10 @@
+<script setup>
+import {ref,computed,watch} from 'vue';
+import {filterQuotes} from '../shared/quote-register.mjs';
+const props=defineProps({refreshKey:Number,busy:Boolean}),emit=defineEmits(['open']);
+const rows=ref([]),query=ref(''),status=ref('all'),message=ref(''),loading=ref(false);
+const visible=computed(()=>filterQuotes(rows.value,query.value,status.value));let requestId=0;
+async function refresh(){const id=++requestId;loading.value=true;try{const r=await fetch('/api/quotes');const value=await r.json();if(!r.ok)throw Error(value.error);if(id===requestId){rows.value=value;message.value='';}}catch(e){if(id===requestId)message.value=e.message;}finally{if(id===requestId)loading.value=false;}}
+watch(()=>props.refreshKey,refresh,{immediate:true});
+</script>
+<template><section aria-label="Cross-job quote register"><h4>All job quotes</h4><label>Search all quotes<input v-model="query" type="search" placeholder="Customer, reference or job"></label><label>Quote register status<select v-model="status" aria-label="Quote register status"><option value="all">All statuses</option><option v-for="s in ['draft','sent','accepted','declined','withdrawn']" :key="s" :value="s">{{ s }}</option></select></label><button :disabled="loading||busy" @click="refresh">Refresh quote register</button><p data-testid="quote-register-count">{{ visible.length }} of {{ rows.length }} quotes shown</p><ul class="job-register-list"><li v-for="q in visible" :key="q.jobId+':'+q.quoteId" data-testid="quote-register-row"><strong>{{ q.jobName }} · r{{ q.revision }}</strong><span>{{ q.customer||'No customer' }} · {{ q.reference||'No reference' }} · {{ q.status }}</span><span>{{ (q.totalCents/100).toFixed(2) }} {{ q.currency }}</span><button :disabled="busy" @click="emit('open',q)">Open quote snapshot</button></li></ul><p v-if="!visible.length" class="hint">No matching quote snapshots.</p><p role="status">{{ message }}</p><p class="hint">Saved quotes across all local jobs and revisions. Restored job copies appear separately. Amounts in different currencies are not combined.</p></section></template>

@@ -1,0 +1,27 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {makeServer} from './index.mjs';
+import {validateProject} from '../shared/project.mjs';
+const base=validateProject({schemaVersion:1,units:'m',name:'Source',room:{width:6,depth:4,height:3}});
+const project=validateProject({...base,room:{...base.room,furniture:[{id:'a',name:'Cabinet',type:'cabinet',width:.9,height:1.2,depth:.5,thickness:.018,shelves:1,x:0,z:0,rotation:0}]}});
+test('job API persists immutable revisions, reviews and detects stale/conflicting edits',async t=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'terratec-jobs-'));let server,url;
+  const start=async()=>{server=makeServer({dataDir});await new Promise(r=>server.listen(0,'127.0.0.1',r));url='http://127.0.0.1:'+server.address().port;};
+  const stop=()=>new Promise(r=>server.close(r));t.after(async()=>{if(server.listening)await stop();await rm(dataDir,{recursive:true,force:true});});await start();
+  const post=(path,body)=>fetch(url+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const created=await post('/api/jobs',{name:'Kitchen',project});assert.equal(created.status,201);const job=await created.json(),path='/api/jobs/'+job.id;
+  assert.equal((await post(path+'/revisions',{project,expectedRevision:1})).status,409);
+  assert.equal((await post(path+'/review',{revision:1,expectedRevision:1,reviewer:'',note:'Review'})).status,400);
+  assert.equal((await post(path+'/review',{revision:1,expectedRevision:1,reviewer:'Matthias',note:'Dimensions checked'})).status,200);
+  const changed={...project,name:'Changed'};
+  const results=await Promise.all([post(path+'/revisions',{project:changed,expectedRevision:1}),post(path+'/revisions',{project:changed,expectedRevision:1})]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+  const record=await (await fetch(url+path)).json();assert.equal(record.revisions.length,2);assert.equal(record.revisions[0].status,'reviewed');assert.equal(record.revisions[1].status,'planned');assert.deepEqual(record.revisions[0].manifest,job.revisions[0].manifest);
+  assert.equal((await post(path+'/review',{revision:1,expectedRevision:2,reviewer:'M',note:'Old'})).status,409);
+  const blocked=await (await post('/api/jobs',{name:'Empty',project:base})).json();assert.equal((await post('/api/jobs/'+blocked.id+'/review',{revision:1,expectedRevision:1,reviewer:'M',note:'Empty'})).status,400);
+  await stop();await start();const persisted=await (await fetch(url+path)).json();assert.equal(persisted.revisions[0].review.reviewer,'Matthias');assert.equal(persisted.revisions.length,2);
+  assert.equal((await fetch(url+'/api/jobs/not-an-id')).status,400);assert.equal((await post('/api/jobs',{name:'Bad',project:{}})).status,400);
+});

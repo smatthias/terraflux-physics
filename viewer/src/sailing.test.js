@@ -32,7 +32,7 @@ test('apparent wind: the true wind minus the boat\'s own motion', () => {
 })
 
 test('points of sail and tacks by the true wind angle', () => {
-  assert.deepEqual([0, 39, 40, 54, 55, 79, 80, 99, 100, 159, 160, 180].map(pointOfSail), ['in irons (no-go zone)', 'in irons (no-go zone)', 'close-hauled', 'close-hauled', 'close reach', 'close reach', 'beam reach', 'beam reach', 'broad reach', 'broad reach', 'running', 'running'])
+  assert.deepEqual([0, 34, 35, 54, 55, 79, 80, 99, 100, 159, 160, 180].map(pointOfSail), ['in irons (no-go zone)', 'in irons (no-go zone)', 'close-hauled', 'close-hauled', 'close reach', 'close reach', 'beam reach', 'beam reach', 'broad reach', 'broad reach', 'running', 'running'])
   assert.equal(tackOf(60), 'starboard tack'); assert.equal(tackOf(-60), 'port tack'); assert.equal(tackOf(1), 'head to wind'); assert.equal(tackOf(-179), 'dead run')
 })
 

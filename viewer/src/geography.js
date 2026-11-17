@@ -4,13 +4,15 @@
 import { project } from './geo.js'
 import { inPolygons } from './gafor.js'
 
-// Larger German cities (and a few neighbours' capitals), latitude and longitude in degrees.
+// Larger German cities (and a few neighbours' capitals and Baltic harbours), latitude and longitude in degrees.
 export const CITIES = [
   ['Berlin', 52.520, 13.405], ['Hamburg', 53.551, 9.994], ['Munich', 48.137, 11.575], ['Cologne', 50.938, 6.960], ['Frankfurt', 50.110, 8.682],
   ['Stuttgart', 48.776, 9.183], ['Düsseldorf', 51.228, 6.773], ['Leipzig', 51.340, 12.375], ['Dortmund', 51.514, 7.466], ['Bremen', 53.079, 8.801],
   ['Dresden', 51.051, 13.738], ['Hanover', 52.376, 9.732], ['Nuremberg', 49.454, 11.077], ['Rostock', 54.092, 12.099], ['Kiel', 54.323, 10.123],
   ['Freiburg', 47.999, 7.842], ['Erfurt', 50.985, 11.030], ['Magdeburg', 52.121, 11.628], ['Saarbrücken', 49.240, 6.997], ['Kassel', 51.312, 9.480],
   ['Prague', 50.087, 14.421], ['Vienna', 48.208, 16.373], ['Amsterdam', 52.370, 4.895], ['Copenhagen', 55.676, 12.568], ['Zurich', 47.377, 8.541],
+  // Baltic harbours (the sailing example).
+  ['Lübeck', 53.866, 10.686], ['Stralsund', 54.315, 13.090], ['Sassnitz', 54.516, 13.643], ['Malmö', 55.605, 13.004], ['Ystad', 55.430, 13.820], ['Rønne', 55.100, 14.706], ['Gedser', 54.575, 11.928],
 ].map(([name, lat, lon]) => ({ name, lat, lon }))
 
 // Grid coordinates (cells, continuous) of a position: x = (east - origin) / spacing.

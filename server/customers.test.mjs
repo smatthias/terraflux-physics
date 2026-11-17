@@ -1,0 +1,23 @@
+import {exportCustomerBackup} from '../shared/customers.mjs';
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {makeServer} from './index.mjs';
+import {customerStore} from './customer-store.mjs';
+test('customer API validates contacts, persists edits and rejects stale versions',async t=>{
+ const dataDir=await mkdtemp(join(tmpdir(),'terratec-customers-'));const server=makeServer({dataDir});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await rm(dataDir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const send=(path,method,value)=>fetch(base+path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
+ const created=await send('/api/customers','POST',{name:'Customer',email:'test@example.com'});assert.equal(created.status,201);const c=await created.json();
+ assert.equal((await send('/api/customers/'+c.id,'PUT',{...c,name:'Renamed',expectedVersion:1})).status,200);
+ assert.equal((await send('/api/customers/'+c.id,'PUT',{...c,name:'Lost update',expectedVersion:1})).status,409);
+ assert.equal((await send('/api/customers','POST',{name:'Bad',email:'invalid'})).status,400);
+ assert.equal((await fetch(base+'/api/customers/not-an-id')).status,400);
+ assert.equal((await (await fetch(base+'/api/customers')).json()).length,1);
+ assert.equal((await customerStore(dataDir).read(c.id)).name,'Renamed');
+ const backup=JSON.parse(exportCustomerBackup(await customerStore(dataDir).read(c.id)));
+ const restoredResponse=await send('/api/customers/restore','POST',backup);assert.equal(restoredResponse.status,201);const restored=await restoredResponse.json();assert.notEqual(restored.id,c.id);assert.equal(restored.name,'Renamed (restore 1)');
+ assert.equal((await send('/api/customers/restore','POST',{format:'wrong'})).status,400);assert.equal((await customerStore(dataDir).list()).length,2);assert.equal((await customerStore(dataDir).read(c.id)).name,'Renamed');
+});

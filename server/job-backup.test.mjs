@@ -1,0 +1,27 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {jobStore} from './job-store.mjs';
+import {makeServer} from './index.mjs';
+import {exportJobBackup,validateJobBackup} from '../shared/job-backup.mjs';
+const project={schemaVersion:1,units:'m',name:'Source',room:{width:6,depth:4,height:3}};
+test('job backup restore verifies content, preserves snapshots and handles conflicts without overwrite',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'terratec-backup-'));t.after(()=>rm(directory,{recursive:true,force:true}));const store=jobStore(directory);
+  const original=await store.create({name:'Restore test',project});
+  const envelope=JSON.parse(await exportJobBackup(original));assert.deepEqual(await validateJobBackup(envelope),original);
+  const restored=await store.restore(envelope);assert.notEqual(restored.id,original.id);assert.equal(restored.name,'Restore test (restore 1)');assert.deepEqual(restored.revisions,original.revisions);assert.equal(restored.restoredFrom.id,original.id);
+  assert.deepEqual(await store.read(original.id),original);
+  const altered=structuredClone(envelope);altered.record.name='Altered';await assert.rejects(()=>store.restore(altered),/checksum/);
+  const invalid={...original,revisions:[{...original.revisions[0],status:'reviewed',review:{reviewer:'M',note:'Forged',reviewedAt:new Date().toISOString()}}]};
+  await assert.rejects(async()=>store.restore(JSON.parse(await exportJobBackup(invalid))),/review/);
+  const badSequence={...original,revisions:[{...original.revisions[0],number:3}]};await assert.rejects(async()=>store.restore(JSON.parse(await exportJobBackup(badSequence))),/sequence/);
+  const tampered=structuredClone(original);tampered.revisions[0].manifest.summary.panels++;await assert.rejects(async()=>store.restore(JSON.parse(await exportJobBackup(tampered))),/integrity/);
+  assert.equal((await store.list()).length,2);
+  assert.equal((await jobStore(directory).read(restored.id)).restoredFrom.backupSha256,envelope.backupSha256);
+  const server=makeServer({dataDir:directory});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const url='http://127.0.0.1:'+server.address().port+'/api/jobs/restore';
+  const post=body=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  assert.equal((await post(envelope)).status,201);assert.equal((await post(altered)).status,400);assert.equal((await fetch(url)).status,405);
+});

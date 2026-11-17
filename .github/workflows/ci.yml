@@ -1,0 +1,31 @@
+name: Foundation checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run check:bundle
+      - run: npm run package:release
+      - run: npm run test:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terratec-linux-release
+          path: release/*.tar.gz
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser:production
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workspace-screenshots
+          path: test-results/
+          if-no-files-found: ignore

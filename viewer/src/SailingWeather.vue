@@ -20,7 +20,7 @@ const props = defineProps({
   frameLabels: { type: Array, default: () => [] },
   northernHemisphere: { type: Boolean, default: true },
 })
-const emit = defineEmits(['move-boat', 'steer-here', 'clear-point', 'reset-boat', 'settings', 'seek'])
+const emit = defineEmits(['move-boat', 'steer-here', 'route-here', 'clear-point', 'reset-boat', 'settings', 'seek'])
 const r = computed(() => props.report)
 const cap = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 const rose = computed(() => {
@@ -61,6 +61,7 @@ const aloftRows = computed(() => props.aloft ? props.aloft.rows.filter(x => !x.b
         <span class="wx-probe-actions">
           <button v-if="!probeHere && probe.onSea !== false" title="Put the boat at this point: the report below then follows it" @click="emit('move-boat')">⛵ Move the boat here</button>
           <button v-if="probe.fromBoat && !probeHere && probe.fromBoat.nm > 0.05" :title="`Set the boat's heading to the bearing of this point (${Math.round(probe.fromBoat.bearingDeg) % 360}° true)`" @click="emit('steer-here')">➜ Steer {{ String(Math.round(probe.fromBoat.bearingDeg) % 360).padStart(3, '0') }}°</button>
+          <button v-if="!probeHere && probe.onSea !== false" title="Plan a passage from the boat to this point through the forecast (the sailing route below)" @click="emit('route-here')">🧭 Route here</button>
           <button class="wx-probe-x" aria-label="Close the point read" title="Close" @click="emit('clear-point')">✕</button>
         </span>
       </div>
@@ -68,7 +69,7 @@ const aloftRows = computed(() => props.aloft ? props.aloft.rows.filter(x => !x.b
         <div><WindBarb :kt="probe.wind.kt" :from-deg="probe.wind.fromDeg" :size="38" :northern-hemisphere="northernHemisphere"/><span><b>F{{ probe.wind.beaufort.force }}</b> {{ probe.wind.kt < 1 ? 'calm' : `${probe.wind.from16} ${Math.round(probe.wind.kt)} kt` }}<small>{{ probe.wind.beaufort.label }} · {{ probe.warning.label }}</small></span></div>
         <div v-if="probe.onSea === false"><span><b>Land</b><small>no waves or current here</small></span></div>
         <div v-else-if="probe.sea"><span><b>{{ probe.sea.hs.toFixed(1) }} m</b> waves<small>{{ probe.sea.state }}<template v-if="probe.sea.hs >= 0.05"> · from {{ compass16(probe.sea.fromDeg) }}, every {{ probe.sea.tp.toFixed(1) }} s</template></small></span></div>
-        <div v-if="probe.current"><span><b>{{ probe.current.driftKt.toFixed(1) }} kt</b> current<small>setting {{ compass16(probe.current.setDeg) }}</small></span></div>
+        <div v-if="probe.current"><span><b>{{ probe.current.driftKt.toFixed(1) }} kt</b> current<small>setting {{ compass16(probe.current.setDeg) }} · {{ probe.current.source === 'table' ? 'table' : probe.current.source === 'drift' ? 'wind drift' : 'ocean model' }}</small></span></div>
         <div v-if="probe.water"><span><b>{{ probe.water.c.toFixed(1) }} °C</b> water</span></div>
         <div v-if="probe.weather?.words || probeVis"><span><b>{{ probe.weather?.words ? cap(probe.weather.words) : 'Visibility' }}</b><small v-if="probeVis">{{ probe.weather?.words ? 'visibility ' : '' }}{{ probeVis.toLowerCase() }}</small></span></div>
         <div v-if="probe.qnhHpa !== null"><span><b>{{ probe.qnhHpa.toFixed(0) }} hPa</b> QNH</span></div>
@@ -78,7 +79,7 @@ const aloftRows = computed(() => props.aloft ? props.aloft.rows.filter(x => !x.b
         <button v-for="(f, k) in probeSeries" :key="k" role="listitem" :class="{ now: k === seriesIndex }" :style="{ background: BF_COLOURS[f] }" :title="`${frameLabels[k] ?? `Frame ${k + 1}`}: force ${f} at the point`" :aria-label="`Frame ${k + 1}: force ${f} at the point`" @click="emit('seek', k)">{{ probeSeries.length <= 40 ? f : '' }}</button>
       </div>
     </div>
-    <p v-else class="wx-probe-hint">Click the map to read any point — wind, waves, current, water, weather and its distance and bearing from the boat. The boat stays where it is; move it or steer for the point from the read-out.</p>
+    <p v-else class="wx-probe-hint">Click the map to read any point — wind, waves, current, water, weather and its distance and bearing from the boat. The boat stays where it is; move it, steer for the point or plan a route there from the read-out.</p>
 
     <div class="wx-top">
       <div class="wx-forecast">
@@ -109,7 +110,8 @@ const aloftRows = computed(() => props.aloft ? props.aloft.rows.filter(x => !x.b
           </svg>
           <div class="wx-boat-in">
             <label>Heading <input type="number" min="0" max="359" step="5" :value="Math.round(r.boat.headingDeg)" aria-label="Boat heading in degrees true" @change="set('headingDeg', $event, 0, 360)"> °T</label>
-            <label>Boat speed <input type="number" min="0" max="30" step="0.5" :value="r.boat.speedKt" aria-label="Boat speed in knots" @change="set('boatKt', $event, 0, 30)"> kt</label>
+            <label v-if="!r.boat.fromPolar">Boat speed <input type="number" min="0" max="30" step="0.5" :value="r.boat.speedKt" aria-label="Boat speed in knots" @change="set('boatKt', $event, 0, 30)"> kt</label>
+            <p v-else class="wx-polar-speed">Boat speed <b>{{ r.boat.speedKt.toFixed(1) }} kt</b> <small>from the polar</small></p>
             <p><b>{{ cap(r.boat.pointOfSail) }}</b> · {{ r.boat.tack }}</p>
             <p><span class="tw">True wind</span> {{ Math.round(Math.abs(r.boat.twa)) }}° {{ side(r.boat.twa) }}, {{ Math.round(r.wind.kt) }} kt</p>
             <p><span class="aw">Apparent</span> {{ Math.round(Math.abs(r.boat.awa)) }}° {{ side(r.boat.awa) }}, {{ Math.round(r.boat.aws) }} kt</p>
@@ -124,10 +126,10 @@ const aloftRows = computed(() => props.aloft ? props.aloft.rows.filter(x => !x.b
           <dt>Waves</dt><dd>{{ r.sea.hs.toFixed(1) }} m, {{ r.sea.state }} <small v-if="r.sea.hs >= 0.05">every {{ r.sea.tp.toFixed(1) }} s, {{ Math.round(r.sea.length) }} m apart</small></dd>
           <template v-if="r.sea.hs >= 0.05"><dt>From</dt><dd>{{ compass16(r.sea.fromDeg) }} ({{ Math.round(r.sea.fromDeg) }}°) <small>{{ r.sea.regime }}<template v-if="r.sea.regime === 'fetch-limited'">, fetch {{ Math.round(r.sea.fetchKm) }} km</template></small></dd></template>
           <template v-if="r.sea.steepness"><dt>Steepness</dt><dd>{{ r.sea.steepness.label }} <small>H/L₀ {{ r.sea.steepness.value.toFixed(3) }}</small></dd></template>
-          <template v-if="r.current"><dt>Current</dt><dd>setting {{ compass16(r.current.setDeg) }}, {{ r.current.driftKt.toFixed(1) }} kt <small v-if="r.current.windAgainstCurrent" class="warn">against the waves</small></dd></template>
+          <template v-if="r.current"><dt>Current</dt><dd>setting {{ compass16(r.current.setDeg) }} ({{ String(Math.round(r.current.setDeg)).padStart(3, '0') }}°), {{ r.current.driftKt.toFixed(1) }} kt <small v-if="r.current.windAgainstCurrent" class="warn">against the waves</small><small class="wx-source">{{ r.current.sourceLabel ?? 'ocean model' }}</small></dd></template>
           <template v-if="r.water"><dt>Water</dt><dd>{{ r.water.c.toFixed(1) }} °C</dd></template>
         </dl>
-        <p v-else class="wx-note">No land/sea mask in this run: waves are not estimated.<template v-if="r.water"> Water {{ r.water.c.toFixed(1) }} °C.</template></p>
+        <p v-else class="wx-note">No land/sea mask in this run: waves are not estimated.<template v-if="r.water"> Water {{ r.water.c.toFixed(1) }} °C.</template><template v-if="r.current"> Current setting {{ compass16(r.current.setDeg) }}, {{ r.current.driftKt.toFixed(1) }} kt ({{ r.current.sourceLabel }}).</template></p>
         <div class="wx-small-label" style="margin-top:14px">BAROMETER</div>
         <p class="wx-line">{{ r.barometer ? `${r.barometer.qnhHpa.toFixed(0)} hPa` : 'not available' }}
           <small v-if="r.barometer?.tendency">{{ r.barometer.tendency.word }} ({{ r.barometer.tendency.hPaPer3h >= 0 ? '+' : '−' }}{{ Math.abs(r.barometer.tendency.hPaPer3h).toFixed(1) }} hPa / 3 h)</small>
