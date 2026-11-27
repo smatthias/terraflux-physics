@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-run-pressure-wind.dir/src/weather/run_pressure_wind.cpp.o -o terraflux-run-pressure-wind  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 

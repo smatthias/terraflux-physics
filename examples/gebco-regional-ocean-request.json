@@ -1,0 +1,160 @@
+{
+  "schema_version": "terraflux.ocean.circulation-run/v1",
+  "time": {
+    "start_time_utc": "2026-01-01T00:00:00Z",
+    "timestep_seconds": 1800.0,
+    "steps": 1,
+    "spinup_steps": 0
+  },
+  "grid": {
+    "nx": 8,
+    "ny": 6,
+    "origin_east_m": 0.0,
+    "origin_north_m": 0.0,
+    "spacing_east_m": 60000.0,
+    "spacing_north_m": 60000.0,
+    "geographic_anchor_longitude_deg": -45.0,
+    "geographic_anchor_latitude_deg": 38.0
+  },
+  "basin": {
+    "sea_level_m": 0,
+    "terrain": {
+      "values": [
+        -5192.0,
+        -5199.0,
+        -5208.0,
+        -5113.0,
+        -4742.0,
+        -4939.0,
+        -4752.0,
+        -4430.0,
+        -5144.0,
+        -5166.0,
+        -4986.0,
+        -4992.0,
+        -4997.0,
+        -5059.0,
+        -4621.0,
+        -4839.0,
+        -4671.0,
+        -4568.0,
+        -4808.0,
+        -4855.0,
+        -5060.0,
+        -5073.0,
+        -5030.0,
+        -5160.0,
+        -4801.0,
+        -4764.0,
+        -4766.0,
+        -4888.0,
+        -5010.0,
+        -5026.0,
+        -4912.0,
+        -4567.0,
+        -4708.0,
+        -4741.0,
+        -4896.0,
+        -4896.0,
+        -4979.0,
+        -4746.0,
+        -4811.0,
+        -4699.0,
+        -4794.0,
+        -4844.0,
+        -4925.0,
+        -4950.0,
+        -4988.0,
+        -4670.0,
+        -4639.0,
+        -4950.0
+      ],
+      "source": "GEBCO Bathymetric Compilation Group 2026 (2026), GEBCO_2026 Grid, doi:10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa; regional nearest-cell sample via CEDA OPeNDAP",
+      "vertical_reference": "mean_sea_level",
+      "projection": "ocean_local_linear"
+    },
+    "sponge": {
+      "south_rows": 4,
+      "time_scale_s": 432000.0
+    }
+  },
+  "ocean": {
+    "initial_thickness_m": 600.0,
+    "initial_salinity_psu": 35.0,
+    "initial_temperature_k": 289.15
+  },
+  "physics": {
+    "coriolis_mode": "beta_plane",
+    "linear_friction_s": 1e-06,
+    "lateral_viscosity_m2_s": 300.0,
+    "tracer_diffusivity_m2_s": 500.0,
+    "stream_speed_threshold_m_s": 0.15,
+    "plume_salinity_deficit_psu": 0.5,
+    "convection_time_scale_s": 12600000.0,
+    "sponge_time_scale_s": 432000.0
+  },
+  "forcing": {
+    "wind": {
+      "kind": "gyre",
+      "stress_amplitude_pa": 0.25,
+      "gyres": 2,
+      "south_margin_m": 200000.0
+    },
+    "surface_temperature": {
+      "south_k": 290.15,
+      "north_k": 285.15,
+      "cold_patches": [
+        {
+          "east_m": 700000.0,
+          "north_m": 2100000.0,
+          "radius_m": 380000.0,
+          "temperature_k": 277.15
+        }
+      ]
+    },
+    "net_precipitation": {
+      "south_m_s": -1e-08,
+      "north_m_s": 5e-09
+    },
+    "rivers": [
+      {
+        "name": "Great southern river",
+        "east_m": 260000.0,
+        "north_m": 700000.0,
+        "discharge_m3_s": 18000.0,
+        "temperature_k": 288.15
+      },
+      {
+        "name": "Northern river",
+        "east_m": 260000.0,
+        "north_m": 1700000.0,
+        "discharge_m3_s": 12000.0,
+        "temperature_k": 281.15
+      },
+      {
+        "name": "Alpine river (catchment run x200)",
+        "east_m": 260000.0,
+        "north_m": 1250000.0,
+        "discharge_m3_s": 0.0,
+        "temperature_k": 283.15,
+        "catchment_timeline_path": "viewer/public/flood/engine-timeline.json",
+        "catchment_scale": 200.0
+      },
+      {
+        "name": "Meltwater pulse",
+        "east_m": 1500000.0,
+        "north_m": 2300000.0,
+        "discharge_m3_s": 0.0,
+        "temperature_k": 274.15,
+        "events": [
+          {
+            "start_seconds": 31536000.0,
+            "duration_seconds": 31536000.0,
+            "discharge_m3_s": 300000.0
+          }
+        ]
+      }
+    ]
+  },
+  "snapshot_every_steps": 1
+}

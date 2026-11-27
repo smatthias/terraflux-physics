@@ -7,6 +7,7 @@
 import { computed } from 'vue'
 import WindBarb from './WindBarb.vue'
 import WeatherIcon from './WeatherIcon.vue'
+import RouteWeather from './RouteWeather.vue'
 import { barbSvg, barbColour } from './barbs.js'
 import { FB_LEVELS } from './windsAloft.js'
 import { HAZARD_INFO, RULES } from './flightPlan.js'
@@ -28,6 +29,7 @@ const props = defineProps({
   returnData: { type: Object, default: null },         // returnTrip(...)
   returnIndex: { type: Number, default: null },
   windows: { type: Object, default: null },            // { outbound: { day, windows }, back: { day, windows } }
+  routeWeather: { type: Object, default: null },       // routeWeather(plan): the weather at every route point
 })
 const emit = defineEmits(['settings', 'seek', 'select-airport', 'fly', 'picking'])
 const p = computed(() => props.plan)
@@ -95,10 +97,14 @@ const section = computed(() => {
   const plan = p.value
   if (!plan?.ok) return null
   const st = plan.section, mid = j => (j <= 0 ? 0 : j >= st.length ? plan.lengthNm : (st[j - 1].distNm + st[j].distNm) / 2)
-  const spans = st.map((s, j) => ({ x0: X(mid(j)), x1: X(mid(j + 1)), s }))
+  // Cloud, icing and thunder at every route point (the route weather) when available; else at the section's points.
+  const rw = props.routeWeather
+  const spans = rw ? rw.samples.map(x => ({ x0: X(x.fromNm), x1: X(x.toNm), s: { distNm: x.distNm, cloud: x.cloud, icing: x.icing, thunder: x.hazards.includes('thunderstorm') } }))
+    : st.map((s, j) => ({ x0: X(mid(j)), x1: X(mid(j + 1)), s }))
+  spans.forEach((sp, k) => { sp.first = sp.s.thunder && !spans[k - 1]?.s.thunder })
   const terrain = [`${X(0)},${Y(0)}`, ...plan.profile.map(q => `${X(q.distNm).toFixed(1)},${Y(q.terrainFt).toFixed(1)}`), `${X(plan.lengthNm)},${Y(0)}`].join(' ')
   const path = [`${X(0)},${Y(plan.from.elevationFt)}`, ...plan.profile.map(q => `${X(q.distNm).toFixed(1)},${Y(q.altFt).toFixed(1)}`), `${X(plan.lengthNm)},${Y(plan.to.elevationFt)}`].join(' ')
-  const freezing = st.map(s => `${X(s.distNm).toFixed(1)},${Y(s.freezingFt).toFixed(1)}`).join(' ')
+  const freezing = (rw ? rw.samples.filter(x => x.freezingFt !== null).map(x => ({ distNm: x.distNm, freezingFt: x.freezingFt })) : st).map(s => `${X(s.distNm).toFixed(1)},${Y(s.freezingFt).toFixed(1)}`).join(' ')
   const barbs = st.flatMap((s, j) => s.winds.filter(w => !w.below).map(w => ({ key: `${j}-${w.level.key}`, x: X(s.distNm), y: Y(w.level.ft), g: barbSvg(w.kt, w.fromDeg, { size: 30, northernHemisphere: props.northernHemisphere }), colour: barbColour(w.kt), title: `${w.level.label} at ${Math.round(s.distNm)} NM: ${dir3(w.fromDeg)}° ${Math.round(w.kt)} kt, ${Math.round(w.tempC)} °C` })))
   const step = [10, 20, 25, 50, 100, 200, 250, 500].find(v => plan.lengthNm / v <= 8) ?? 1000, ticks = []
   for (let d = 0; d <= plan.lengthNm + 1e-6; d += step) ticks.push(d)
@@ -234,8 +240,10 @@ const cloudFill = c => (c.convective === 'CB' ? '#5d6b78' : c.convective === 'TC
         </template>
       </div>
 
+      <RouteWeather v-if="routeWeather" :weather="routeWeather" :plan="p" :northern-hemisphere="northernHemisphere" @seek="k => emit('seek', k)"/>
+
       <div class="fp-section">
-        <div class="wx-small-label">ROUTE CROSS-SECTION · WEATHER WHEN THE AIRCRAFT PASSES · BARBS AT EVERY LEVEL</div>
+        <div class="wx-small-label">ROUTE CROSS-SECTION · CLOUD, ICING AND FREEZING LEVEL AT EVERY ROUTE POINT WHEN THE AIRCRAFT PASSES · BARBS AT EVERY LEVEL</div>
         <svg :viewBox="`0 0 ${W} ${H}`" class="fp-xsec" role="img" :aria-label="`Cross-section from ${p.from.id} to ${p.to.id}`">
           <defs>
             <pattern id="fp-ice" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(111,184,255,0.18)"/><line x1="0" y1="0" x2="0" y2="8" stroke="#6fb8ff" stroke-width="2.5"/></pattern>
@@ -246,7 +254,7 @@ const cloudFill = c => (c.convective === 'CB' ? '#5d6b78' : c.convective === 'TC
           <template v-for="sp in section.spans" :key="sp.s.distNm">
             <rect v-if="sp.s.cloud" :x="sp.x0" :width="sp.x1 - sp.x0" :y="Y(sp.s.cloud.topFt)" :height="Math.max(2, Y(sp.s.cloud.baseFt) - Y(sp.s.cloud.topFt))" :fill="cloudFill(sp.s.cloud)" :stroke="sp.s.cloud.convective === 'CB' ? '#ff5252' : 'none'" opacity="0.55"><title>{{ sp.s.cloud.cover }} {{ sp.s.cloud.abbreviation }} {{ Math.round(sp.s.cloud.baseFt / 100) * 100 }}–{{ Math.round(sp.s.cloud.topFt / 100) * 100 }} ft</title></rect>
             <rect v-if="sp.s.icing" :x="sp.x0" :width="sp.x1 - sp.x0" :y="Y(sp.s.icing.toFt)" :height="Math.max(2, Y(sp.s.icing.fromFt) - Y(sp.s.icing.toFt))" fill="url(#fp-ice)"><title>Icing {{ sp.s.icing.severity }}</title></rect>
-            <text v-if="sp.s.thunder" :x="(sp.x0 + sp.x1) / 2" :y="Y(sp.s.cloud?.topFt ?? 30000) - 6" class="fp-ts">⚡ CB</text>
+            <text v-if="sp.s.thunder && sp.first" :x="(sp.x0 + sp.x1) / 2" :y="Y(sp.s.cloud?.topFt ?? 30000) - 6" class="fp-ts">⚡ CB</text>
           </template>
           <polyline :points="section.freezing" class="fp-freezing"/>
           <text :x="W - R - 4" :y="Y(p.section.at(-1).freezingFt) - 4" class="fp-freezing-label">0 °C</text>

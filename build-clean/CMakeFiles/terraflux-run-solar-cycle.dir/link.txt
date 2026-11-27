@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-run-solar-cycle.dir/src/weather/run_solar_cycle.cpp.o -o terraflux-run-solar-cycle  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 

@@ -78,7 +78,7 @@ export function apparentWind(twdFrom, twsKt, headingDeg, boatKt) {
 
 // Customary points of sail by the absolute true wind angle.
 export function pointOfSail(twaAbs) {
-  if (twaAbs < 40) return 'in irons (no-go zone)'
+  if (twaAbs < 35) return 'in irons (no-go zone)'
   if (twaAbs < 55) return 'close-hauled'
   if (twaAbs < 80) return 'close reach'
   if (twaAbs < 100) return 'beam reach'
@@ -100,7 +100,9 @@ export const DEFAULT_SAILING_SETTINGS = { headingDeg: 45, boatKt: 5, reefKt: 18,
 
 // frame: the current frame; requested: the picked cell; sea: the run's sea mask (or null); waves: the frame's wave field
 // (waves.js waveField result, or null); frames/index: the timeline (for the barometer tendency).
-export function sailingReport(frame, requested, { sea = null, waves = null, frames = null, index = 0, settings = {} } = {}) {
+// currentAt(i): the current at a cell from the current model (currents.js: { u, v, setDeg, driftKt, source,
+// sourceLabel } or null); without it, the run's ocean model only.
+export function sailingReport(frame, requested, { sea = null, waves = null, frames = null, index = 0, settings = {}, currentAt = null } = {}) {
   const opts = { ...DEFAULT_SAILING_SETTINGS, ...settings }
   const g = frame.forecast.grid, near = nearestSea(sea, g, requested)
   if (!near) return { available: false, reason: 'This run has no sea: there is nowhere to sail.', settings: opts }
@@ -116,16 +118,19 @@ export function sailingReport(frame, requested, { sea = null, waves = null, fram
   const warning = marineWarning(wind.kt, seaInfo?.hs, opts)
 
   // The boat.
-  const aw = apparentWind(wind.fromDeg, wind.kt, opts.headingDeg, opts.boatKt)
-  const boat = { headingDeg: norm360(opts.headingDeg), speedKt: opts.boatKt, ...aw, tack: tackOf(aw.twa), pointOfSail: pointOfSail(Math.abs(aw.twa)), vmgKt: opts.boatKt * Math.cos(aw.twa * Math.PI / 180) }
+  // The boat speed: the user's, or the boat's polar at this wind and angle (settings.polar(twsKt, twaDeg) -> kt).
+  const boatKt = typeof opts.polar === 'function' ? opts.polar(wind.kt, angleDiff(wind.fromDeg, opts.headingDeg)) : opts.boatKt
+  const aw = apparentWind(wind.fromDeg, wind.kt, opts.headingDeg, boatKt)
+  const boat = { headingDeg: norm360(opts.headingDeg), speedKt: boatKt, fromPolar: typeof opts.polar === 'function', ...aw, tack: tackOf(aw.twa), pointOfSail: pointOfSail(Math.abs(aw.twa)), vmgKt: boatKt * Math.cos(aw.twa * Math.PI / 180) }
 
   // Current and water temperature (ocean runs; SST also from a storm run's surface).
   const o = frame.ocean
   let current = null
-  if (o && o.mask[i]) {
-    const u = o.u[i], v = o.v[i], drift = Math.hypot(u, v) * KT_PER_MS
+  const cur = currentAt ? currentAt(i) : o && o.mask[i] ? { u: o.u[i], v: o.v[i], source: 'ocean', sourceLabel: 'ocean model (engine)' } : null
+  if (cur) {
+    const u = cur.u, v = cur.v, drift = Math.hypot(u, v) * KT_PER_MS
     const against = seaInfo && seaInfo.hs > 0.05 ? -(u * Math.sin(seaInfo.towardsDeg * Math.PI / 180) + v * Math.cos(seaInfo.towardsDeg * Math.PI / 180)) * KT_PER_MS : 0
-    current = { setDeg: norm360(Math.atan2(u, v) * 180 / Math.PI), driftKt: drift, againstWavesKt: against, windAgainstCurrent: against > 0.5 }
+    current = { setDeg: norm360(Math.atan2(u, v) * 180 / Math.PI), driftKt: drift, againstWavesKt: against, windAgainstCurrent: against > 0.5, source: cur.source, sourceLabel: cur.sourceLabel }
   }
   const sstK = finiteOr(o?.thermal?.sst?.[i], null) ?? (o?.mask[i] ? finiteOr(o?.temperature?.[i], null) : null) ?? finiteOr(frame.surface?.sst?.[i], null)
   const water = sstK === null ? null : { c: sstK - 273.15, coldShock: sstK - 273.15 < 15 }
@@ -167,6 +172,8 @@ export function sailingReport(frame, requested, { sea = null, waves = null, fram
   if (near.snapped) notes.push(`Moved to the nearest sea cell, ${(near.distanceM / 1000).toFixed(0)} km from the picked point.`)
   if (vis) notes.push('Visibility is estimated (the engine has no visibility).')
   if (!current && o) notes.push('No ocean current at this cell.')
+  if (current?.source === 'drift') notes.push('The current is the wind drift estimated from the wind (about 2.5 % of it, turned to the right): no tides; load a current table for tidal streams.')
+  if (current?.source === 'table') notes.push(`The current is from the loaded table (${current.sourceLabel}), interpolated to this point and time.`)
   if (barometer?.staticField) notes.push('The pressure field of this run is prescribed and constant in time: no barometer tendency.')
   notes.push('Gusts are not modelled. Directions are true.')
 
@@ -225,7 +232,7 @@ export const beaufortSeries = (frames, i) => frames.map(f => beaufort(surfaceWin
 // Wind (Beaufort, warning), the wind sea there (waves.js field) when the point is at sea, current and water temperature
 // (ocean runs), weather symbol and words, visibility and barometer, and the distance and true bearing from the boat
 // (great circle). sea: the run's sea mask or null; waves: the frame's wave field; boat: { lat, lon } or null.
-export function pointReadout(frame, i, { sea = null, waves = null, boat = null, settings = {} } = {}) {
+export function pointReadout(frame, i, { sea = null, waves = null, boat = null, settings = {}, currentAt = null } = {}) {
   const opts = { ...DEFAULT_SAILING_SETTINGS, ...settings }
   const g = frame.forecast.grid, loc = cellLocation(g, i), wind = surfaceWind(frame, i), bf = beaufort(wind.speed)
   const onSea = sea ? !!sea[i] : null
@@ -235,7 +242,8 @@ export function pointReadout(frame, i, { sea = null, waves = null, boat = null, 
     seaInfo = { hs: waves.hs[i], tp: waves.tp[i], length: waves.length[i], fromDeg: norm360(towards + 180), state: seaState(waves.hs[i]), regime: waves.regime[i] ?? 'calm' }
   }
   const o = frame.ocean
-  const current = o && o.mask[i] ? { setDeg: norm360(Math.atan2(o.u[i], o.v[i]) * 180 / Math.PI), driftKt: Math.hypot(o.u[i], o.v[i]) * KT_PER_MS } : null
+  const cur = onSea === false ? null : currentAt ? currentAt(i) : o && o.mask[i] ? { u: o.u[i], v: o.v[i], source: 'ocean', sourceLabel: 'ocean model (engine)' } : null
+  const current = cur ? { setDeg: norm360(Math.atan2(cur.u, cur.v) * 180 / Math.PI), driftKt: Math.hypot(cur.u, cur.v) * KT_PER_MS, source: cur.source, sourceLabel: cur.sourceLabel } : null
   const sstK = finiteOr(o?.thermal?.sst?.[i], null) ?? (o?.mask[i] ? finiteOr(o?.temperature?.[i], null) : null) ?? finiteOr(frame.surface?.sst?.[i], null)
   const rh = relativeHumidity(frame, i), cloud = cloudLayer(frame, i), wx = presentWeather(frame, i)
   const vis = estimateVisibility({ rh, weather: wx, cloudBase: cloud.layer?.base ?? null }), p = pressures(frame, i)

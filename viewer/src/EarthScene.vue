@@ -14,6 +14,7 @@ import { arrowField } from './flowArrows.js'
 import { watchCurtain, hurricaneBands } from './stormScene.js'
 import { maskOutline } from './stormWatch.js'
 import { cloudForms, cloudDrawn, isobars, levelMask, globeDir } from './earthScene.js'
+import { globeReliefHeight } from './globalRelief.js'
 import { textSprite, glyphSprite, softFloor, sceneLights, disposeTree } from './sceneKit.js'
 
 const props = defineProps({
@@ -251,7 +252,7 @@ function forecastOverlays() {
 const GLOBE_R = 9
 function globeBase() {
   const g = props.grid, nx = g.nx, ny = g.ny, count = nx * ny, R = GLOBE_R
-  const raise = i => (props.land[i] ? 0.06 : 0) + (layers.value.relief && props.heights ? Math.max(0, Math.min(1, props.heights[i] ?? 0)) * 1.6 : 0)
+  const raise = i => (layers.value.relief && props.elevation ? globeReliefHeight(props.elevation[i], R) : (props.land[i] ? 0.06 : 0)) + (layers.value.relief && props.heights ? Math.max(0, Math.min(1, props.heights[i] ?? 0)) * 1.6 : 0)
   const opts = { nx, ny, heights: Float32Array.from({ length: count }, (_, i) => raise(i)), colors: baseColours(count, ...LAND.climate), values: null, R, centre: new THREE.Vector3(0, 0, 0), dir: globeDir }
   const material = surfaceMaterial({ nx, ny, wrap: true }); surfaceU = material.userData.uniforms
   sheet = new THREE.Mesh(globeSurface({ ...opts, s: 4 }), material); base.add(sheet)

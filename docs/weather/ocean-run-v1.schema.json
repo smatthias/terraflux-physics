@@ -160,6 +160,9 @@
                     "values"
                   ],
                   "properties": {
+                    "source": {"type": "string"},
+                    "vertical_reference": {"type": "string"},
+                    "projection": {"type": "string"},
                     "values": {
                       "type": "array",
                       "items": {

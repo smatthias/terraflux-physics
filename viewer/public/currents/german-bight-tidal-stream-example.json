@@ -1,0 +1,395 @@
+{
+ "schema": "terraflux.tidal-stream/v1",
+ "name": "German Bight tidal streams (synthetic example)",
+ "synthetic": true,
+ "source": "SYNTHETIC EXAMPLE of the tidal stream table format (hourly set and rates at springs and neaps from high water at a reference port, as in a tidal stream atlas or the tidal diamonds of a chart). Made up; not from any atlas. Replace with values transcribed from a published atlas or chart you are entitled to use.",
+ "reference_port": {
+  "name": "Helgoland",
+  "spring_range_m": 2.9,
+  "neap_range_m": 1.9,
+  "high_waters": [
+   {
+    "time": "2026-11-01T14:45Z",
+    "range_m": 2.9
+   },
+   {
+    "time": "2026-11-02T03:10Z",
+    "range_m": 2.89
+   },
+   {
+    "time": "2026-11-02T15:35Z",
+    "range_m": 2.85
+   },
+   {
+    "time": "2026-11-03T04:00Z",
+    "range_m": 2.79
+   },
+   {
+    "time": "2026-11-03T16:25Z",
+    "range_m": 2.72
+   },
+   {
+    "time": "2026-11-04T04:50Z",
+    "range_m": 2.63
+   },
+   {
+    "time": "2026-11-04T17:15Z",
+    "range_m": 2.52
+   },
+   {
+    "time": "2026-11-05T05:40Z",
+    "range_m": 2.41
+   },
+   {
+    "time": "2026-11-05T18:05Z",
+    "range_m": 2.31
+   },
+   {
+    "time": "2026-11-06T06:30Z",
+    "range_m": 2.2
+   }
+  ]
+ },
+ "diamonds": [
+  {
+   "id": "A",
+   "lat": 54.05,
+   "lon": 8.1,
+   "hours": [
+    {
+     "hour": -6,
+     "set_deg": 290,
+     "spring_kt": 1.7,
+     "neap_kt": 1.0
+    },
+    {
+     "hour": -5,
+     "set_deg": 290,
+     "spring_kt": 1.2,
+     "neap_kt": 0.7
+    },
+    {
+     "hour": -4,
+     "set_deg": 290,
+     "spring_kt": 0.4,
+     "neap_kt": 0.2
+    },
+    {
+     "hour": -3,
+     "set_deg": 110,
+     "spring_kt": 0.5,
+     "neap_kt": 0.3
+    },
+    {
+     "hour": -2,
+     "set_deg": 110,
+     "spring_kt": 1.3,
+     "neap_kt": 0.8
+    },
+    {
+     "hour": -1,
+     "set_deg": 110,
+     "spring_kt": 1.7,
+     "neap_kt": 1.0
+    },
+    {
+     "hour": 0,
+     "set_deg": 110,
+     "spring_kt": 1.7,
+     "neap_kt": 1.0
+    },
+    {
+     "hour": 1,
+     "set_deg": 110,
+     "spring_kt": 1.3,
+     "neap_kt": 0.8
+    },
+    {
+     "hour": 2,
+     "set_deg": 110,
+     "spring_kt": 0.5,
+     "neap_kt": 0.3
+    },
+    {
+     "hour": 3,
+     "set_deg": 290,
+     "spring_kt": 0.4,
+     "neap_kt": 0.2
+    },
+    {
+     "hour": 4,
+     "set_deg": 290,
+     "spring_kt": 1.2,
+     "neap_kt": 0.7
+    },
+    {
+     "hour": 5,
+     "set_deg": 290,
+     "spring_kt": 1.7,
+     "neap_kt": 1.0
+    },
+    {
+     "hour": 6,
+     "set_deg": 290,
+     "spring_kt": 1.8,
+     "neap_kt": 1.1
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "lat": 53.95,
+   "lon": 8.55,
+   "hours": [
+    {
+     "hour": -6,
+     "set_deg": 300,
+     "spring_kt": 2.3,
+     "neap_kt": 1.4
+    },
+    {
+     "hour": -5,
+     "set_deg": 300,
+     "spring_kt": 1.6,
+     "neap_kt": 0.9
+    },
+    {
+     "hour": -4,
+     "set_deg": 300,
+     "spring_kt": 0.5,
+     "neap_kt": 0.3
+    },
+    {
+     "hour": -3,
+     "set_deg": 120,
+     "spring_kt": 0.7,
+     "neap_kt": 0.4
+    },
+    {
+     "hour": -2,
+     "set_deg": 120,
+     "spring_kt": 1.7,
+     "neap_kt": 1.0
+    },
+    {
+     "hour": -1,
+     "set_deg": 120,
+     "spring_kt": 2.3,
+     "neap_kt": 1.4
+    },
+    {
+     "hour": 0,
+     "set_deg": 120,
+     "spring_kt": 2.3,
+     "neap_kt": 1.4
+    },
+    {
+     "hour": 1,
+     "set_deg": 120,
+     "spring_kt": 1.7,
+     "neap_kt": 1.0
+    },
+    {
+     "hour": 2,
+     "set_deg": 120,
+     "spring_kt": 0.7,
+     "neap_kt": 0.4
+    },
+    {
+     "hour": 3,
+     "set_deg": 300,
+     "spring_kt": 0.5,
+     "neap_kt": 0.3
+    },
+    {
+     "hour": 4,
+     "set_deg": 300,
+     "spring_kt": 1.6,
+     "neap_kt": 0.9
+    },
+    {
+     "hour": 5,
+     "set_deg": 300,
+     "spring_kt": 2.3,
+     "neap_kt": 1.4
+    },
+    {
+     "hour": 6,
+     "set_deg": 300,
+     "spring_kt": 2.4,
+     "neap_kt": 1.4
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "lat": 54.2,
+   "lon": 7.8,
+   "hours": [
+    {
+     "hour": -6,
+     "set_deg": 275,
+     "spring_kt": 1.3,
+     "neap_kt": 0.8
+    },
+    {
+     "hour": -5,
+     "set_deg": 275,
+     "spring_kt": 0.9,
+     "neap_kt": 0.5
+    },
+    {
+     "hour": -4,
+     "set_deg": 275,
+     "spring_kt": 0.3,
+     "neap_kt": 0.2
+    },
+    {
+     "hour": -3,
+     "set_deg": 95,
+     "spring_kt": 0.4,
+     "neap_kt": 0.3
+    },
+    {
+     "hour": -2,
+     "set_deg": 95,
+     "spring_kt": 1.0,
+     "neap_kt": 0.6
+    },
+    {
+     "hour": -1,
+     "set_deg": 95,
+     "spring_kt": 1.4,
+     "neap_kt": 0.8
+    },
+    {
+     "hour": 0,
+     "set_deg": 95,
+     "spring_kt": 1.4,
+     "neap_kt": 0.8
+    },
+    {
+     "hour": 1,
+     "set_deg": 95,
+     "spring_kt": 1.0,
+     "neap_kt": 0.6
+    },
+    {
+     "hour": 2,
+     "set_deg": 95,
+     "spring_kt": 0.4,
+     "neap_kt": 0.3
+    },
+    {
+     "hour": 3,
+     "set_deg": 275,
+     "spring_kt": 0.3,
+     "neap_kt": 0.2
+    },
+    {
+     "hour": 4,
+     "set_deg": 275,
+     "spring_kt": 0.9,
+     "neap_kt": 0.5
+    },
+    {
+     "hour": 5,
+     "set_deg": 275,
+     "spring_kt": 1.3,
+     "neap_kt": 0.8
+    },
+    {
+     "hour": 6,
+     "set_deg": 275,
+     "spring_kt": 1.4,
+     "neap_kt": 0.8
+    }
+   ]
+  },
+  {
+   "id": "D",
+   "lat": 54.4,
+   "lon": 8.3,
+   "hours": [
+    {
+     "hour": -6,
+     "set_deg": 330,
+     "spring_kt": 1.1,
+     "neap_kt": 0.7
+    },
+    {
+     "hour": -5,
+     "set_deg": 330,
+     "spring_kt": 0.8,
+     "neap_kt": 0.5
+    },
+    {
+     "hour": -4,
+     "set_deg": 330,
+     "spring_kt": 0.2,
+     "neap_kt": 0.1
+    },
+    {
+     "hour": -3,
+     "set_deg": 150,
+     "spring_kt": 0.4,
+     "neap_kt": 0.2
+    },
+    {
+     "hour": -2,
+     "set_deg": 150,
+     "spring_kt": 0.9,
+     "neap_kt": 0.5
+    },
+    {
+     "hour": -1,
+     "set_deg": 150,
+     "spring_kt": 1.2,
+     "neap_kt": 0.7
+    },
+    {
+     "hour": 0,
+     "set_deg": 150,
+     "spring_kt": 1.2,
+     "neap_kt": 0.7
+    },
+    {
+     "hour": 1,
+     "set_deg": 150,
+     "spring_kt": 0.9,
+     "neap_kt": 0.5
+    },
+    {
+     "hour": 2,
+     "set_deg": 150,
+     "spring_kt": 0.4,
+     "neap_kt": 0.2
+    },
+    {
+     "hour": 3,
+     "set_deg": 330,
+     "spring_kt": 0.2,
+     "neap_kt": 0.1
+    },
+    {
+     "hour": 4,
+     "set_deg": 330,
+     "spring_kt": 0.8,
+     "neap_kt": 0.5
+    },
+    {
+     "hour": 5,
+     "set_deg": 330,
+     "spring_kt": 1.1,
+     "neap_kt": 0.7
+    },
+    {
+     "hour": 6,
+     "set_deg": 330,
+     "spring_kt": 1.2,
+     "neap_kt": 0.7
+    }
+   ]
+  }
+ ]
+}
