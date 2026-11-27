@@ -540,3 +540,5 @@ This configures/builds C++, runs CTest and fixture checks, runs Python tests, in
 ### Globe relief
 
 The Coupled Earth climate and CO₂ globe views accept offline global elevation JSON, including negative seafloor elevations. See [the relief contract and current limits](docs/weather/global-relief.md) and [the synthetic import example](examples/global-relief-synthetic.json). An offline GEBCO NetCDF converter is available as `tools/gebco_to_relief.py`; real-file verification and model coupling remain pending.
+
+Regional ocean runs can import GEBCO elevations through `tools/gebco_to_ocean.py`; see [coordinates, coverage rules and model limits](docs/weather/regional-bathymetry.md).

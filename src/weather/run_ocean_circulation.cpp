@@ -205,6 +205,9 @@ std::vector<double> parse_basin(const Json& request, const TransportGrid2D& grid
         elevation = required_number_array(terrain, "values");
         if (elevation.size() != count) throw std::invalid_argument("basin.terrain.values must contain one elevation per grid cell");
         provenance = {{"kind", "prescribed_cell_values"}, {"sea_level_m", sea_level}};
+        for (const char* key : {"source", "vertical_reference", "projection"}) {
+            if (terrain.contains(key)) provenance[key] = required_string(terrain, key);
+        }
     } else {
         SyntheticTerrainSpec spec;
         spec.base_elevation_m = optional_number(terrain, "base_elevation_m", -4000.0);
@@ -2009,8 +2012,8 @@ int main(int argc, char** argv) {
                 {"schema_version", "terraflux.terrain.grid/v1"},
                 {"grid", grid_json(config.grid)},
                 {"units", "m"},
-                {"vertical_reference", "synthetic_local_datum"},
-                {"source_id", basin_provenance.at("kind").get<std::string>()},
+                {"vertical_reference", optional_string(basin_provenance, "vertical_reference", "synthetic_local_datum")},
+                {"source_id", optional_string(basin_provenance, "source", basin_provenance.at("kind").get<std::string>())},
                 {"values", elevation},
             }},
             {"ocean", {

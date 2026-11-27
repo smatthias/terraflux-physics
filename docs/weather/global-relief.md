@@ -53,3 +53,5 @@ python3 tools/gebco_to_relief.py \
 `viewer/public/relief/gebco-2026-10deg.json` contains these 648 sampled elevations, ranging from −6,731 m to +5,009 m. The climate and CO₂ maps offer **Load GEBCO 2026 sample (10°)** to load it offline. The source field preserves attribution. This is a very coarse display sample and is not suitable for coastal detail or model bathymetry. The source URL is the unversioned-access location of the named 2026 release; the committed values provide a stable fixture.
 
 The real output passed viewer contract validation and resampling to 90 × 45 cells. A committed test covers this path without network access. Visual browser verification was attempted but blocked by an incomplete Chromium installation and denied browser-binary download; actual rendered geometry remains to be inspected. Ocean-model coupling remains pending.
+
+For sampling onto the engine's regional ocean grid, see [regional bathymetry](regional-bathymetry.md). This path produces an ocean request rather than changing only globe geometry.

@@ -263,6 +263,8 @@ if(BUILD_TESTING)
     add_executable(terraflux-ocean-circulation-test tests/weather/ocean_circulation_test.cpp)
     target_link_libraries(terraflux-ocean-circulation-test PRIVATE terraflux_weather_map)
     add_test(NAME weather.ocean_circulation COMMAND terraflux-ocean-circulation-test)
+    add_test(NAME weather.regional_bathymetry_cli
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/regional_bathymetry_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
     add_test(NAME weather.ocean_circulation_cli
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/ocean_circulation_check.py $<TARGET_FILE:terraflux-run-ocean-circulation>)
     add_executable(terraflux-ocean-heat-rain-test tests/weather/ocean_heat_rain_test.cpp)
