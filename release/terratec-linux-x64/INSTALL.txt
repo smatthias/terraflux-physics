@@ -1,6 +1,0 @@
-Requires Node.js >=22.12.0 and a compatible linux/x64 system.
-Extract this archive, then run: node /path/to/terratec-linux-x64/start.mjs
-Open http://127.0.0.1:3001
-Optional: PORT and TERRATEC_DATA_DIR environment variables. Default data: data/ beside start.mjs.
-No npm install, Vite or compiler required. Back up data/ before upgrading; use TERRATEC_DATA_DIR outside this folder to retain data across upgrades.
-Native binary is built for the runner platform; cross-platform installers are not included.

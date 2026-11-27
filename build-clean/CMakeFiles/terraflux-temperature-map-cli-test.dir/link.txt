@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/terraflux-temperature-map-cli-test.dir/tests/weather/temperature_map_cli_test.cpp.o -o terraflux-temperature-map-cli-test  libterraflux_weather_map.a /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 
