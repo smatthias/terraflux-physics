@@ -21,6 +21,20 @@ The grid covers the entire world, longitude −180° to +180° and latitude −9
 
 Use `examples/global-relief-synthetic.json` to exercise loading and clearing. It is deliberately coarse synthetic data, not geographic terrain.
 
-## Next integration
+## GEBCO NetCDF conversion
 
-A GEBCO converter must read coordinate axes and vertical metadata, subset or downsample before export, reverse north-first rows when necessary, preserve nodata, and include dataset version and attribution in `source`. No GEBCO download, NetCDF converter, or model bathymetry coupling is included yet. The coarse climate grid limits visible detail even with a denser input file.
+Install the optional converter dependencies and convert an already downloaded **global elevation grid** (not the TID grid):
+
+```sh
+python3 -m pip install -r tools/requirements-relief.txt
+python3 tools/gebco_to_relief.py GEBCO_2026.nc relief.json --nx 360 --ny 180 \
+  --source "GEBCO Bathymetric Compilation Group 2026 (2026), GEBCO_2026 Grid, doi:10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa; nearest-cell sample"
+```
+
+Open a climate or CO₂ map and load `relief.json` using **Load globe relief JSON**.
+
+The converter expects `elevation(lat, lon)`, metres positive upward, with regular global pixel-centre coordinates. It accepts ascending or descending latitude and longitude axes, including 0–360° longitude, and emits south-to-north, west-to-east rows. It reads selected positions from each sampled row rather than loading the entire elevation raster. Masked and nonfinite cells become JSON null. Sampling selects the nearest source cell; it does not average depth or retain small coast features. Regional subsets and non-global axes are rejected rather than stretched over the planet. The climate grid still limits display detail.
+
+[GEBCO's 2026 documentation](https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid) describes global cell-centred elevation in metres and an assumed mean-sea-level datum, with exceptions in some shallow-water source data. The output uses that assumption; it performs no vertical datum transformation. Preserve the release's attribution in `--source` and consult its terms. The converter does not download data automatically.
+
+Synthetic NetCDF tests cover coordinate reversal, longitude wrapping, nodata, CLI downsampling and rejected inputs. Actual GEBCO-file conversion, visual browser verification and model bathymetry coupling remain pending.
