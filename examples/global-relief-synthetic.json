@@ -1,0 +1,10 @@
+{
+  "schema": "terraflux.global-relief/v1",
+  "nx": 4,
+  "ny": 2,
+  "units": "m",
+  "datum": "mean_sea_level",
+  "row_order": "south_to_north",
+  "source": "Synthetic demonstration; not GEBCO",
+  "elevation_m": [-4000, -2000, null, -1000, 1000, 2000, 0, -3000]
+}

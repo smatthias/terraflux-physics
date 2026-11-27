@@ -13,10 +13,22 @@ import {
   co2LayerInfo, co2Budget, couplingGraph, edgePath, strengthWeight, keyAnswers,
   temperatureColor, windColor, probabilityColor, levelColor, warmingColor, localWarmingColor, fmt, signed,
 } from './coupledEarth.js'
+import { validateGlobalRelief, resampleGlobalRelief } from './globalRelief.js'
 import EarthScene from './EarthScene.vue'
 import { trackAt, galeRadius, fluxArrows, nextFrame, ensembleStorm, nearestFrame } from './earthScene.js'
 
 const props = defineProps({ document: { type: Object, default: null }, goto: { type: Object, default: null } })
+const relief = ref(null), reliefError = ref('')
+async function loadRelief(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  try {
+    if (file.size > 32000000) throw new Error('Relief file exceeds 32 MB')
+    const next = validateGlobalRelief(JSON.parse(await file.text()))
+    relief.value = next; reliefError.value = ''
+  } catch (err) { reliefError.value = err.message }
+  event.target.value = ''
+}
 const base = import.meta.env.BASE_URL
 const view = ref('overview')
 const forecastDoc = ref(null), climateDoc = ref(null)
@@ -242,7 +254,7 @@ const mapTitle = computed(() => {
 
 const sceneReady = computed(() => !!(mapGrid.value && cellValue.value && (mapKind.value === 'forecast' ? forecast.value : climate.value)))
 const sceneLand = computed(() => (mapKind.value === 'forecast' ? forecast.value?.static.land_mask : climate.value?.map.land_mask) ?? [])
-const sceneElevation = computed(() => (mapKind.value === 'forecast' ? forecast.value?.static.elevation_m ?? null : null))
+const sceneElevation = computed(() => (mapKind.value === 'forecast' ? forecast.value?.static.elevation_m ?? null : relief.value && mapGrid.value ? resampleGlobalRelief(relief.value, mapGrid.value.nx, mapGrid.value.ny) : null))
 const sceneColors = computed(() => {
   const v = cellValue.value, g = mapGrid.value
   return v && g ? Array.from({ length: g.nx * g.ny }, (_, i) => v.color(i) ?? null) : null
@@ -471,6 +483,11 @@ const timeLabel = h => (forecast.value ? validTime(forecast.value, h).toISOStrin
     <div v-if="mapKind && (mapKind === 'forecast' ? forecast : climate)" class="earth-grid map-grid">
       <article class="earth-panel map-panel">
         <div class="map-title"><strong>{{ mapTitle }}</strong><small v-if="hoverText">{{ hoverText }}</small><small v-else>{{ mapKind === 'forecast' ? 'Hover for values · click a cell to pin it' + (view === 'wind' ? ' (wind: the nearest city)' : '') : 'Hover for values' }}</small></div>
+        <div v-if="mapKind === 'climate'" class="hint">
+          <label>Load globe relief JSON <input type="file" accept=".json,application/json" @change="loadRelief"></label>
+          <template v-if="relief"> · {{ relief.source }} · relief exaggerated 20× <button @click="relief = null; reliefError = ''">Clear relief</button></template>
+          <span v-if="reliefError" role="alert">{{ reliefError }}</span>
+        </div>
         <EarthScene v-if="sceneReady" :kind="mapKind" :grid="mapGrid" :land="sceneLand" :elevation="sceneElevation" :colors="sceneColors" :heights="sceneHeights" :overlays="sceneOverlays"
           :selected="['weather', 'severe'].includes(view) ? selectedCell : null" :playing="playing" :can-play="canPlay" :play-label="playLabel"
           @hover="onSceneHover" @pick="onScenePick" @toggle-play="togglePlay">

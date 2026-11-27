@@ -536,3 +536,7 @@ python3 tools/verify_pipeline.py
 ```
 
 This configures/builds C++, runs CTest and fixture checks, runs Python tests, installs locked viewer dependencies, and runs viewer tests plus its production build. Native dependencies must already be installed. The runner stops at the first failure; `--dry-run` only prints commands. CI uses the same runner for its C++/Python and viewer jobs. See [prerequisites, dependency prefixes and partial modes](docs/VERIFY_PIPELINE.md). All examples remain synthetic; AI and live-provider work are excluded.
+
+### Globe relief
+
+The Coupled Earth climate and CO₂ globe views accept offline global elevation JSON, including negative seafloor elevations. See [the relief contract and current limits](docs/weather/global-relief.md) and [the synthetic import example](examples/global-relief-synthetic.json). GEBCO conversion and model coupling remain pending.
