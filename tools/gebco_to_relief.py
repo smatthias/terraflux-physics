@@ -67,7 +67,7 @@ def convert(path, nx, ny, source):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('input', type=Path)
+    parser.add_argument('input', help='Local NetCDF file or HTTPS OPeNDAP dataset URL')
     parser.add_argument('output', type=Path)
     parser.add_argument('--nx', type=int, default=360)
     parser.add_argument('--ny', type=int, default=180)

@@ -19,6 +19,13 @@ import { trackAt, galeRadius, fluxArrows, nextFrame, ensembleStorm, nearestFrame
 
 const props = defineProps({ document: { type: Object, default: null }, goto: { type: Object, default: null } })
 const relief = ref(null), reliefError = ref('')
+async function loadGebcoSample() {
+  try {
+    const response = await fetch(`${base}relief/gebco-2026-10deg.json`)
+    if (!response.ok) throw new Error('Could not load GEBCO sample')
+    relief.value = validateGlobalRelief(await response.json()); reliefError.value = ''
+  } catch (err) { reliefError.value = err.message }
+}
 async function loadRelief(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -484,6 +491,7 @@ const timeLabel = h => (forecast.value ? validTime(forecast.value, h).toISOStrin
       <article class="earth-panel map-panel">
         <div class="map-title"><strong>{{ mapTitle }}</strong><small v-if="hoverText">{{ hoverText }}</small><small v-else>{{ mapKind === 'forecast' ? 'Hover for values · click a cell to pin it' + (view === 'wind' ? ' (wind: the nearest city)' : '') : 'Hover for values' }}</small></div>
         <div v-if="mapKind === 'climate'" class="hint">
+          <button @click="loadGebcoSample">Load GEBCO 2026 sample (10°)</button>
           <label>Load globe relief JSON <input type="file" accept=".json,application/json" @change="loadRelief"></label>
           <template v-if="relief"> · {{ relief.source }} · relief exaggerated 20× <button @click="relief = null; reliefError = ''">Clear relief</button></template>
           <span v-if="reliefError" role="alert">{{ reliefError }}</span>
