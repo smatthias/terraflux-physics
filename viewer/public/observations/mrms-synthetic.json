@@ -1,0 +1,292 @@
+[
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:00:00Z",
+    "variable": "radar_reflectivity",
+    "value": 0,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122.5,
+        38
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:00:00Z",
+    "variable": "radar_reflectivity",
+    "value": 35,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122,
+        38
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:00:00Z",
+    "variable": "radar_reflectivity",
+    "value": 55,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -121.5,
+        38
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:00:00Z",
+    "variable": "radar_reflectivity",
+    "value": null,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122.5,
+        38.5
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "no_data",
+      "reason": "MRMS no-coverage value code -999"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:00:00Z",
+    "variable": "radar_reflectivity",
+    "value": 20,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122,
+        38.5
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:00:00Z",
+    "variable": "radar_reflectivity",
+    "value": 5,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -121.5,
+        38.5
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:02:00Z",
+    "variable": "radar_reflectivity",
+    "value": 0,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122.5,
+        38
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:02:00Z",
+    "variable": "radar_reflectivity",
+    "value": 35,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122,
+        38
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:02:00Z",
+    "variable": "radar_reflectivity",
+    "value": 55,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -121.5,
+        38
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:02:00Z",
+    "variable": "radar_reflectivity",
+    "value": null,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122.5,
+        38.5
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "no_data",
+      "reason": "MRMS no-coverage value code -999"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:02:00Z",
+    "variable": "radar_reflectivity",
+    "value": 20,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -122,
+        38.5
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  },
+  {
+    "schema_version": "terraflux.weather.observation/v1",
+    "source": {
+      "source_id": "noaa_mrms",
+      "source_kind": "synthetic_fixture",
+      "product_id": "MergedReflectivityComposite",
+      "interpretation": "structured_grid_value"
+    },
+    "valid_time_utc": "2026-01-01T00:02:00Z",
+    "variable": "radar_reflectivity",
+    "value": 5,
+    "units": "dBZ",
+    "location": {
+      "crs": "EPSG:4326",
+      "coordinates": [
+        -121.5,
+        38.5
+      ]
+    },
+    "vertical_reference": "composite",
+    "quality": {
+      "status": "decoded"
+    }
+  }
+]

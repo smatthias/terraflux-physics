@@ -2,7 +2,7 @@
 
 A C++ home for deterministic, testable physical models used by TerraFlux. The first planned area is weather physics, with a future interface for coupling weather to terrain and wildfire spread.
 
-The engine is intended to read structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation decodes sidecar-backed radar and temperature PNG/PPM maps, tracks timestamped temperature frames through a 2D dry transport model, and writes versioned forecast JSON. NOAA MRMS is the temporary live radar data source; its GRIB2 acquisition helper is in place, while GRIB2 decoding into the model's canonical observation contract remains the next step. The planned Victoria source remains BOM radar, pending a suitable commercial licence and sample.
+The engine is intended to read structured weather datasets and rendered weather maps, interpret them into georeferenced observations, and keep those observations distinct from simulated state. The current implementation decodes sidecar-backed radar and temperature PNG/PPM maps, tracks timestamped temperature frames through a 2D dry transport model, and writes versioned forecast JSON. NOAA MRMS is the prototype radar source; acquisition and bounded GRIB2 decoding helpers are in place. The viewer imports the decoded canonical radar records into a separate Observations workspace; the complete live-provider path remains unverified. The planned Victoria source remains BOM radar, pending a suitable commercial licence and sample.
 
 ## Reviewer and handover guide
 
@@ -542,3 +542,7 @@ This configures/builds C++, runs CTest and fixture checks, runs Python tests, in
 The Coupled Earth climate and CO₂ globe views accept offline global elevation JSON, including negative seafloor elevations. See [the relief contract and current limits](docs/weather/global-relief.md) and [the synthetic import example](examples/global-relief-synthetic.json). An offline GEBCO NetCDF converter is available as `tools/gebco_to_relief.py`; real-file verification and model coupling remain pending.
 
 Regional ocean runs can import GEBCO elevations through `tools/gebco_to_ocean.py`; see [coordinates, coverage rules and model limits](docs/weather/regional-bathymetry.md).
+
+### Radar observations
+
+The **Observations** workspace imports bounded NOAA MRMS decoder output, with separate UTC frames, quality/coverage counts, reflectivity inspection and file-age labels. It does not alter simulation data. See [workflow and current limits](docs/weather/observation-viewer.md).

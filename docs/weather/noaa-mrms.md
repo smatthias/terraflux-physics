@@ -28,3 +28,6 @@ python3 tools/decode_noaa_mrms.py \
 The decoder asks `wgrib2` to select `MergedReflectivityComposite`, crop to the requested longitude/latitude bounds, and emit CSV. It reads the GRIB verification time and each point's longitude, latitude, and dBZ value, then writes canonical `terraflux.weather.observation/v1` records. Explicit `-99`, `-999`, and `-3` missing/no-coverage codes become `no_data`; zero remains numeric reflectivity. Undefined points omitted by wgrib2 remain absent rather than being fabricated.
 
 The output is a radar-reflectivity observation field, not air temperature, rain rate, or a forecast. To produce a separate empirical rain-rate estimate, pass it to `terraflux-estimate-rain-rate` as described in [precipitation estimation](precipitation-estimation.md). The current dry temperature transport model does not consume radar observations as temperature.
+## View decoded observations
+
+Open the decoded JSON in the viewer's **Observations** workspace. It preserves valid times, source, zero reflectivity and missing-data quality independently of simulation state. Use `--max-points 100000` for the viewer's bounded importer. See [observation viewer](observation-viewer.md) for display and verification limits.
